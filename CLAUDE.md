@@ -65,6 +65,12 @@ pnpm exec tsc -p e2e --noEmit  # E2E コードの型チェック
 ```
 
 - **E2E はコンテナ内実行が正**: `pnpm run test:e2e` は `tools/e2e-in-container.sh` 経由で公式 Playwright イメージ(タグはインストール済み `@playwright/test` バージョンから自動導出、例 `mcr.microsoft.com/playwright:v1.62.1-noble`)内で実行される。ホスト OS(Debian devcontainer / Ubuntu CI)のフォント差によるスクリーンショット乖離を防ぐため。ローカル・CI とも同一経路。ホスト直実行(`pnpm exec playwright test`)はデバッグ用の逃げ道であり、その結果のスクリーンショット比較は非公式 — 基準画像更新は絶対にホストで行わない。
+- **devcontainer 内で docker daemon が起動しない場合**(`Cannot connect to the Docker daemon` / dockerd ログに `can't initialize iptables table 'nat'`): docker-in-docker の iptables legacy バックエンドがホストカーネル(nftables のみ)と不整合。以下で復旧する(コンテナ rebuild のたびに必要になることがある):
+  ```bash
+  sudo update-alternatives --set iptables /usr/sbin/iptables-nft
+  sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
+  sudo bash -c 'dockerd > /tmp/dockerd-manual.log 2>&1 &'
+  ```
 - **OA スイープ**(組合せ探索、通常 CI 外): 手順・水準設計ルール・既知非不具合は `e2e/oa/CLAUDE.md` が正本。`playwright.config.ts` は `testIgnore: "oa/**"` — OA は専用 config(`e2e/oa/playwright.oa.config.ts`)で `OA_RUNS=...` を指定して実行する。
 - **性能回帰**: `e2e/perf-regression.spec.ts` + `e2e/perf-10k.spec.ts`。assert は CI ノイズ対策で意図的に緩い(実測値はログ出力を見る)。
 - **examples/**: 47ページ + `index.html` カタログ。`basic/interaction/scheduling/tracking/resource/data-sync.html` の6枚は E2E が DOM 契約(id・ボタン・`window.gantt` / `window.__lastOp`)に依存 — 変更時は対応する E2E を必ず確認する。
