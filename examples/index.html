@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StarGantt v2 — Examples</title>
+    <link rel="stylesheet" href="./examples.css" />
+    <style>
+      /* Long unbreakable file-path tokens in the description should break at word boundaries
+         instead of forcing horizontal page scroll (WCAG 1.4.10 Reflow). */
+      .ex-description code {
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt v2 examples</h1>
+      <p class="ex-description">
+        Every page below is a complete, self-contained HTML file: one
+        <code>&lt;script src="../packages/stargantt/dist/stargantt.iife.js"&gt;</code> tag, then a boot script
+        that composes <code>StarGantt.presetStandard()</code> (and, where the page demonstrates one, an
+        opt-in factory — <code>tracking()</code>, <code>resource()</code>, <code>dataSync()</code>,
+        <code>portfolio()</code>, <code>i18n()</code>, <code>perfTools()</code>) through the public API only.
+        Six pages (<code>basic.html</code>, <code>interaction.html</code>, <code>scheduling.html</code>,
+        <code>tracking.html</code>, <code>resource.html</code>, <code>data-sync.html</code>) are exercised by
+        the Playwright E2E suite; the rest demonstrate individual features through the nested-config
+        plugin API.
+      </p>
+      <!-- The catalog is rendered here by site.js, which holds the single list of pages. -->
+      <div id="catalog"></div>
+    </div>
+    <script src="./site.js"></script>
+  </body>
+</html>

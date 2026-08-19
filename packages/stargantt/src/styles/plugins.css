@@ -1,0 +1,622 @@
+/* Part 3/3 of the StarGantt default stylesheet — split from styles/layout.css at a rule boundary
+   (a blank line between two complete rules, not inside one), so each part parses standalone as
+   valid CSS; see styles/tokens.css's header for the split rationale. Sections below "Task bars"
+   style plugins not yet implemented in v2 (tooltip, side-panel, a11y mirror, load chart, resource
+   lanes); kept in place for behavioral fidelity — harmless until those plugins land. */
+
+.sg-scrollbar__thumb:active {
+  cursor: grabbing;
+}
+
+/* WCAG 2.2 §2.5.8 wants a ≥24×24 CSS px pointer target, and the painted thumb is 8px on its cross
+   axis — thin on purpose, so it does not cover the chart it floats over. The pattern applied here:
+   keep the paint, grow the hit box. A transparent pseudo-element extends the thumb inward (away
+   from the chart edge) to 24px; it is part of the thumb's hit region, and because pointer events on
+   a pseudo-element target its originating element, `scrollbars.ts` still receives `pointerdown` on
+   `.sg-scrollbar__thumb` and its track-relative geometry is untouched. Along its own axis the thumb
+   is already at least 24px (the renderer's minimum thumb size), so both axes clear the minimum.
+   The band only exists while the thumb does — that is, while the content overflows — so it adds no
+   invisible dead strip to a chart that fits.
+   The insets below are the slack: 24px less the 8px each axis rule paints, spent **outward first**.
+   The bar sits 2px off the chart's edge, and those 2px are the only slack that costs nothing, so
+   the pseudo-element takes them before it reaches inward — leaving 14px over the content rather
+   than 16. What is left is a real trade and not an oversight: while the content overflows, a 14px
+   strip along the thumb's own length belongs to the thumb, and a bar body or resize handle under
+   exactly that strip is grabbed by the scrollbar instead. Shrinking the target back below 24px
+   would fail WCAG 2.2 §2.5.8 for the one control on screen that has no keyboard equivalent, and
+   there is nowhere else for the slack to go: the scrollbar is an overlay that reserves no layout
+   space by construction. The strip is bounded — it never spans the full edge, only the thumb — and
+   the same scroll remains reachable by wheel, trackpad and touch drag on the content itself.
+   The values are literals rather than custom properties because the painted thickness they derive
+   from is a literal too; the divider's `--sg-divider-hit-*` helpers exist precisely because *its*
+   painted width is a token. */
+.sg-scrollbar__thumb::before {
+  content: "";
+  position: absolute;
+}
+
+.sg-scrollbar--vertical .sg-scrollbar__thumb::before {
+  top: 0;
+  bottom: 0;
+  right: -2px;
+  left: -14px;
+}
+
+.sg-scrollbar--horizontal .sg-scrollbar__thumb::before {
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  top: -14px;
+}
+
+.sg-scrollbar--vertical .sg-scrollbar__thumb {
+  left: 0;
+  width: 100%;
+}
+
+.sg-scrollbar--horizontal .sg-scrollbar__thumb {
+  top: 0;
+  height: 100%;
+}
+
+.sg-scrollbar--active .sg-scrollbar__thumb {
+  background: var(--sg-scrollbar-thumb-active);
+}
+
+/* ------------------------------------------------------------------ *
+ * Tree grid
+ * ------------------------------------------------------------------ */
+
+.sg-grid-header {
+  /* Fixed to the shared header token so grid rows and chart rows start at the same y. */
+  flex: 0 0 var(--sg-header-height, 44px);
+  height: var(--sg-header-height, 44px);
+  display: flex;
+  align-items: center;
+  background: var(--sg-header-bg);
+  color: var(--sg-header-fg);
+  border-bottom: 1px solid var(--sg-border);
+  font-weight: 600;
+  white-space: nowrap;
+  /* The header scrolls in lockstep with the body, but only programmatically — the grid
+     sets this element's `scrollLeft` to mirror the body's, which the CSSOM honors regardless of
+     `overflow`. `hidden` (rather than `auto`) keeps the header from also drawing its own
+     scrollbar or accepting independent wheel/touch input. */
+  overflow: hidden;
+}
+
+/* Header cells stretch to the full header band height so the resize handle they anchor is
+   a ≥24 px pointer target on both axes; flex centering keeps the label where it always was. */
+.sg-grid-header .sg-grid-header-cell {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+/* The visible twin of `aria-sort` — a direction glyph painted from `data-sort`, so the
+   three-state sort cycle is discoverable by sight, not only through assistive technology. */
+.sg-grid-header-cell[data-sort="ascending"]::after {
+  content: "▲";
+  margin-left: 4px;
+  font-size: 9px;
+}
+
+.sg-grid-header-cell[data-sort="descending"]::after {
+  content: "▼";
+  margin-left: 4px;
+  font-size: 9px;
+}
+
+/* The painted affordance of the 24 px-wide resize hit box stays a narrow strip on the
+   column boundary, visible on hover like the pane divider. */
+.sg-grid-header-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+}
+
+.sg-grid-header-resize-handle:hover::after {
+  background: var(--sg-divider-hover-bg);
+}
+
+.sg-grid-body {
+  position: relative;
+  flex: 1 1 auto;
+  /* Horizontal scrolling is native — trailing columns are reachable by wheel, trackpad,
+     touch and the container's own scrollbar. Vertical scrolling stays fully synthetic:
+     rows are positioned by the row model, not by native `scrollHeight`. */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Native horizontal scroll worked and looked like a rendering bug: with overlay scrollbars the
+   only sign that trailing columns existed was a header label cut mid-word, which reads as broken
+   layout rather than as "there is more this way". The plugin sets `data-overflow` on the body
+   whenever the column track is wider than the pane; the `::after` below paints the edge it can
+   still scroll toward.
+
+   This is a generated overlay box, not a shadow on `.sg-grid-body` itself: `.sg-grid-row` is
+   `position: absolute` (above), so it paints in the same "positioned" layer as anything
+   else positioned, ordered by tree position within that layer — an `inset box-shadow` painted by
+   `.sg-grid-body` paints with the *element's own background*, a layer below every row, and
+   disappears the moment a row's own background stops being transparent (the odd-row stripe, the
+   hover fill, the selected fill, all fully opaque). The `::after` is generated *last* in
+   `.sg-grid-body`'s children, after every `.sg-grid-row`, so within that same positioned-elements
+   layer it paints on top of all of them regardless of scroll position or row state. `inset: 0`
+   sizes it to the body's own padding box — an absolutely positioned descendant of its own
+   `overflow: auto` containing block stays pinned to that box's visible frame rather than
+   scrolling away with the content — and `pointer-events: none` keeps it out of every row
+   interaction (click, toggle, drag, inline edit) underneath it.
+
+   An inset shadow rather than a fade, so text under it stays legible, and derived from `--sg-fg`
+   so it inverts with the scheme without claiming a token of its own. Ground, not figure: well
+   under the contrast the bars and the grid's own text carry. */
+/* The grid pane's
+   half of a row drag's insertion line, painted in the same colour as the chart pane's canvas line
+   (--sg-drag-ghost-stroke) so the two halves of one gesture read as one mark. Absolutely positioned
+   inside the body (which is `position: relative`), it is placed at the drop gap's viewport-local y
+   and inset to the depth the drop would commit; `right: 0` keeps it spanning the visible frame
+   whatever the body's horizontal scroll. `pointer-events: none` keeps it out of the very gesture
+   that draws it. */
+.sg-grid-drop-indicator {
+  position: absolute;
+  right: 0;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--sg-drag-ghost-stroke);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sg-grid-body[data-overflow]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sg-grid-body[data-overflow="start"]::after,
+.sg-grid-body[data-overflow="both"]::after {
+  box-shadow: inset 8px 0 6px -6px color-mix(in srgb, var(--sg-fg) 22%, transparent);
+}
+
+.sg-grid-body[data-overflow="end"]::after,
+.sg-grid-body[data-overflow="both"]::after {
+  box-shadow: inset -8px 0 6px -6px color-mix(in srgb, var(--sg-fg) 22%, transparent);
+}
+
+/* Both edges at once needs both shadows in one declaration — the two rules above would otherwise
+   have the later one replace the earlier. */
+.sg-grid-body[data-overflow="both"]::after {
+  box-shadow:
+    inset 8px 0 6px -6px color-mix(in srgb, var(--sg-fg) 22%, transparent),
+    inset -8px 0 6px -6px color-mix(in srgb, var(--sg-fg) 22%, transparent);
+}
+
+.sg-grid-row {
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* The row's width comes from its own content (the composed columns), not a 100% pin to
+     the pane — pinning to the pane's width left no way for a row to be wider than the pane, which
+     is exactly what horizontal scrolling of trailing columns requires. An absolutely positioned
+     block with only `left` set already shrinks-to-fit its children, so this states that intent
+     rather than leaving it as an accident of the positioning scheme. */
+  width: max-content;
+  min-width: 100%;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* The grid pane's half of the alternating row background. `grid-lines` paints the chart
+   pane's half from the same row index, so the two panes stripe the same rows — the cue that
+   tracks one task across the split. It replaces the per-row `border-bottom` this rule used to
+   carry: a rule under every row reads as a mesh once the grid is more than a few rows tall, and
+   the stripe carries the same "which row am I on" information with far less ink.
+   Specificity is deliberately low (one class): both `:hover` and the doubled selected-row rule
+   below outrank it, so a striped row still shows hover and selection. */
+.sg-grid-row--odd {
+  background: var(--sg-row-stripe-bg);
+}
+
+.sg-grid-row:hover {
+  background: var(--sg-row-hover-bg);
+}
+
+/* The reflected selection set (`GridRowsService.setSelected`). The class is doubled so the
+   rule outweighs `.sg-grid-row:hover` — source order alone loses to the hover rule's extra
+   pseudo-class, which took the selection fill away from exactly the row the pointer was over. */
+.sg-grid-row.sg-grid-row--selected {
+  background: var(--sg-row-selected-bg);
+}
+
+/* Hovering a selected row still has to read as a hover, so the selection fill is tinted toward the
+   hover fill rather than replaced by it: the row stays recognizably selected and the pointer's
+   position stays visible. Both ends come from the same two tokens, so a retheme carries. */
+.sg-grid-row.sg-grid-row--selected:hover {
+  background: color-mix(in srgb, var(--sg-row-hover-bg) 50%, var(--sg-row-selected-bg));
+}
+
+/* The task under keyboard-a11y's roving focus (`focus/changed`). An inset outline so it
+   reads distinctly from the selection fill above and composes with it on a row that is both. */
+.sg-grid-row--focused {
+  outline: 2px solid var(--sg-focus-stroke);
+  outline-offset: -2px;
+}
+
+.sg-grid-cell {
+  flex: 0 0 auto;
+  min-width: 0;
+  /* The same token the plugin reads back as the tree column's indent base — and also
+     the padding the 24px minimum content box is measured net of — so the painted padding and the
+     computed geometry cannot drift apart. */
+  padding: 0 var(--sg-treegrid-cell-padding, 8px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sg-grid-toggle {
+  flex: 0 0 auto;
+  /* Matches the divider's 24 CSS px pointer target so the toggle stays reachable
+     at touch scale; coordinated with the grid's column budget (part of the tree column's
+     content) rather than reserved as extra row width. The plugin lays this element out
+     immediately before the tree column's cell — with `wbs` on that is after the numbering column,
+     not at the row's leading edge. The width lives in --sg-treegrid-toggle-width, which the
+     plugin reads back for the gutter's depth-widened width. */
+  width: var(--sg-treegrid-toggle-width, 24px);
+  /* The width alone met WCAG 2.2 §2.5.8 on one axis only: the height was whatever the row's line
+     box happened to give it — 18.2px at the common 30px row — so the caret was a 24×18 target.
+     The row is a centering flex container, so a minimum height is all it takes to square it up.
+     `min()` keeps a denser configuration honest: at a row shorter than 24px the row height is the
+     ceiling, and a toggle taller than its row would spill into the row below rather than gain a
+     real target. Densities below 24px therefore cannot satisfy §2.5.8 by CSS alone; the row height
+     is the constraint to raise. */
+  min-height: min(24px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sg-muted-fg);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* COLUMN-EDITING-SORT-08: the editing input needs its own border and background — otherwise it is
+   visually indistinguishable from the static cell text it replaces. */
+.sg-grid-editor {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 3px;
+  border: 1px solid var(--sg-focus-stroke);
+  border-radius: 2px;
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  font: inherit;
+  outline: none;
+}
+
+/* The bundled editors fill their cell exactly like the shared text editor above. An
+   intrinsic-width `<input type="date">` (~150px in Chromium) overflowed narrow date columns,
+   pushing the native calendar icon under the neighbouring cell — where a press was a row
+   gesture that blurred, and thereby cancelled, the very edit it belonged to (the blur-on-row-
+   press rule). Same treatment for the bundled select, whose intrinsic width tracks its options. */
+.sg-grid-date,
+.sg-grid-select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0 3px;
+  border: 1px solid var(--sg-focus-stroke);
+  border-radius: 2px;
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  font: inherit;
+  outline: none;
+}
+
+/* An open inline editor opts back into the text selection the grid pane switches off for its
+   rows. Selecting the text you are editing — to replace it, or to copy it out — is the whole point
+   of an editor. The rule sits on the editor host rather than on the controls, so a custom editor a
+   host mounts into the cell (`column.editor`) is covered by the same opt-in as the bundled ones. */
+.sg-grid-editor-host {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ------------------------------------------------------------------ *
+ * Task bars
+ * ------------------------------------------------------------------ */
+
+/* The zero-row placeholder task-bars mounts in the chart body when the composed row count is 0. Not hit-testable — `pointer-events: none` — so it never shows up to `renderer/hitTest`
+   or the `pointer/*` event family; public surface, so a host may restyle or reposition it. */
+.sg-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sg-muted-fg);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * Tooltip
+ * ------------------------------------------------------------------ */
+
+.sg-tooltip {
+  z-index: 2;
+  max-width: 320px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--sg-tooltip-bg);
+  color: var(--sg-tooltip-fg);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
+/* ------------------------------------------------------------------ *
+ * Side panel (opt-in `stargantt.side-panel` plugin)
+ * ------------------------------------------------------------------ */
+
+.sg-side-panel {
+  height: 100%;
+  padding: 10px;
+  overflow: hidden auto;
+  border-left: 1px solid var(--sg-border);
+}
+
+.sg-side-panel-field,
+.sg-side-panel-section {
+  margin: 0 0 10px;
+}
+
+.sg-side-panel-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--sg-muted-fg);
+  font-size: 11px;
+}
+
+.sg-side-panel-input {
+  width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--sg-border);
+  border-radius: 3px;
+  background: var(--sg-bg);
+  color: inherit;
+  font: inherit;
+}
+
+.sg-side-panel-empty,
+.sg-side-panel-multi {
+  color: var(--sg-muted-fg);
+}
+
+/* A rejected edit's field, alongside its `aria-invalid="true"`. Colour alone never carries
+   the state — the ARIA attribute does — but the outline keeps the mark visible without relying on
+   the border colour change alone. */
+.sg-side-panel-input--invalid {
+  border-color: var(--sg-invalid-stroke);
+  outline: 1px solid var(--sg-invalid-stroke);
+  outline-offset: -1px;
+}
+
+/* The pane's rejected-edit cause text, mirrored from the dialog's inline error styling
+   (side-panel dialog uses `var(--sg-dialog-danger, #b3261e)` inline). Scheme-aware via the
+   registered --sg-dialog-danger token. Non-default visual state: rendered only after a rejected
+   edit, so no default-preset screenshot impact. */
+.sg-side-panel-error {
+  color: var(--sg-dialog-danger, #b3261e);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* The host element every
+   `sidepanel/fields` contribution mounts into. A general rule (not task-fields-specific): it
+   separates a contributed section from the built-in fields above it and from any other
+   contribution's section below it. */
+.sg-side-panel-field--custom {
+  margin-top: 12px;
+}
+
+/* The `renderBody` seam's
+   host element. A plain block: the seam owns everything drawn inside it, so this rule adds no
+   chrome of its own beyond letting the element participate in the panel's flow like any other
+   body content. */
+.sg-side-panel__body {
+  display: block;
+}
+
+/* The `sidepanel/fields` section
+   task-fields contributes. Structural styling only: matches the side panel's own built-in
+   field rhythm (`.sg-side-panel-field` / `.sg-side-panel-label` / `.sg-side-panel-input` above)
+   using existing theme tokens, so a section mounted by a third-party plugin reading the same
+   pattern gets the identical visual language for free. */
+.sg-taskfields-heading {
+  margin: 0 0 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sg-border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sg-muted-fg);
+}
+
+.sg-taskfields-row {
+  margin: 0 0 10px;
+}
+
+.sg-taskfields-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--sg-muted-fg);
+  font-size: 11px;
+}
+
+.sg-taskfields-row > select,
+.sg-taskfields-row > input,
+.sg-taskfields-row > textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 6px;
+  border: 1px solid var(--sg-border);
+  border-radius: 3px;
+  background: var(--sg-bg);
+  color: inherit;
+  font: inherit;
+}
+
+.sg-taskfields-row > textarea {
+  resize: vertical;
+  min-height: 3.5em;
+}
+
+/* The actual-start/actual-end rows' 2-column wrapper — the section's only departure from the
+   one-field-per-row rhythm (§2.3). Its two `.sg-taskfields-row` children keep their own rules. */
+.sg-taskfields-row-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Accessibility mirror
+ *
+ * The plugin already hides these elements with inline styles; the rules here only stop a host
+ * stylesheet from giving the mirror visible box decoration.
+ * ------------------------------------------------------------------ */
+
+.sg-a11y,
+.sg-a11y-live {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sg-a11y-row,
+.sg-a11y-cell {
+  display: block;
+}
+
+/* ------------------------------------------------------------------ *
+ * Load chart (resource-load histogram band)
+ *
+ * The band
+ * is DOM, rendered inside the bottom pane's body/gutter columns, and every color
+ * reaches it through these class rules — the plugin reads no color token at paint time.
+ * Geometry (positions, sizes) is inline; only paint-affecting properties belong here.
+ * ------------------------------------------------------------------ */
+
+/* Both load-chart strips are bottom panes, and the strip's own surface — the part of it
+   outside the band's or the lanes' own boxes, i.e. the gutter and trailing columns — carries the
+   band background so the strip reads as one surface across all three columns. The class is put on
+   the panes-owned `.sg-bottom-pane` element by the plugin; the panes plugin itself declares no
+   background, exactly as it declares no width or height for a contributed strip's contents. */
+.sg-load-pane {
+  background: var(--sg-load-bg);
+}
+
+.sg-load-chart {
+  background: var(--sg-load-bg);
+  overflow: hidden;
+  /* The band never intercepts the chart pane's hover/hit resolution. */
+  pointer-events: none;
+}
+
+/* docs/specs/plugins/resource.md §3.6 (canvas-substrate ruling, review round) — the band's bars,
+   capacity line, gridlines and value labels are drawn INTO the strip's `<canvas>` (`band-view.ts`'s
+   `paintBand`) rather than as per-bucket DOM elements: this ships no bundled stylesheet dependency
+   for those per-bar/per-line rules, and the `export/auxiliarySurfaces` tile routine needs one
+   `CanvasRenderingContext2D` drawing pipeline shared by the live strip and the exported image. A
+   per-element DOM approach's `.sg-load-chart__{bar,bar-over,capacity,gridline,value}` rules
+   accordingly have no DOM to match here and are deleted (recorded divergence, not a regression — the
+   colours they carried are read directly from the same `--sg-load-*` tokens by `band-view.ts`/`band.ts`). The tick-label
+   backdrop rule below (`.sg-load-chart__axis-label`) stays: `axis.ts`'s labels ARE real DOM.
+   ------------------------------------------------------------------ */
+
+/* The axis column paints above the bars, but its backdrop must not erase
+   the bucket beneath it — the opaque full-column fill hid the leftmost bar entirely. The column
+   itself is transparent; each tick label carries a narrow, semi-transparent strip sized to its
+   own text, keeping ticks legible over a bar while the bar stays visible around them. */
+.sg-load-chart__axis-label {
+  color: var(--sg-muted-fg);
+  font: var(--sg-header-font);
+  width: fit-content;
+  padding-right: 2px;
+  background: color-mix(in srgb, var(--sg-load-bg) 78%, transparent);
+}
+
+/* ------------------------------------------------------------------
+ * Resource lanes (one load histogram per resource)
+ *
+ * A second bottom strip under the aggregate
+ * band, rendered inside its own bottom pane's body/gutter columns. Unlike the band it takes
+ * pointer input, because a roster taller than the strip scrolls inside it.
+ * ------------------------------------------------------------------ */
+
+.sg-load-lanes {
+  background: var(--sg-load-bg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* The lanes own their own strip — the chart body no longer occupies it — so taking
+     pointer input here never competes with the chart's hover or hit resolution. */
+  pointer-events: auto;
+}
+
+.sg-load-lanes__lane {
+  overflow: hidden;
+  /* docs/specs/plugins/resource.md §3.6 (canvas-substrate ruling, review round) — the earlier DOM
+     inset box-shadow hairline is REMOVED here: `lanes-view.ts` strokes the lane separator itself as part
+     of its one canvas drawing pass (zebra, separators, the dashed reference line and the bars are
+     all one pipeline, for the same export-tile-sharing reason `band-view.ts` draws the band). A
+     CSS hairline layered on top of the canvas-drawn one produced a visible DOUBLE line at every
+     lane boundary; removing it leaves exactly the canvas-drawn separator. */
+}
+
+/* The gutter-hosted name column (aria-hidden — each lane's aria-label carries the name).
+   `hidden` rather than `auto`: its vertical scroll only mirrors `.sg-load-lanes`' scrollTop
+   programmatically (the same grid-header treatment), so it never draws its own scrollbar or
+   accepts independent wheel input. */
+.sg-load-lanes__names {
+  overflow: hidden;
+}
+
+/* One lane's resource name, truncated with an ellipsis rather than
+   wrapping. In the gutter column by default, over the strip's own --sg-load-bg — no backdrop
+   needed there. */
+.sg-load-lanes__label {
+  overflow: hidden;
+  color: var(--sg-muted-fg);
+  font: var(--sg-header-font);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The zero-gutter fallback (the chart-only view mode): the name returns to the
+   in-plot sticky column — a label INSIDE the scrollable lane container, over the bars — and only
+   there it carries the translucent backdrop, for the same reason the axis column's labels do:
+   an opaque block would erase the bar behind it. The gutter presentation's labels live in
+   `.sg-load-lanes__names` (a sibling of `.sg-load-lanes`, in the gutter column), so this
+   descendant selector never reaches them. */
+.sg-load-lanes .sg-load-lanes__label {
+  background: color-mix(in srgb, var(--sg-load-bg) 78%, transparent);
+}
+
+/* A gutter-hosted lane name is right-aligned against the gutter's inner edge with the same
+   2px inset the band's tick labels carry, so a name sits beside the lane it labels however wide
+   the grid is. Scoped to the gutter column, leaving the zero-gutter in-plot fallback left-aligned
+   at the plot's own left edge. */
+.sg-load-lanes__names .sg-load-lanes__label {
+  text-align: right;
+  padding-right: 2px;
+}
+
+/* docs/specs/plugins/resource.md §3.6 (canvas-substrate ruling) — the earlier per-element DOM
+   `.sg-load-lanes__{bar,bar-over,capacity,value}` rules are deleted with the same rationale as the
+   band's equivalents above: `lanes-view.ts` draws the bars, the overload texture, the dashed
+   reference line and the value labels into the strip's `<canvas>` (one pipeline shared with the
+   export tile routine), reading the same `--sg-load-*` tokens directly rather than through a class. */

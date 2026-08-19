@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Calendars example</title>
+    <!--
+      Demonstrates the `stargantt.calendars` service (scheduling.md §1.2): a registry of named
+      working calendars (Standard Mon-Fri 09:00-17:00 with two holidays, a Gulf Sun-Thu week, a
+      24/7 continuous calendar), per-task calendar assignment (undoable, via `assignTask`), a
+      switchable shading overlay, and the working-calendar editor dialog.
+
+      Design notes:
+      - `CalendarsService.state` (scheduling.md §1.2) is a store, not a pair of accessors: every
+        read below goes through `cal.state.get().calendars` / `cal.state.get().shadeCalendar`.
+      - The current zoom level is exposed as the `zoomLevel` store on `stargantt.timeline`.
+      - Per view.md's "Calendar source resolution", the *base* (always-on) grid-line shading's
+        `gridLines.nonWorkingDays.calendar` field resolves a `CalendarDef` from `stargantt.data`'s
+        own `calendars` map (`query().calendars`), not from the scheduling plugin's registry — the
+        scheduling registry's `isDefault` concept does not reach the view layer. This page
+        therefore carries a `standard` entry in the DATA STORE's own `calendars` array (mirroring
+        the scheduling registry's "Standard" calendar's Mon-Fri 09:00-17:00 shape, so the two
+        agree) purely so the view layer has an id to name, and configures
+        `view.gridLines.nonWorkingDays.calendar: "standard"` — both setup-time-only fields.
+      - `gridLines.nonWorkingHours` (the off-hours hatch toggle) only draws for the ONE calendar
+        `nonWorkingDays.calendar` names (here, the `standard` entry above); with no calendar
+        named, the hatch never draws (view.md: "with the weekend fallback the hatch never
+        draws"), which is exactly why the data-store entry above exists. This produces TWO
+        independent non-working-time visuals worth keeping straight (scheduling.md §6.2 /
+        view.md's `gridLines` table):
+          - The calendars plugin's own order-8 overlay (`calendars.shadeCalendar`, switched by the
+            "Overlay shading" dropdown below) paints a SOLID tint — `--sg-calendar-nonworking` —
+            over whichever registry calendar is selected, whole-day and intra-day gaps alike. It is
+            never hatched (scheduling.md §6.2: "shades... in `--sg-calendar-nonworking`").
+          - The view plugin's order-10 grid-line pass paints the actual off-hours HATCH, fixed to
+            the `standard` data-store calendar regardless of which calendar the dropdown shades,
+            and only once an intra-day band clears the 3px minimum-band-width guard (so it needs
+            the Hour zoom level to be legible — the Day/Hour buttons below are kept for this). It
+            is not affected by the "Overlay shading" dropdown at all.
+      - `scheduling.dependencies` is enabled with its defaults whenever `scheduling` is composed
+        and the nest is omitted (scheduling.md §11), and `scheduling` is always part of
+        `presetStandard()` — so this page's FS-chained rollout links paint as connector ports and
+        dependency lines by default.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 14px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      .group {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .group label {
+        color: #444;
+      }
+      button,
+      select {
+        font: inherit;
+        font-size: 12px;
+      }
+      #status {
+        margin: 0 0 6px;
+        font-size: 12px;
+        color: #333;
+        min-height: 1.2em;
+      }
+      #chart {
+        height: 460px;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — working calendars</h1>
+    <details>
+      <summary>What's on this page</summary>
+      A registry of named working calendars (Standard, Gulf week, 24/7 continuous), one task
+      calendar assigned directly through the data store's own <code>calendars</code> map, per-task
+      assignment (undoable), a switchable non-working-time overlay, and the exception editor
+      dialog.
+    </details>
+
+    <div class="toolbar">
+      <div class="group">
+        <label for="shade-select">Overlay shading</label>
+        <select id="shade-select"></select>
+      </div>
+      <div class="group" role="group" aria-label="Zoom">
+        <span>Zoom:</span>
+        <button id="zoom-day" type="button" aria-pressed="false">Day</button>
+        <button id="zoom-hour" type="button" aria-pressed="false">Hour (off-hours hatch)</button>
+      </div>
+      <div class="group">
+        <label for="task-select">Task</label>
+        <select id="task-select"></select>
+      </div>
+      <div class="group">
+        <label for="cal-select">Calendar to assign</label>
+        <select id="cal-select"></select>
+      </div>
+      <button id="assign-btn" type="button">Assign (undoable)</button>
+      <button id="editor-btn" type="button">Edit exceptions&hellip;</button>
+    </div>
+    <p id="status" role="status" aria-live="polite">Loading&hellip;</p>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const HOUR = 3600000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2), so anchoring the data there opens the chart on the data with zero configuration.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+      const iso = (offsetDays) => new Date(T0 + offsetDays * DAY).toISOString().slice(0, 10);
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "rollout", parentId: null, name: "Ground station rollout", type: "summary", start: T0, end: T0 + 24 * DAY },
+            { id: "survey", parentId: "rollout", name: "Site survey", start: T0, end: T0 + 5 * DAY, progress: 1 },
+            { id: "order", parentId: "rollout", name: "Hardware order", start: T0 + 5 * DAY, end: T0 + 11 * DAY, progress: 0.5 },
+            { id: "dubai", parentId: "rollout", name: "Dubai install team", type: "summary", start: T0 + 11 * DAY, end: T0 + 21 * DAY },
+            // These two run on the Gulf working week, not the project default.
+            { id: "rack", parentId: "dubai", name: "Rack install", start: T0 + 11 * DAY, end: T0 + 16 * DAY, calendarId: "gulf" },
+            { id: "antenna", parentId: "dubai", name: "Antenna alignment", start: T0 + 16 * DAY, end: T0 + 21 * DAY, calendarId: "gulf" },
+            // "night-ops" lives in the data store's own calendar set below, not in the plugin
+            // registry — CalendarsService.resolve() searches the registry first, then the store.
+            { id: "cutover", parentId: "rollout", name: "Night cutover", start: T0 + 21 * DAY, end: T0 + 23 * DAY, calendarId: "night-ops" },
+            { id: "handover", parentId: "rollout", name: "Handover", type: "milestone", start: T0 + 24 * DAY, end: T0 + 24 * DAY },
+          ],
+          links: [
+            { sourceId: "survey", targetId: "order", type: "FS" },
+            { sourceId: "order", targetId: "rack", type: "FS" },
+            { sourceId: "rack", targetId: "antenna", type: "FS" },
+            { sourceId: "antenna", targetId: "cutover", type: "FS" },
+            { sourceId: "cutover", targetId: "handover", type: "FS" },
+          ],
+          calendars: [
+            // Mirrors the scheduling registry's "Standard" calendar (Mon-Fri, 09:00-17:00) into
+            // the DATA STORE's own calendar set — the only place `view.gridLines.nonWorkingDays.
+            // calendar` can resolve an id from (view.md's "Calendar source resolution" deviation)
+            // — so this is what makes the Hour-zoom off-hours hatch below possible at all.
+            { id: "standard", workingDays: [1, 2, 3, 4, 5], workingHours: [[9 * HOUR, 17 * HOUR]] },
+            // Working windows are milliseconds from UTC midnight: 20:00 to the end of the day.
+            { id: "night-ops", workingDays: [0, 1, 2, 3, 4, 5, 6], workingHours: [[20 * HOUR, 24 * HOUR]] },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          treeGrid: { paneWidth: 280 },
+          interaction: {
+            // Dragged/resized dates landing in non-working time of the registry's default
+            // calendar are moved to the nearest working-interval boundary.
+            snap: { workingDays: true },
+          },
+          view: {
+            gridLines: {
+              // Names the data-store's own "standard" calendar (added above) so both the base
+              // shading and the off-hours hatch have a real calendar to resolve, per view.md's
+              // "Calendar source resolution" deviation — the scheduling registry's own default
+              // does not reach this layer. "standard"'s Mon-Fri week matches the built-in
+              // Saturday/Sunday fallback, so the always-on base shading looks the same as before;
+              // only the Hour-zoom off-hours hatch is new. Both fields are setup-time-only.
+              nonWorkingDays: { calendar: "standard" },
+              nonWorkingHours: true,
+            },
+          },
+          scheduling: {
+            calendars: {
+              calendars: [
+                StarGantt.regionCalendar({
+                  id: "standard",
+                  name: "Standard (Mon-Fri, 09:00-17:00)",
+                  isDefault: true,
+                  weekend: [0, 6],
+                  holidays: [iso(9), iso(19)],
+                  workingHours: [[9 * HOUR, 17 * HOUR]],
+                }),
+                StarGantt.regionCalendar({
+                  id: "gulf",
+                  name: "Gulf week (Sun-Thu, 08:00-16:00)",
+                  weekend: [5, 6],
+                  holidays: [iso(13)],
+                  workingHours: [[8 * HOUR, 16 * HOUR]],
+                }),
+                StarGantt.regionCalendar({
+                  id: "continuous",
+                  name: "24/7 continuous",
+                  weekend: [],
+                }),
+              ],
+              // Mounts the exception-day editor panel, hidden until openEditor() is called.
+              editor: true,
+            },
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset());
+      window.gantt = gantt;
+
+      const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const data = gantt.service("stargantt.data");
+      const cal = gantt.service("stargantt.calendars");
+      const timeline = gantt.service("stargantt.timeline");
+
+      const shadeSelect = document.getElementById("shade-select");
+      const taskSelect = document.getElementById("task-select");
+      const calSelect = document.getElementById("cal-select");
+      const assignBtn = document.getElementById("assign-btn");
+      const editorBtn = document.getElementById("editor-btn");
+      const zoomDay = document.getElementById("zoom-day");
+      const zoomHour = document.getElementById("zoom-hour");
+      const status = document.getElementById("status");
+
+      // Option values are list indexes, never the ids themselves: a swapped dataset may use
+      // numeric task or calendar ids, which a <select> would hand back as strings.
+      let taskIds = [];
+      let calendarIds = [];
+      let assignableIds = [];
+
+      function say(text) {
+        status.textContent = text;
+      }
+
+      function workingDaysText(def) {
+        if (!def || !Array.isArray(def.workingDays)) return "unknown";
+        if (def.workingDays.length === 0) return "no working days";
+        return def.workingDays.map((d) => DAY_NAMES[d]).join(" ");
+      }
+
+      function calendarLabel(cals, id) {
+        for (const c of cals) if (c.id === id) return c.name || String(c.id);
+        return String(id);
+      }
+
+      /** Rebuilds every selector from the live registry, data store and zoom level. */
+      function refresh() {
+        const registry = cal.state.get().calendars;
+
+        // Overlay shading: none, plus every registry calendar.
+        const currentShade = cal.state.get().shadeCalendar;
+        calendarIds = registry.map((c) => c.id);
+        shadeSelect.textContent = "";
+        const noShade = document.createElement("option");
+        noShade.value = "none";
+        noShade.textContent = "None (no overlay)";
+        shadeSelect.appendChild(noShade);
+        registry.forEach((c, i) => {
+          const option = document.createElement("option");
+          option.value = String(i);
+          option.textContent = c.name || String(c.id);
+          shadeSelect.appendChild(option);
+        });
+        const shadeIndex = calendarIds.indexOf(currentShade);
+        shadeSelect.value = shadeIndex >= 0 ? String(shadeIndex) : "none";
+
+        // Assignable calendars: the registry plus the calendars the data store carries.
+        const storeCalendars = [...data.query().calendars.keys()].filter(
+          (id) => calendarIds.indexOf(id) < 0,
+        );
+        assignableIds = calendarIds.concat(storeCalendars);
+        calSelect.textContent = "";
+        const noCal = document.createElement("option");
+        noCal.value = "none";
+        noCal.textContent = "None (inherit project default)";
+        calSelect.appendChild(noCal);
+        assignableIds.forEach((id, i) => {
+          const option = document.createElement("option");
+          option.value = String(i);
+          option.textContent =
+            calendarLabel(registry, id) + (storeCalendars.indexOf(id) >= 0 ? " (data store)" : "");
+          calSelect.appendChild(option);
+        });
+
+        // Tasks, leaf rows first so the list is short and every entry is schedulable.
+        taskIds = [...data.taskIds()].filter((id) => {
+          const task = data.getTask(id);
+          return task && task.type !== "summary";
+        });
+        taskSelect.textContent = "";
+        taskIds.forEach((id, i) => {
+          const option = document.createElement("option");
+          option.value = String(i);
+          option.textContent = data.getTask(id).name;
+          taskSelect.appendChild(option);
+        });
+
+        syncZoom();
+        describeTask();
+      }
+
+      function syncZoom() {
+        const level = timeline.zoomLevel.get().id;
+        setPressed(zoomDay, level === "day", "Day");
+        setPressed(zoomHour, level === "hour", "Hour (off-hours hatch)");
+      }
+
+      function setPressed(button, pressed, label) {
+        button.setAttribute("aria-pressed", pressed ? "true" : "false");
+        // Text prefix, not colour alone (WCAG 1.4.1).
+        button.textContent = (pressed ? "✓ " : "") + label;
+      }
+
+      /** Reports the effective calendar of the selected task over the next four weeks. */
+      function describeTask() {
+        const id = taskIds[Number(taskSelect.value)];
+        if (id === undefined) {
+          say("No schedulable task in this dataset.");
+          return;
+        }
+        const task = data.getTask(id);
+        const def = cal.effectiveCalendar(id);
+        if (!def) {
+          say('"' + task.name + '" resolves no calendar — every day counts as working.');
+          return;
+        }
+        const from = Math.floor(Date.now() / DAY) * DAY;
+        const ranges = cal.nonWorkingRanges(def, from, from + 28 * DAY);
+        const days = ranges.reduce((n, r) => n + Math.round((r.end - r.start) / DAY), 0);
+        say(
+          '"' +
+            task.name +
+            '" runs on calendar "' +
+            calendarLabel(cal.state.get().calendars, def.id) +
+            '" — working days: ' +
+            workingDaysText(def) +
+            "; " +
+            days +
+            " non-working days in the next 4 weeks; today is " +
+            (cal.isWorkingDay(def, from) ? "a working day" : "non-working") +
+            ".",
+        );
+      }
+
+      shadeSelect.addEventListener("change", () => {
+        if (shadeSelect.value === "none") {
+          cal.setShadeCalendar(undefined);
+          say("Overlay shading off.");
+          return;
+        }
+        const id = calendarIds[Number(shadeSelect.value)];
+        cal.setShadeCalendar(id);
+        say(
+          'Overlay shading follows "' +
+            calendarLabel(cal.state.get().calendars, id) +
+            '" — its non-working stretches are painted as a solid tint (the calendars plugin\'s ' +
+            "own order-8 layer; never hatched). The separate off-hours hatch (Hour zoom) is fixed " +
+            'to the "standard" calendar and does not follow this dropdown.',
+        );
+      });
+
+      taskSelect.addEventListener("change", describeTask);
+
+      assignBtn.addEventListener("click", () => {
+        const taskId = taskIds[Number(taskSelect.value)];
+        if (taskId === undefined) return;
+        const calendarId = calSelect.value === "none" ? undefined : assignableIds[Number(calSelect.value)];
+        cal.assignTask(taskId, calendarId);
+        describeTask();
+        say(status.textContent + " Assigned through the task/update command, so Ctrl+Z undoes it.");
+      });
+
+      editorBtn.addEventListener("click", () => {
+        // Idempotent: closing first means a second click re-opens the panel on the current
+        // calendar rather than leaving a stale one behind.
+        cal.closeEditor();
+        const id = calendarIds[Number(shadeSelect.value)];
+        cal.openEditor(id);
+        say("Exception editor open: toggle weekly working days, add or remove exception dates. Its close control and Escape (once focus is inside) close it. Registry edits are not undoable.");
+      });
+
+      /** The first working day of the base calendar at or after today, or today as a fallback. */
+      function firstWorkingDay(today) {
+        const registry = cal.state.get().calendars;
+        const base = registry.filter((c) => c.isDefault)[0] || registry[0];
+        if (!base) return today;
+        for (let i = 0; i < 14; i++) {
+          if (cal.isWorkingDay(base, today + i * DAY)) return today + i * DAY;
+        }
+        return today;
+      }
+
+      function zoomTo(levelId) {
+        const today = Math.floor(Date.now() / DAY) * DAY;
+        // The off-hours hatch only marks *working* days, so the zoom anchors on the first working
+        // day (mid-morning) rather than today, which may itself be a weekend. Both levels share
+        // the anchor, so switching back and forth returns to the same stretch of the timeline.
+        const anchor = firstWorkingDay(today) + 8 * HOUR;
+        timeline.setZoomLevel(levelId, anchor);
+        syncZoom();
+        say(
+          levelId === "hour"
+            ? "Hour zoom, anchored on " +
+                timeline.formatDate(anchor) +
+                ': the "standard" calendar\'s off-hours are hatched (view.gridLines.nonWorkingHours, ' +
+                "order 10). Whichever calendar the Overlay shading dropdown picks is painted as a " +
+                "separate solid tint (the calendars plugin's order-8 layer) underneath — the two " +
+                "never mix, and the hatch does not follow the dropdown."
+            : "Day zoom: the off-hours hatch needs the Hour zoom to clear the minimum on-screen band width and become legible; non-working days already show as a solid tint at this zoom.",
+        );
+      }
+
+      zoomDay.addEventListener("click", () => zoomTo("day"));
+      zoomHour.addEventListener("click", () => zoomTo("hour"));
+
+      refresh();
+    </script>
+  </body>
+</html>

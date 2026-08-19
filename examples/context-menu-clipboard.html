@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Context menu and clipboard example</title>
+    <!--
+      One HTML file + one script tag. Demonstrates the right-press context menu (insert /
+      duplicate / delete / link-from / link-to / cancel-link), copy / paste / duplicate through
+      the clipboard, native system-clipboard copy/paste, pasting foreign tab-separated rows as
+      cell values, and a third-party-style plugin that contributes two extra entries to the menu
+      through the public `contextmenu/items` extension point.
+
+      Design notes (interaction.md is normative for all of these):
+      - `contextMenu` and `clipboard` behavior are composed automatically by `presetStandard()`,
+        as nested config groups (`contextMenu`, `clipboard`) inside the single `interaction`
+        plugin, wired internally in the right start order.
+      - `stargantt.clipboard` is not published as a service (interaction.md §2.4): "Clipboard
+        operations are the `clipboard/*` commands" — nothing else is published. So there is no
+        `.copy(ids)`, `.paste()`, `.duplicate()`, `.hasClipboard()` to call; `gantt.dispatch(...)`
+        returns nothing. This page adapts by (a) dispatching `clipboard/copy` /
+        `clipboard/paste` / `clipboard/duplicate` with no return value, (b) tracking "clipboard
+        holds something" as a page-local flag set after a successful copy dispatch (an
+        approximation — there is no public read-back of the plugin's held clipboard), and (c)
+        rebuilding the TSV preview text itself from the current selection's task data, in the same
+        column order and encoding documented at interaction.md §6.7 (name, start/end as UTC ISO
+        days, progress as a bare number) — the command does not hand the copied text back.
+      - `clipboard/copy` operates on the CURRENT SELECTION only (payload is `void`) — there is no
+        per-id variant for an arbitrary id list. The contributed "Copy this task" / "Duplicate
+        this task" menu entries below therefore select the right-pressed task first, then
+        dispatch the command.
+      - This page subscribes to `SelectionService.state`, `data.tasks`, `HistoryService.state`
+        and `FocusService.state` for change notifications (interaction.md §7, undo-redo.md
+        "Events").
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 6px;
+        font-size: 11px;
+        color: #333;
+      }
+      details > summary {
+        cursor: pointer;
+        color: #555;
+      }
+      details ul {
+        margin: 4px 0 0;
+        padding-left: 18px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 16px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      button,
+      textarea {
+        font: inherit;
+      }
+      button {
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      textarea {
+        font: 11px ui-monospace, monospace;
+        width: 320px;
+        height: 40px;
+        vertical-align: middle;
+      }
+      .label {
+        color: #555;
+        font-size: 11px;
+      }
+      .panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 18px;
+        margin: 0 0 6px;
+        font-size: 11px;
+      }
+      .panel > div {
+        display: flex;
+        gap: 4px;
+        align-items: baseline;
+      }
+      pre {
+        margin: 2px 0 0;
+        padding: 3px 6px;
+        border: 1px solid #eee;
+        font: 11px ui-monospace, monospace;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — context menu and clipboard</h1>
+    <details>
+      <summary>How to use</summary>
+      <ul>
+        <li><strong>Right-press a bar</strong> to open the menu: <em>Insert task</em>, <em>Duplicate task</em>, <em>Delete task</em>, then <em>Start link from here</em>. Pick that last entry, right-press a second bar, and <em>Link here from source</em> becomes enabled — activating it creates an FS dependency. The pending source is one-shot: every menu opened while it is armed also offers <em>Cancel link</em>, and the source is dropped once the next menu invocation ends.</li>
+        <li><strong>Right-press empty chart space</strong> for the background menu (<em>Insert task</em> at the root level).</li>
+        <li>The menu is keyboard-driven: it takes focus on open, <strong>&uarr;</strong>/<strong>&darr;</strong> move (wrapping), <strong>Home</strong>/<strong>End</strong> jump, <strong>Enter</strong> or <strong>Space</strong> activate, <strong>Escape</strong> closes and gives focus back.</li>
+        <li><em>Extra menu entries</em> toggles a page-local plugin that contributes two entries through <code>contextmenu/items</code> — they select the right-pressed task, then call the public clipboard commands, showing how a third-party plugin extends the menu.</li>
+        <li>Select bars (click, Ctrl/Cmd-click, Shift-click, or the <em>Select summary branch</em> button), then <strong>Copy</strong>: the whole subtree plus every link with both endpoints inside the selection is captured. <strong>Paste</strong> inserts it after the anchor row with fresh ids and remapped links; <strong>Duplicate</strong> (or <strong>Ctrl</strong>/<strong>Cmd</strong> + <strong>D</strong>) copies in place without touching the held clipboard.</li>
+        <li>With focus inside the chart, <strong>Ctrl</strong>/<strong>Cmd</strong> + <strong>C</strong> and <strong>V</strong> use the system clipboard through the native <code>copy</code> / <code>paste</code> events, so rows can travel to and from a spreadsheet.</li>
+        <li><strong>Paste rows as cells</strong> feeds the textarea's tab-separated rows to a foreign-text paste. Text is written onto the rows from the anchor downward — the anchor is the focused row, else the first selected row — and any rows that outrun the grid become new root tasks appended at the end. Click a row first to move the anchor there.</li>
+        <li>Every clipboard or menu action is exactly one history entry: <strong>Undo</strong> reverses a whole paste, not one task at a time.</li>
+      </ul>
+    </details>
+
+    <div class="toolbar">
+      <span class="label">Clipboard actions</span>
+      <button type="button" id="selectBranchBtn">Select summary branch</button>
+      <button type="button" id="clearSelBtn">Clear selection</button>
+      <button type="button" id="copyBtn">Copy</button>
+      <button type="button" id="pasteBtn">Paste</button>
+      <button type="button" id="duplicateBtn">Duplicate</button>
+      <span class="label">History</span>
+      <button type="button" id="undoBtn">Undo</button>
+      <button type="button" id="redoBtn">Redo</button>
+      <button id="extrasToggle" type="button" aria-pressed="true">Extra menu entries: on</button>
+    </div>
+    <div class="toolbar">
+      <label class="label" for="cellText">Spreadsheet rows (name, start, end, progress)</label>
+      <textarea id="cellText" spellcheck="false"></textarea>
+      <button type="button" id="pasteCellsBtn">Paste rows as cells</button>
+    </div>
+    <div class="panel">
+      <div><span class="label">Status</span><span id="statusReadout" role="status">Ready.</span></div>
+      <div><span class="label">Selection</span><span id="selectionReadout">(none)</span></div>
+      <div><span class="label">Clipboard</span><span id="clipboardReadout">empty</span></div>
+      <div><span class="label">Paste anchor (focused row)</span><span id="anchorReadout">(none)</span></div>
+      <div><span class="label">Tasks in store</span><span id="taskCountReadout">0</span></div>
+    </div>
+    <div class="label">Last copied cell text (TSV preview)</div>
+    <pre id="tsvReadout">(nothing copied yet)</pre>
+    <div id="chart"></div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      // The time-axis origin defaults to today 0:00 UTC, so the default data is laid out as fixed
+      // offsets from a day-floored "today" anchor: deterministic, and always in the initial view.
+      const DAY = 86400000;
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+      const d = (days) => T0 + days * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "relaunch", parentId: null, name: "Website relaunch", type: "summary", start: d(0), end: d(28) },
+            { id: "discovery", parentId: "relaunch", name: "Discovery", type: "summary", start: d(0), end: d(8) },
+            { id: "interviews", parentId: "discovery", name: "Stakeholder interviews", type: "task", start: d(0), end: d(4), progress: 1 },
+            { id: "audit", parentId: "discovery", name: "Content audit", type: "task", start: d(4), end: d(8), progress: 0.6 },
+            { id: "build", parentId: "relaunch", name: "Build", type: "summary", start: d(8), end: d(26) },
+            { id: "design", parentId: "build", name: "Design system", type: "task", start: d(8), end: d(14), progress: 0.4 },
+            { id: "templates", parentId: "build", name: "Page templates", type: "task", start: d(14), end: d(20), progress: 0.1 },
+            { id: "cms", parentId: "build", name: "CMS integration", type: "task", start: d(20), end: d(26), progress: 0 },
+            { id: "launch", parentId: "relaunch", name: "Launch", type: "milestone", start: d(28), end: d(28) },
+          ],
+          links: [
+            { sourceId: "interviews", targetId: "audit", type: "FS" },
+            { sourceId: "audit", targetId: "design", type: "FS" },
+            { sourceId: "design", targetId: "templates", type: "FS" },
+            { sourceId: "templates", targetId: "cms", type: "FS" },
+            { sourceId: "cms", targetId: "launch", type: "FS" },
+          ],
+        };
+      }
+
+      // Page-local state the contributed menu entries read at open time. The toolbar's toggle
+      // writes it, so switching the extras on or off needs no re-creation.
+      const demo = { extraItems: true, clipboardHeld: false };
+
+      // A third-party-style plugin: it uses nothing but the public API — the `contextmenu/items`
+      // collect point defined by interaction (interaction.md §3), the `stargantt.selection`
+      // service, and the `clipboard/*` commands (there is no `stargantt.clipboard` service to use
+      // instead — see the header comment).
+      const menuExtras = StarGantt.definePlugin({
+        meta: {
+          id: "demo.context-menu-extras",
+          dependsOn: ["stargantt.interaction"],
+        },
+        setup(ctx) {
+          const selection = ctx.use("stargantt.selection");
+          ctx.contribute("contextmenu/items", (target) => {
+            if (!demo.extraItems) return undefined;
+            if (target.kind !== "hit") return undefined;
+            if (target.hitKind !== "bar" && target.hitKind !== "handle") return undefined;
+            return [
+              {
+                id: "demo-copy",
+                label: "Copy this task (contextmenu/items demo)",
+                separatorBefore: true,
+                run(t) {
+                  // clipboard/copy has no per-id form (interaction.md §4) — it always captures the
+                  // current selection, so the entry selects the right-pressed task first.
+                  selection.select([t.id]);
+                  ctx.dispatch("clipboard/copy", undefined);
+                  demo.reportCopy?.(1);
+                },
+              },
+              {
+                id: "demo-duplicate",
+                label: "Duplicate this task (contextmenu/items demo)",
+                run(t) {
+                  selection.select([t.id]);
+                  ctx.dispatch("clipboard/duplicate", undefined);
+                  demo.reportDuplicate?.();
+                },
+              },
+            ];
+          });
+        },
+      });
+
+      const statusReadout = document.getElementById("statusReadout");
+      const selectionReadout = document.getElementById("selectionReadout");
+      const clipboardReadout = document.getElementById("clipboardReadout");
+      const taskCountReadout = document.getElementById("taskCountReadout");
+      const anchorReadout = document.getElementById("anchorReadout");
+      const tsvReadout = document.getElementById("tsvReadout");
+      const extrasToggle = document.getElementById("extrasToggle");
+      const cellText = document.getElementById("cellText");
+      const undoBtn = document.getElementById("undoBtn");
+      const redoBtn = document.getElementById("redoBtn");
+
+      function setStatus(text) {
+        statusReadout.textContent = text;
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          interaction: {
+            selection: { mode: "multi" },
+            contextMenu: {},
+            // fields/systemClipboard both have working defaults; spelled out here because the
+            // defaults are exactly what this page demonstrates.
+            clipboard: { fields: ["name", "start", "end", "progress"], systemClipboard: true },
+          },
+        }).concat([menuExtras]),
+      });
+      window.gantt = gantt;
+
+      gantt.service("stargantt.data").load(dataset());
+
+      const data = gantt.service("stargantt.data");
+      const selectionService = gantt.service("stargantt.selection");
+      const historyService = gantt.service("stargantt.history");
+      const focusService = gantt.service("stargantt.focus");
+
+      /** Reconstructs the TSV a copy would produce, from the current selection's task data, in
+       *  the configured column order and encoding (interaction.md §6.7). Display-only: the
+       *  `clipboard/copy` command does not hand the copied text back — see the header comment. */
+      function previewCopyText(ids) {
+        const rows = ids
+          .map((id) => data.getTask(id))
+          .filter((t) => t !== undefined)
+          .map((t) => [
+            t.name ?? "",
+            t.start === undefined ? "" : new Date(t.start).toISOString().slice(0, 10),
+            t.end === undefined ? "" : new Date(t.end).toISOString().slice(0, 10),
+            t.progress === undefined ? "" : String(t.progress),
+          ].join("\t"));
+        return rows.join("\n");
+      }
+
+      function focusedId() {
+        const id = focusService.state.get().focused;
+        return id === undefined ? null : id;
+      }
+
+      function refresh() {
+        const ids = Array.from(selectionService.state.get().taskIds);
+        selectionReadout.textContent = ids.length ? ids.join(", ") : "(none)";
+        clipboardReadout.textContent = demo.clipboardHeld ? "holds a copied subtree" : "empty";
+        const anchor = focusedId();
+        anchorReadout.textContent = anchor === null ? "(none)" : String(anchor);
+        taskCountReadout.textContent = String(data.toJSON().tasks.length);
+        const h = historyService.state.get();
+        undoBtn.disabled = !h.canUndo;
+        redoBtn.disabled = !h.canRedo;
+      }
+
+      // The tab-separated sample rows are built here (rather than typed into the textarea's
+      // markup) so the dates track the same day-floored "today" anchor the chart data uses.
+      function sampleRows() {
+        const iso = (days) => new Date(T0 + days * DAY).toISOString().slice(0, 10);
+        return [
+          ["Kickoff workshop", iso(1), iso(3), "0.25"].join("\t"),
+          ["Accessibility audit", iso(21), iso(25), "0"].join("\t"),
+        ].join("\n");
+      }
+      cellText.value = sampleRows();
+
+      document.getElementById("selectBranchBtn").addEventListener("click", () => {
+        const tasks = data.toJSON().tasks;
+        const parents = {};
+        tasks.forEach((t) => { if (t.parentId != null) parents[t.parentId] = true; });
+        // The first summary that is itself a child — "Discovery" in the page's own data — is the
+        // most instructive copy source: a subtree with an internal link.
+        const branch =
+          tasks.find((t) => parents[t.id] && t.parentId != null) ||
+          tasks.find((t) => parents[t.id]) ||
+          tasks[0];
+        if (!branch) return;
+        selectionService.select([branch.id]);
+        setStatus(`Selected "${branch.name}" — Copy captures it with its whole subtree.`);
+      });
+
+      document.getElementById("clearSelBtn").addEventListener("click", () => {
+        selectionService.clear();
+        setStatus("Selection cleared.");
+      });
+
+      document.getElementById("copyBtn").addEventListener("click", () => {
+        const ids = Array.from(selectionService.state.get().taskIds);
+        if (ids.length === 0) {
+          setStatus("Nothing copied — select at least one bar first.");
+          return;
+        }
+        gantt.dispatch("clipboard/copy", undefined);
+        demo.clipboardHeld = true;
+        tsvReadout.textContent = previewCopyText(ids);
+        setStatus(`Copied ${ids.length} task(s) — see the cell text below.`);
+        refresh();
+      });
+
+      document.getElementById("pasteBtn").addEventListener("click", () => {
+        if (!demo.clipboardHeld) {
+          setStatus("Nothing to paste — copy a selection first.");
+          return;
+        }
+        gantt.dispatch("clipboard/paste", undefined);
+        setStatus("Pasted the held subtree with fresh ids (one undo step).");
+        refresh();
+      });
+
+      document.getElementById("duplicateBtn").addEventListener("click", () => {
+        const ids = Array.from(selectionService.state.get().taskIds);
+        if (ids.length === 0) {
+          setStatus("Nothing to duplicate — select at least one bar first.");
+          return;
+        }
+        gantt.dispatch("clipboard/duplicate", undefined);
+        setStatus("Duplicated the selection in place (one undo step).");
+        refresh();
+      });
+
+      document.getElementById("pasteCellsBtn").addEventListener("click", () => {
+        const text = cellText.value;
+        if (text.trim() === "") {
+          setStatus("Nothing to paste — the spreadsheet rows box is empty.");
+          return;
+        }
+        const anchor = focusedId();
+        gantt.dispatch("clipboard/paste", { text });
+        setStatus(
+          "Pasted tab-separated rows as cell values from the anchor row" +
+            (anchor === null ? " (none — appended as new root tasks)" : ` "${anchor}"`) +
+            " downward (one undo step).",
+        );
+        refresh();
+      });
+
+      undoBtn.addEventListener("click", () => {
+        gantt.dispatch("history/undo", undefined);
+        setStatus("Undid the last step.");
+        refresh();
+      });
+
+      redoBtn.addEventListener("click", () => {
+        gantt.dispatch("history/redo", undefined);
+        setStatus("Redid the last undone step.");
+        refresh();
+      });
+
+      extrasToggle.addEventListener("click", () => {
+        demo.extraItems = !demo.extraItems;
+        syncExtrasToggle();
+        setStatus(
+          demo.extraItems
+            ? "Contributed menu entries on — right-press a bar to see them below the built-ins."
+            : "Contributed menu entries off — the menu shows the built-in entries only.",
+        );
+      });
+
+      function syncExtrasToggle() {
+        extrasToggle.setAttribute("aria-pressed", demo.extraItems ? "true" : "false");
+        extrasToggle.textContent = "Extra menu entries: " + (demo.extraItems ? "on" : "off");
+      }
+
+      // The contributed menu entries report what they did through these closures (set here rather
+      // than called directly from `setup()`, since the plugin is defined before this page's own
+      // helpers exist).
+      demo.reportCopy = (count) => {
+        demo.clipboardHeld = true;
+        const ids = Array.from(selectionService.state.get().taskIds);
+        tsvReadout.textContent = previewCopyText(ids);
+        setStatus(`Copied ${count} task(s) from the context menu.`);
+        refresh();
+      };
+      demo.reportDuplicate = () => {
+        setStatus("Duplicated the right-pressed task from the context menu (one undo step).");
+        refresh();
+      };
+
+      selectionService.state.subscribe(refresh);
+      data.tasks.subscribe(refresh);
+      historyService.state.subscribe(refresh);
+      focusService.state.subscribe(refresh);
+      syncExtrasToggle();
+      refresh();
+      // The roving keyboard focus settles on its first row once the row model has materialized;
+      // read the anchor readout again one frame after boot in case that initial settle predates
+      // this subscription.
+      requestAnimationFrame(refresh);
+    </script>
+  </body>
+</html>

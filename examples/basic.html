@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Basic example</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: system-ui, sans-serif;
+      }
+      #chart {
+        height: 420px;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2</h1>
+    <p>One HTML file + one script tag. Styles are injected by <code>create()</code>.</p>
+    <div id="chart"></div>
+    <p id="perf-readout"></p>
+
+    <footer>
+      Loads <code>../packages/stargantt/dist/stargantt.iife.js</code> (core + all fifteen official
+      plugins + CSS; this page composes the nine-plugin <code>presetStandard()</code>).
+    </footer>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2). Anchoring the data there puts the chart in the initial view with zero
+      // configuration.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      /** mulberry32 — tiny deterministic PRNG; seed and algorithm are the dataset contract. */
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return function () {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function smallDataset() {
+        return {
+          tasks: [
+            { id: "root", parentId: null, name: "Release prep", type: "summary", start: T0, end: T0 + 20 * DAY },
+            { id: "spec", parentId: "root", name: "Design", start: T0, end: T0 + 5 * DAY, progress: 1 },
+            { id: "impl", parentId: "root", name: "Implementation", start: T0 + 5 * DAY, end: T0 + 15 * DAY, progress: 0.4 },
+            { id: "qa", parentId: "root", name: "Verification", start: T0 + 15 * DAY, end: T0 + 20 * DAY },
+            { id: "ship", parentId: "root", name: "Release", type: "milestone", start: T0 + 20 * DAY, end: T0 + 20 * DAY },
+          ],
+          links: [
+            { id: "l1", sourceId: "spec", targetId: "impl", type: "FS" },
+            { id: "l2", sourceId: "impl", targetId: "qa", type: "FS" },
+            { id: "l3", sourceId: "qa", targetId: "ship", type: "FS" },
+          ],
+        };
+      }
+
+      // Deterministic multi-phase generator for the `?tasks=N` perf harness: a fixed seed,
+      // phases of tasks with a chained FS link inside each phase — no Math.random(), so the
+      // shape is reproducible.
+      function generatedDataset(count) {
+        const rnd = mulberry32(0xba5e);
+        const tasksPerPhase = 20;
+        const phaseCount = Math.max(1, Math.ceil(count / tasksPerPhase));
+        const tasks = [];
+        const links = [];
+        let phaseStart = 0;
+        let taskId = 0;
+        for (let p = 0; p < phaseCount && taskId < count; p++) {
+          const pid = "ph" + p;
+          let cursor = phaseStart;
+          let phaseEnd = phaseStart;
+          tasks.push({ id: pid, parentId: null, name: "Phase " + (p + 1), type: "summary", start: T0 + phaseStart * DAY, end: T0 + (phaseStart + 1) * DAY });
+          let prev = null;
+          for (let i = 0; i < tasksPerPhase && taskId < count; i++, taskId++) {
+            const tid = "t" + taskId;
+            const dur = 2 + Math.floor(rnd() * 8);
+            const start = cursor;
+            const end = start + dur;
+            tasks.push({
+              id: tid,
+              parentId: pid,
+              name: "Task " + (taskId + 1),
+              start: T0 + start * DAY,
+              end: T0 + end * DAY,
+              progress: Math.round(rnd() * 20) / 20,
+            });
+            if (prev !== null) links.push({ id: "l" + tid, sourceId: prev, targetId: tid, type: "FS" });
+            prev = tid;
+            cursor = end;
+            phaseEnd = Math.max(phaseEnd, end);
+          }
+          const phaseTask = tasks.find((t) => t.id === pid);
+          phaseTask.end = T0 + phaseEnd * DAY;
+          phaseStart = phaseEnd;
+        }
+        return { tasks, links };
+      }
+
+      const params = new URLSearchParams(location.search);
+      const requestedCount = Number(params.get("tasks"));
+      const dataset =
+        Number.isFinite(requestedCount) && requestedCount > 0 ? generatedDataset(requestedCount) : smallDataset();
+
+      const perfStart = performance.now();
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard(),
+      });
+      gantt.service("stargantt.data").load(dataset);
+
+      // Perceived-performance readout: time from load() to the first completed
+      // canvas composite, exposed by the view service (`firstPaintMs()`, RenderSurface). Polled
+      // with rAF rather than awaited synchronously — the first paint can land a frame or two
+      // after load() returns.
+      window.gantt = gantt;
+      function reportFirstPaint() {
+        const view = gantt.getService("stargantt.view");
+        const firstPaintMs = view ? view.firstPaintMs() : undefined;
+        if (firstPaintMs === undefined) {
+          requestAnimationFrame(reportFirstPaint);
+          return;
+        }
+        const elapsed = performance.now() - perfStart;
+        const readout = document.getElementById("perf-readout");
+        readout.textContent = `Loaded ${dataset.tasks.length.toLocaleString()} tasks — first paint at ${firstPaintMs.toFixed(1)} ms (wall clock since create(): ${elapsed.toFixed(1)} ms).`;
+        readout.dataset.taskCount = String(dataset.tasks.length);
+        readout.dataset.firstPaintMs = String(firstPaintMs);
+        readout.dataset.wallMs = String(elapsed);
+      }
+      requestAnimationFrame(reportFirstPaint);
+    </script>
+  </body>
+</html>

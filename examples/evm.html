@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — EVM example</title>
+    <!--
+      One HTML file + one script tag, composed with `presetStandard()` plus the OPT-IN tracking
+      plugin (tracking ships in the bundle but is not preset-composed), configured with only its
+      `evm` nest (docs/specs/plugins/tracking.md §5.4); the service id is `stargantt.evm`. The
+      status-date line and timeline origin are nested groups of `view` (view.md §"todayLine" /
+      §"timeline.origin") — this page passes both through
+      `presetStandard({ view: { todayLine: { statusDate }, timeline: { origin } } })`.
+
+      Both `evm.statusDate` and `view.todayLine.statusDate` are read once at setup, so changing
+      the status-date offset means disposing and re-creating the chart. This page is
+      self-contained: `boot(statusDate)` disposes the previous `GanttInstance`
+      (`gantt.dispose()` — architecture.md's public teardown) and creates a fresh one into the
+      same `#chart` element.
+
+      "Design" has half its planned span elapsed but only 30% earned, at a cost overrun — the
+      source of the SPI &lt; 1 / CPI &lt; 1 flags on the dashboard. The dataset is small and
+      deterministic (no Math.random(), fixed relative offsets from "today") so a manual pass
+      through this page and any e2e coverage see the same shapes. CLAUDE.md's documented viewport
+      floor is 720x540 (tablet and up, no mobile breakpoints) — the chrome below is kept minimal.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 460px;
+        border: 1px solid #ccc;
+      }
+      #toolbar button,
+      #status-toolbar button {
+        min-height: 24px;
+        margin: 0 4px 4px 0;
+        font: inherit;
+        cursor: pointer;
+      }
+      #status-toolbar button[aria-pressed="true"] {
+        font-weight: 600;
+      }
+      #status-readout {
+        margin: 4px 0 0;
+        font-size: 11px;
+        min-height: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — EVM (earned value)</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Per-task BAC / actual cost (percent-complete accrual), the ten-tile KPI dashboard (BAC PV EV
+      AC SV CV SPI CPI EAC ETC) and the PV/EV/AC S-curve. The status-date buttons below re-create
+      the chart at a different status date — the solid line is <code>view.todayLine</code>'s
+      "today" marker; the dashed line is the same status date fed to
+      <code>view.todayLine.statusDate</code> and <code>tracking.evm.statusDate</code>, so the two
+      coincide only at the "Today" offset.
+    </details>
+    <div id="toolbar">
+      <button id="evm-dashboard" type="button">Open EVM dashboard</button>
+      <button id="evm-curve" type="button">Open S-curve</button>
+    </div>
+    <div id="chart"></div>
+
+    <section aria-labelledby="status-date-title">
+      <h2 id="status-date-title" style="font-size: 12px; margin: 8px 0 2px">Status-date line</h2>
+      <div id="status-toolbar" role="group" aria-labelledby="status-date-title">
+        <button id="status-back" type="button" aria-pressed="false" data-offset="-3">3 days ago</button>
+        <button id="status-today" type="button" aria-pressed="true" data-offset="0">Today</button>
+        <button id="status-fwd" type="button" aria-pressed="false" data-offset="3">In 3 days</button>
+      </div>
+      <p id="status-readout" role="status"></p>
+    </section>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2). "plan" starts at `T0 - 8 * DAY`, before that default origin, so the preset's
+      // `view.timeline.origin` is pulled back to cover it — without it that content sits left of
+      // content x = 0 and no scroll gesture can reach it.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            // Done, on budget.
+            { id: "plan", parentId: null, name: "Planning", start: T0 - 8 * DAY, end: T0 - 4 * DAY, progress: 1 },
+            // Half the planned span has elapsed but only 30% is earned, at a cost overrun — the
+            // source of the SPI < 1 / CPI < 1 flags on the dashboard.
+            { id: "design", parentId: null, name: "Design", start: T0 - 4 * DAY, end: T0 + 4 * DAY, progress: 0.3 },
+            { id: "impl", parentId: null, name: "Implementation", start: T0 + 2 * DAY, end: T0 + 10 * DAY },
+            { id: "ship", parentId: null, name: "Ship", start: T0 + 10 * DAY, end: T0 + 10 * DAY, type: "milestone" },
+          ],
+        };
+      }
+
+      let gantt;
+
+      // Both `view.todayLine.statusDate` and `tracking.evm.statusDate` are read once at setup
+      // (view.md / tracking.md §5.4), so changing the status date means disposing the previous
+      // instance and creating a fresh one.
+      function boot(statusDate) {
+        if (gantt) gantt.dispose();
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: [
+            ...StarGantt.presetStandard({
+              view: { todayLine: { statusDate }, timeline: { origin: T0 - 8 * DAY } },
+            }),
+            StarGantt.tracking({ evm: { statusDate } }),
+          ],
+        });
+        gantt.service("stargantt.data").load(dataset());
+
+        // Per-task budgets and actuals via the service — each call is one undoable step.
+        const evm = gantt.service("stargantt.evm");
+        evm.setFields("plan", { bac: 4000, actualCost: 4000 });
+        evm.setFields("design", { bac: 8000, actualCost: 3600 });
+        evm.setFields("impl", { bac: 12000, actualCost: 0 });
+
+        window.gantt = gantt;
+        return gantt;
+      }
+
+      document.getElementById("evm-dashboard").addEventListener("click", () => {
+        gantt.service("stargantt.evm").openDashboardPanel();
+      });
+      document.getElementById("evm-curve").addEventListener("click", () => {
+        gantt.service("stargantt.evm").openCurvePanel();
+      });
+
+      // "Status-date line" section.
+      (function () {
+        const buttons = [
+          document.getElementById("status-back"),
+          document.getElementById("status-today"),
+          document.getElementById("status-fwd"),
+        ];
+        const readout = document.getElementById("status-readout");
+        for (const button of buttons) {
+          button.dataset.label = button.textContent.trim();
+        }
+
+        function sync(offsetDays, statusDate) {
+          for (const button of buttons) {
+            const own = Number(button.dataset.offset);
+            const pressed = own === offsetDays;
+            button.setAttribute("aria-pressed", pressed ? "true" : "false");
+            // Text prefix, not color alone (WCAG 1.4.1).
+            button.textContent = (pressed ? "✓ " : "") + button.dataset.label;
+          }
+          const iso = new Date(statusDate).toISOString().slice(0, 10);
+          readout.textContent =
+            "Status date: " +
+            iso +
+            " (" +
+            (offsetDays === 0
+              ? "today - the dashed status line coincides with the solid today line, which paints last and wins"
+              : (offsetDays > 0 ? "+" : "") + offsetDays + " days from today - the dashed status line is drawn separately") +
+            "). The same instant drives the EVM measurement: reopen the dashboard or the S-curve to read the recomputed PV/EV/SPI.";
+        }
+
+        function select(offsetDays) {
+          const statusDate = T0 + offsetDays * DAY;
+          boot(statusDate);
+          sync(offsetDays, statusDate);
+        }
+
+        for (const button of buttons) {
+          button.addEventListener("click", () => select(Number(button.dataset.offset)));
+        }
+
+        select(0);
+      })();
+    </script>
+  </body>
+</html>

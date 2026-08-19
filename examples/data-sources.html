@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Data-sources example</title>
+    <!--
+      Demonstrates the merged, OPT-IN `StarGantt.dataSync()` plugin, composed as one
+      `dataSync({ sources, graphql, lazyLoad })` call: the REST source is a config-time `sources`
+      entry, the GraphQL source is the `graphql` config nest (which builds and registers its own
+      adapter internally), and the backlog pager is the `lazyLoad` nest. This page demonstrates
+      full snapshot load, delta sync, optimistic write-back with rollback, server-side filtering,
+      lazy paging with dedup, and streamed increments, all through a single service surface
+      (`gantt.service("stargantt.data-sync")`, `sources.activate()`/`sources.active()`) and a
+      single event namespace (`sync/sourceSynced`, `sync/sourceRolledBack`,
+      `sync/lazyRangeLoaded`, `sync/lazyChangesApplied`). Row and view concerns are reached via
+      `stargantt.rows` and `stargantt.view`, and the viewport is the `view.viewport` store.
+
+      The page is a single self-contained boot script, matching `examples/data-sync.html`'s
+      idiom. The in-page mock backend (REST + GraphQL + backlog paging over an injectable
+      `fetch`, latency slider, "fail the next request" switch) is ordinary host code, not part of
+      the library's API surface.
+
+      No real server is contacted: every request is served by the mock `fetch` below over an
+      in-memory backend. The latency slider and the "fail the next request" switch inject network
+      conditions; failures surface in the status line, never the console.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 360px;
+        border: 1px solid #ccc;
+      }
+      .panels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 6px 0;
+      }
+      .panel {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 6px 8px;
+        min-width: 230px;
+        flex: 1 1 230px;
+      }
+      .panel h2 {
+        font-size: 12px;
+        margin: 0 0 4px;
+      }
+      .panel button,
+      .panel input[type="text"],
+      .panel select {
+        font: inherit;
+        min-height: 24px;
+      }
+      .panel button {
+        margin: 0 4px 4px 0;
+        cursor: pointer;
+      }
+      .readout {
+        font-size: 11px;
+        color: #333;
+        margin: 2px 0;
+      }
+      #status {
+        font-size: 12px;
+        color: #333;
+        margin: 4px 0 0;
+      }
+      #status[data-kind="error"] {
+        color: #a30000;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — data-sources (REST / GraphQL / lazy loading)</h1>
+    <details>
+      <summary>What's on this page</summary>
+      One <code>dataSync()</code> composition with a REST source, a GraphQL source (config-nested,
+      not a separate factory), and a lazily-paged 60-row backlog. No real server is contacted — a
+      mock <code>fetch</code> below stands in.
+    </details>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Backend source</h2>
+        <select id="source-select">
+          <option value="rest" selected>rest (REST adapter)</option>
+          <option value="graphql">graphql (GraphQL adapter)</option>
+        </select>
+        <br />
+        <button id="load-btn">Load snapshot</button>
+        <button id="sync-btn">Delta sync</button>
+        <br />
+        <input id="filter-input" type="text" placeholder="e.g. migration" />
+        <button id="filter-btn">Apply &amp; reload</button>
+        <p class="readout" id="server-out">server: revision v1</p>
+      </div>
+
+      <div class="panel">
+        <h2>Optimistic write-back</h2>
+        <button id="edit-btn">Reschedule a task locally (+1 day)</button>
+        <br />
+        <button id="flush-btn">Flush pending changes</button>
+        <p class="readout" id="pending-out">pending: 0 creates, 0 updates, 0 removes</p>
+        <p class="readout">Flush with "fail the next request" armed to watch the rollback.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Lazy loading (backlog)</h2>
+        <button id="page-btn">Load next backlog page</button>
+        <button id="stream-btn">Apply streamed change</button>
+        <br />
+        <label><input id="auto-page-toggle" type="checkbox" /> Fetch next page near scroll end</label>
+        <p class="readout" id="lazy-out">pages loaded: 0, total: unknown</p>
+      </div>
+
+      <div class="panel">
+        <h2>Mock transport</h2>
+        <label>Latency <input id="latency" type="range" min="0" max="2000" step="100" value="200" /></label>
+        <span class="readout" id="latency-out">200 ms</span>
+        <br />
+        <label><input id="fail-next" type="checkbox" /> Fail the next request</label>
+        <p class="readout">The switch disarms itself once the failure has been served.</p>
+      </div>
+    </div>
+
+    <div id="chart"></div>
+    <p id="status" role="status" aria-live="polite" data-kind="idle">
+      Idle. The chart shows the page's local cache; nothing has been fetched yet.
+    </p>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+      const d = (n) => T0 + n * DAY;
+
+      // ---------------------------------------------------------------- the page's local cache
+      // Deliberately a revision behind the mock backend below, so "Load snapshot" and "Delta sync"
+      // both have something visible to do.
+      function dataset() {
+        return {
+          tasks: [
+            { id: "P", parentId: null, name: "Platform migration", type: "summary", start: d(0), end: d(28) },
+            { id: "T1", parentId: "P", name: "Requirements", start: d(0), end: d(4), progress: 0.5 },
+            { id: "T2", parentId: "P", name: "Schema design", start: d(3), end: d(9), progress: 0.2 },
+            { id: "T3", parentId: "P", name: "API implementation", start: d(8), end: d(18), progress: 0 },
+            { id: "T4", parentId: "P", name: "Data migration", start: d(16), end: d(24), progress: 0 },
+            { id: "T5", parentId: "P", name: "Cutover", type: "milestone", start: d(26), end: d(26) },
+          ],
+          links: [
+            { id: "L1", sourceId: "T1", targetId: "T2", type: "FS" },
+            { id: "L2", sourceId: "T2", targetId: "T3", type: "FS" },
+            { id: "L3", sourceId: "T3", targetId: "T4", type: "FS" },
+            { id: "L4", sourceId: "T4", targetId: "T5", type: "FS" },
+          ],
+        };
+      }
+
+      // ---------------------------------------------------------------- the in-page mock backend
+      // A plain object standing in for a server. It owns a task table, a queue of not-yet-delivered
+      // delta revisions, and a 60-row backlog served in pages. Not part of the library's API
+      // surface — ordinary host code.
+      const backend = {
+        syncToken: "v1",
+        tasks: [
+          { id: "P", parentId: null, name: "Platform migration", type: "summary", start: d(0), end: d(34) },
+          { id: "T1", parentId: "P", name: "Requirements", start: d(0), end: d(4), progress: 1 },
+          { id: "T2", parentId: "P", name: "Schema design", start: d(3), end: d(9), progress: 0.75 },
+          { id: "T3", parentId: "P", name: "API implementation", start: d(8), end: d(20), progress: 0.3 },
+          { id: "T4", parentId: "P", name: "Data migration", start: d(18), end: d(26), progress: 0 },
+          { id: "T5", parentId: "P", name: "Cutover", type: "milestone", start: d(28), end: d(28) },
+          { id: "T6", parentId: "P", name: "Load testing", start: d(20), end: d(27), progress: 0 },
+          { id: "T7", parentId: "P", name: "Rollback drill", start: d(24), end: d(27), progress: 0 },
+        ],
+        links: [
+          { id: "L1", sourceId: "T1", targetId: "T2", type: "FS" },
+          { id: "L2", sourceId: "T2", targetId: "T3", type: "FS" },
+          { id: "L3", sourceId: "T3", targetId: "T4", type: "FS" },
+          { id: "L4", sourceId: "T4", targetId: "T5", type: "FS" },
+        ],
+        revisions: [
+          {
+            syncToken: "v2",
+            changes: [
+              { type: "upsert", task: { id: "T4", parentId: "P", name: "Data migration", start: d(18), end: d(29), progress: 0.4 } },
+              { type: "upsert", task: { id: "T8", parentId: "P", name: "Post-migration review", start: d(29), end: d(32), progress: 0 } },
+              { type: "remove", id: "T7" },
+            ],
+          },
+        ],
+        backlog: (() => {
+          const rows = [];
+          for (let i = 1; i <= 60; i++) {
+            const pad = i < 10 ? "0" + i : String(i);
+            rows.push({
+              id: "BL-" + pad,
+              parentId: null,
+              name: "Backlog item " + pad,
+              start: d(2 + (i % 20)),
+              end: d(2 + (i % 20) + 1 + (i % 4)),
+            });
+          }
+          return rows;
+        })(),
+      };
+
+      const REST_BASE = "https://mock.stargantt.invalid/rest";
+      const GRAPHQL_URL = "https://mock.stargantt.invalid/graphql";
+
+      const el = (id) => document.getElementById(id);
+      const latencyMs = () => {
+        const v = Number(el("latency").value);
+        return Number.isFinite(v) && v >= 0 ? v : 200;
+      };
+      // Reads the "fail the next request" switch and disarms it: one arming = one failure.
+      const takeInjectedFailure = () => {
+        const input = el("fail-next");
+        if (!input.checked) return false;
+        input.checked = false;
+        return true;
+      };
+      const reply = (body, status) => {
+        const code = status === undefined ? 200 : status;
+        return { ok: code >= 200 && code < 300, status: code, json: () => Promise.resolve(body) };
+      };
+
+      function matches(task, query) {
+        if (!query) return true;
+        return String(task.name).toLowerCase().indexOf(String(query).toLowerCase()) >= 0;
+      }
+
+      /** The server-side filter: name substring, ancestors kept for context. */
+      function snapshot(query) {
+        const hits = backend.tasks.filter((t) => matches(t, query));
+        const keep = new Set(hits.map((t) => t.id));
+        hits.forEach((t) => { if (t.parentId) keep.add(t.parentId); });
+        const tasks = backend.tasks.filter((t) => keep.has(t.id));
+        const links = backend.links.filter((l) => keep.has(l.sourceId) && keep.has(l.targetId));
+        return { tasks, links, syncToken: backend.syncToken };
+      }
+
+      function nextDelta() {
+        const revision = backend.revisions.shift();
+        if (!revision) return { changes: [], syncToken: backend.syncToken };
+        backend.syncToken = revision.syncToken;
+        revision.changes.forEach((change) => {
+          if (change.type === "remove") {
+            backend.tasks = backend.tasks.filter((t) => t.id !== change.id);
+            return;
+          }
+          const index = backend.tasks.findIndex((t) => t.id === change.task.id);
+          if (index >= 0) backend.tasks[index] = change.task; else backend.tasks.push(change.task);
+        });
+        return { changes: revision.changes, syncToken: revision.syncToken };
+      }
+
+      /** Applies a pushed `ChangeBatch` and mints the next revision token. */
+      function applyBatch(batch) {
+        (batch.creates || []).forEach((task) => backend.tasks.push(task));
+        (batch.updates || []).forEach((update) => {
+          const index = backend.tasks.findIndex((t) => t.id === update.id);
+          if (index >= 0) backend.tasks[index] = Object.assign({}, backend.tasks[index], update.after);
+        });
+        (batch.removes || []).forEach((id) => { backend.tasks = backend.tasks.filter((t) => t.id !== id); });
+        backend.syncToken = "v" + (Number(backend.syncToken.slice(1)) + 1);
+        return { syncToken: backend.syncToken };
+      }
+
+      function backlogPage(offset, limit) {
+        return {
+          tasks: backend.backlog.slice(offset, offset + limit),
+          total: backend.backlog.length,
+          cursor: "cursor-" + (offset + limit),
+        };
+      }
+
+      function graphqlResolve(body) {
+        const doc = String(body.query || "");
+        const vars = body.variables || {};
+        if (doc.indexOf("LoadTasks") >= 0) return { project: { snapshot: snapshot(vars.query) } };
+        if (doc.indexOf("DeltaTasks") >= 0) return { project: { changes: nextDelta() } };
+        if (doc.indexOf("PushTasks") >= 0) return { pushTasks: applyBatch(vars.batch || {}) };
+        return {};
+      }
+
+      /** One injectable `fetch` for the REST endpoints, the GraphQL endpoint, and backlog paging. */
+      function mockFetch(input, init) {
+        return new Promise((resolve) => setTimeout(resolve, latencyMs())).then(() => {
+          const url = new URL(String(input), "https://mock.stargantt.invalid");
+          const failing = takeInjectedFailure();
+          if (url.pathname === "/graphql") {
+            if (failing) return reply({ errors: [{ message: "injected backend failure" }] });
+            return reply({ data: graphqlResolve(JSON.parse(String((init && init.body) || "{}"))) });
+          }
+          if (failing) return reply({ message: "injected backend failure" }, 503);
+          if (url.pathname === "/rest/tasks") return reply(snapshot(url.searchParams.get("q")));
+          if (url.pathname === "/rest/tasks/delta") return reply(nextDelta());
+          if (url.pathname === "/rest/tasks/batch") return reply(applyBatch(JSON.parse(String((init && init.body) || "{}"))));
+          if (url.pathname === "/rest/backlog") {
+            return reply(backlogPage(Number(url.searchParams.get("offset")), Number(url.searchParams.get("limit"))));
+          }
+          return reply({ message: "no such endpoint" }, 404);
+        });
+      }
+
+      // The lazy-load range adapter is just an object with `fetchRange`; latency and failure
+      // injection apply to paging too.
+      const backlogAdapter = {
+        fetchRange(request) {
+          const query = "?offset=" + request.offset + "&limit=" + request.limit +
+            (request.cursor ? "&cursor=" + encodeURIComponent(request.cursor) : "");
+          return mockFetch(REST_BASE + "/backlog" + query).then((response) => {
+            if (!response.ok) throw new Error("backlog HTTP " + response.status);
+            return response.json();
+          });
+        },
+      };
+
+      // The GraphQL adapter ships no default documents — the host supplies one document per
+      // capability, plus the dot-paths that select each result out of `data`.
+      const LOAD_DOC = "query LoadTasks($query: String, $criteria: JSON) {" +
+        " project { snapshot(query: $query, criteria: $criteria) { tasks links syncToken } } }";
+      const DELTA_DOC = "query DeltaTasks($since: String!, $query: String, $criteria: JSON) {" +
+        " project { changes(since: $since, query: $query) { changes syncToken } } }";
+      const PUSH_DOC = "mutation PushTasks($batch: ChangeBatch!) { pushTasks(batch: $batch) { syncToken } }";
+
+      // ---------------------------------------------------------------- composition
+      // One `dataSync()` call covers the REST source, the GraphQL source, and lazy loading. The
+      // GraphQL source is registered (not yet activated) through the `graphql` nest; the page
+      // switches the active source at runtime through `sources.activate()`.
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          ...StarGantt.presetStandard(),
+          StarGantt.dataSync({
+            sources: { rest: StarGantt.restAdapter({ baseUrl: REST_BASE, fetch: mockFetch }) },
+            active: "rest",
+            rollbackOnError: true,
+            graphql: {
+              name: "graphql",
+              url: GRAPHQL_URL,
+              fetch: mockFetch,
+              operations: { load: LOAD_DOC, delta: DELTA_DOC, push: PUSH_DOC },
+              select: { load: "project.snapshot", delta: "project.changes", push: "pushTasks" },
+              activate: false,
+            },
+            // `lazyLoad.followViewport` is left off: it maps row indices onto dataset offsets,
+            // which is exact only for a flat, backend-ordered, unfiltered dataset. This store is a
+            // mixed tree (the project snapshot above the backlog), so the page drives paging
+            // itself with real offsets (§3.3's escape hatch).
+            lazyLoad: { sources: { backlog: backlogAdapter }, active: "backlog", pageSize: 20 },
+          }),
+        ],
+      });
+
+      const sync = gantt.service("stargantt.data-sync");
+      const data = gantt.service("stargantt.data");
+
+      data.load(dataset());
+
+      function status(text, kind) {
+        const out = el("status");
+        out.textContent = text;
+        out.setAttribute("data-kind", kind || "ok");
+      }
+
+      function counts(c) {
+        return c.creates + " creates, " + c.updates + " updates, " + c.removes + " removes";
+      }
+
+      function refresh() {
+        el("pending-out").textContent = "pending: " + counts(sync.pending());
+        const total = sync.lazy.total();
+        el("lazy-out").textContent =
+          "pages loaded: " + sync.lazy.loadedPages() + ", total: " + (total === undefined ? "unknown" : total + " rows");
+        el("server-out").textContent = "server: revision " + backend.syncToken + ", " + backend.tasks.length + " tasks";
+      }
+
+      // Every `stargantt.data-sync` facade method resolves — never rejects — with `ok: false` on
+      // failure (data-sync.md §"Error discipline"), so in principle `run()` never rejects either.
+      // The rejection branch below is kept anyway, as defense in depth: it is the only
+      // thing standing between a genuinely unexpected throw (a bug, a future API change) and a
+      // button stuck disabled forever with no visible failure.
+      function busy(button, label, run) {
+        button.disabled = true;
+        status(label + "…", "busy");
+        run().then(
+          (result) => {
+            button.disabled = false;
+            refresh();
+            return result;
+          },
+          (error) => {
+            button.disabled = false;
+            status(label + " failed: " + error, "error");
+          }
+        );
+      }
+
+      el("load-btn").addEventListener("click", () => {
+        busy(el("load-btn"), "Loading a full snapshot", () =>
+          sync.load().then((result) => {
+            if (result.ok) {
+              status(
+                'Snapshot loaded from "' + sync.sources.active() + '": ' + result.tasks +
+                  " tasks. A full load also resets the lazy-load paging bookkeeping.",
+                "ok"
+              );
+            }
+            return result;
+          })
+        );
+      });
+
+      el("sync-btn").addEventListener("click", () => {
+        busy(el("sync-btn"), "Syncing changes since the held token", () =>
+          sync.sync().then((result) => {
+            if (result.ok) {
+              const applied = result.applied;
+              status(
+                "Sync (" + result.mode + " mode): " +
+                  (applied ? applied.added + " added, " + applied.updated + " updated, " + applied.removed + " removed" : "no changes") +
+                  ". Delta application is ordinary undoable history.",
+                "ok"
+              );
+            }
+            return result;
+          })
+        );
+      });
+
+      el("filter-btn").addEventListener("click", () => {
+        const query = el("filter-input").value.trim();
+        busy(el("filter-btn"), query ? 'Reloading with server filter "' + query + '"' : "Reloading without a filter", () => {
+          sync.setFilter(query ? { query } : null);
+          return sync.load().then((result) => {
+            if (result.ok) {
+              status(
+                "Server-side filter " + (query ? '"' + query + '"' : "cleared") +
+                  ": the backend returned " + result.tasks + " tasks (matches plus their parent).",
+                "ok"
+              );
+            }
+            return result;
+          });
+        });
+      });
+
+      el("edit-btn").addEventListener("click", () => {
+        let task = data.getTask("T3");
+        if (!task) {
+          const first = Array.from(data.taskIds())[0];
+          task = first === undefined ? undefined : data.getTask(first);
+        }
+        if (!task) {
+          status("The store is empty — load a snapshot first.", "error");
+          return;
+        }
+        gantt.dispatch("task/move", { id: task.id, start: task.start + DAY, end: task.end + DAY });
+        refresh();
+        status(
+          '"' + task.name + '" moved one day later. The edit is already in the store (the ' +
+            "optimistic UI is the ordinary command pipeline) and is now queued for the next flush.",
+          "ok"
+        );
+      });
+
+      el("flush-btn").addEventListener("click", () => {
+        busy(el("flush-btn"), "Pushing pending changes", () =>
+          sync.flush().then((result) => {
+            if (result.ok) {
+              status(
+                result.sent && result.sent.creates + result.sent.updates + result.sent.removes > 0
+                  ? "Pushed " + counts(result.sent) + " to the backend."
+                  : "Nothing to push — the pending set is empty.",
+                "ok"
+              );
+            } else if (result.rolledBack) {
+              status("The push was rejected; the local changes were rolled back.", "error");
+            } else {
+              status("The push failed and no source could accept it.", "error");
+            }
+            return result;
+          })
+        );
+      });
+
+      el("page-btn").addEventListener("click", () => {
+        const offset = sync.lazy.loadedPages() * 20;
+        busy(el("page-btn"), "Fetching backlog rows " + offset + "–" + (offset + 19), () =>
+          sync.lazy.ensureRange(offset, 20).then((result) => {
+            if (result.ok) {
+              status(
+                result.pages > 0
+                  ? "Fetched " + result.pages + " backlog page(s) starting at row " + offset + "."
+                  : "That range is already loaded — no request was made (in-flight/loaded dedup).",
+                "ok"
+              );
+            }
+            return result;
+          })
+        );
+      });
+
+      el("stream-btn").addEventListener("click", () => {
+        const day = T0;
+        // A minimal merge: the upsert assigns only the fields it carries, and the removal drops a
+        // row — no round trip, no rebuild.
+        const applied = sync.lazy.applyChanges([
+          { type: "upsert", task: { id: "BL-03", name: "Backlog item 03 (escalated)", start: day + 3 * DAY, end: day + 6 * DAY, progress: 0.9 } },
+          { type: "remove", id: "BL-05" },
+        ]);
+        refresh();
+        status(
+          "Streamed change applied without a request: " + applied.added + " added, " +
+            applied.updated + " updated, " + applied.removed + " removed.",
+          "ok"
+        );
+      });
+
+      el("auto-page-toggle").addEventListener("change", function () {
+        status(
+          this.checked
+            ? "Scroll-driven paging on: reaching the last loaded row fetches the next backlog page."
+            : "Scroll-driven paging off: backlog pages load only on the button.",
+          "ok"
+        );
+      });
+
+      /**
+       * Scroll-driven paging, driven by the page rather than by `lazyLoad.followViewport` (see the
+       * header comment): when the viewport reaches the last loaded row, fetch the next backlog page
+       * at its real dataset offset. `ensureRange` deduplicates loaded and in-flight pages itself, so
+       * calling it on every scroll event is cheap.
+       *
+       * Only forward (downward) scrolling can bring the viewport to the loaded edge — a backward
+       * jump means the position was re-clamped by a full snapshot reload, not scrolled by the reader.
+       */
+      let lastScrollTop = 0;
+      const rows = gantt.service("stargantt.rows");
+      const view = gantt.service("stargantt.view");
+      gantt.on("view/scrolled", (event) => {
+        const previousScrollTop = lastScrollTop;
+        lastScrollTop = event.scrollTop;
+        if (!el("auto-page-toggle").checked) return;
+        if (event.scrollTop <= previousScrollTop) return;
+        const viewport = view.viewport.get();
+        if (rows.rowAtY(event.scrollTop + viewport.height) < rows.rowCount() - 2) return;
+        const offset = sync.lazy.loadedPages() * 20;
+        const total = sync.lazy.total();
+        if (total !== undefined && offset >= total) return;
+        sync.lazy.ensureRange(offset, 20).then((result) => {
+          if (result.ok && result.pages > 0) {
+            status("Scrolled to the loaded edge: fetched backlog rows " + offset + "–" + (offset + 19) + ".", "ok");
+          }
+        });
+      });
+
+      // The active source is chosen live through the service — no rebuild needed. Switching drops
+      // the held sync token and the pending changes: they belong to the previous backend.
+      el("source-select").addEventListener("change", function () {
+        const name = this.value;
+        const ok = sync.sources.activate(name);
+        refresh();
+        status(
+          ok
+            ? 'Active source is now "' + name + '". The held sync token and any pending local changes were dropped.'
+            : 'No source is registered under "' + name + '".',
+          ok ? "ok" : "error"
+        );
+      });
+
+      el("latency").addEventListener("input", function () {
+        el("latency-out").textContent = this.value + " ms";
+      });
+
+      gantt.on("sync/sourceSynced", () => {
+        el("server-out").textContent = "server: revision " + backend.syncToken + ", " + backend.tasks.length + " tasks";
+      });
+      gantt.on("sync/sourceRolledBack", (e) => {
+        status("Rollback: " + e.tasks + " task(s) restored to their pre-edit state.", "error");
+      });
+      gantt.on("sync/lazyRangeLoaded", () => refresh());
+      gantt.on("sync/lazyChangesApplied", () => refresh());
+      gantt.on("core/pluginError", (e) => {
+        const error = e.error && e.error.cause !== undefined ? e.error.cause : e.error;
+        status(e.pluginId + ": " + (error && error.message ? error.message : String(error)), "error");
+      });
+
+      refresh();
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

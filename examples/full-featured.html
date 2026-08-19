@@ -1,0 +1,2891 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Full-featured example</title>
+    <!--
+      The kitchen-sink page: one HTML file plus the one bundle script tag, composing ALL FIFTEEN
+      official plugins at once with (nearly) every published config field given a deliberate value.
+      `presetStandard()` supplies nine of them (data-store, view, tree-grid, task-bars, interaction,
+      undo-redo, a11y, scheduling, export) and the six opt-in plugins (resource, tracking, data-sync,
+      portfolio, i18n, perf-tools) are appended to the same plugin array. A settings dialog, persisted
+      in localStorage, arbitrates the combinations that genuinely fight each other and rebuilds the
+      chart from scratch when applied.
+
+      Each of the 15 official plugins owns a NESTED CONFIG GROUP in the config object below rather
+      than being configured as a standalone plugin (`treeGrid.taskFields`/`treeGrid.conditionalFormat`,
+      `dataStore.customFields`, the ten interaction concerns under `interaction.*`,
+      the five scheduling concerns under `scheduling.*`, the four tracking concerns under `tracking.*`,
+      the five resource concerns under `resource.*`, the five sync concerns under `dataSync.*`, the six
+      export/IO concerns under `export.*`, and `portfolio.dashboard`).
+
+      Four notable design points, each marked inline where it happens:
+        1. `downloadFile` — the single `stargantt.export` facade returns bytes (`toPng` -> Blob,
+           `exportCsv` -> string) and leaves saving to the host; `StarGantt.downloadFile(document, data, filename,
+           mimeType?)` — the SDK's public `downloadFile`, re-exported on the IIFE global — does it.
+        2. Corner arbitration — the core arbitrates "which overlay owns a chart-pane corner" through
+           `ctx.claimSlot("overlay-corner", …)`, which grants a free alternative corner to a
+           displaced overlay. The Overlays section of the settings dialog therefore survives as a
+           LAYOUT choice ("which overlay sits where you expect"), not a correctness one.
+        3. i18n — composing `i18n()` alone re-labels nothing: every official plugin resolves its
+           `messages` catalog once at setup from its own factory config (i18n.md §2). The dictionary
+           is therefore built with `StarGantt.createDictionary()` BEFORE `create()` and fed into the
+           sibling factories through `dict.catalog(prefix, defaults)`, which is the documented
+           pattern; `i18n()` is still composed so the service (and runtime `t()`) exists.
+        4. Events -> stores — the readouts below subscribe to the owning service's store
+           (`history.state`, `filter.state`, …) rather than to change events.
+
+      Deliberately absent from the dialog as corner-slot overlays: the "Team capacity summary"
+      and "Demand vs supply trend" options. Those are on-demand PANELS opened through
+      `stargantt.utilization` (`openSummaryPanel()` / `openTrendPanel()`), not corner-slot overlays,
+      so they are app-bar buttons here instead of corner occupants.
+
+      Viewport floor is 720x540 (tablet and up) — no mobile breakpoints, per CLAUDE.md.
+    -->
+    <style>
+      /*
+       * This page styles its own chrome only — never `.sg-*` classes and never `--sg-*` custom
+       * properties, which belong to the library. The one carve-out is sizing the mount element,
+       * which is what `#gantt-root` does.
+       */
+      :root {
+        color-scheme: light dark;
+        --bg: light-dark(#f6f7f9, #14161a);
+        --surface: light-dark(#ffffff, #1c1f25);
+        --surface-2: light-dark(#eef0f4, #23272f);
+        --text: light-dark(#16181d, #e8eaee);
+        --muted: light-dark(#565d6b, #a3abb8);
+        --border: light-dark(#d3d7de, #363b45);
+        --accent: light-dark(#1d4ed8, #7aa2f7);
+        --accent-text: light-dark(#ffffff, #10131a);
+        --warn: light-dark(#9a3412, #fdba74);
+        --focus: light-dark(#1d4ed8, #9ec1ff);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        min-width: 720px;
+        min-height: 540px;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+
+      /* Focus is visible everywhere and never thinner than 2px (WCAG 2.4.7 / 2.4.11). */
+      :focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      /* The chart is a treegrid with its own roving tabindex; the skip link puts it one Tab away. */
+      .skip {
+        position: absolute;
+        left: 8px;
+        top: -48px;
+        z-index: 10;
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: var(--accent);
+        color: var(--accent-text);
+        text-decoration: none;
+        transition: top 120ms ease;
+      }
+      .skip:focus {
+        top: 8px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .skip {
+          transition: none;
+        }
+      }
+
+      /* ---------------------------------------------------------------- app bar */
+
+      .appbar {
+        flex: 0 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 16px;
+        padding: 8px 12px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin-right: auto;
+        min-width: 0;
+      }
+      .brand strong {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .group-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      /*
+       * Density, not a mobile fallback: below ~1080px the five group captions push the app bar to a
+       * third row and take that row off the chart. They go visually hidden rather than away — every
+       * button still names its group through `aria-describedby`, so nothing is lost to a screen
+       * reader. There is no breakpoint under the 720px viewport floor and no layout changes here.
+       */
+      @media (max-width: 1080px) {
+        .group-label {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          clip-path: inset(50%);
+          white-space: nowrap;
+        }
+        .appbar {
+          gap: 8px 10px;
+        }
+      }
+
+      /* 32px min height keeps every pointer target past the 24x24 floor (WCAG 2.5.8). */
+      .btn,
+      .sel {
+        min-height: 32px;
+        padding: 4px 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface-2);
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn:hover:not(:disabled),
+      .sel:hover {
+        border-color: var(--accent);
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .btn--primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-text);
+        font-weight: 600;
+      }
+
+      .readout {
+        font-size: 12px;
+        color: var(--muted);
+        min-width: 0;
+      }
+
+      /* ---------------------------------------------------------------- chart */
+
+      main {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 12px;
+      }
+
+      /* Sizing only — the mount element's look is entirely the library's. */
+      #gantt-root {
+        width: 100%;
+        height: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--surface);
+      }
+
+      /* ---------------------------------------------------------------- dialogs */
+
+      dialog {
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        color: var(--text);
+        max-width: min(880px, 92vw);
+        max-height: 86vh;
+        overflow: hidden;
+      }
+      dialog::backdrop {
+        background: rgb(0 0 0 / 0.45);
+      }
+
+      .dlg-head,
+      .dlg-foot {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--surface-2);
+      }
+      .dlg-head {
+        border-bottom: 1px solid var(--border);
+      }
+      .dlg-foot {
+        border-top: 1px solid var(--border);
+        justify-content: flex-end;
+      }
+      /* A long status line wraps; it never squeezes the actions it sits beside. */
+      .dlg-foot .btn {
+        white-space: nowrap;
+      }
+      .dlg-foot .readout {
+        flex: 1 1 auto;
+      }
+      .dlg-head h2 {
+        margin: 0;
+        font-size: 15px;
+      }
+      .dlg-head p {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .dlg-body {
+        padding: 16px;
+        overflow: auto;
+        max-height: calc(86vh - 116px);
+      }
+
+      /* Sections keep the option count per screenful low (Hick's law); each is collapsible so the
+         rarely-touched groups stay out of the way (progressive disclosure). */
+      .section {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 12px;
+      }
+      .section > summary {
+        padding: 10px 12px;
+        font-weight: 600;
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .section > summary::before {
+        content: "\25B8";
+        color: var(--muted);
+      }
+      .section[open] > summary::before {
+        content: "\25BE";
+      }
+      .section > summary::-webkit-details-marker {
+        display: none;
+      }
+      .badge {
+        margin-left: auto;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: var(--accent-text);
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .section-body {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+        padding: 0 12px 12px;
+      }
+
+      fieldset {
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px 10px;
+        min-width: 0;
+      }
+      legend {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 0 4px;
+      }
+      .hint {
+        margin: 0 0 6px;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      .opt {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 3px 0;
+        min-height: 24px;
+        cursor: pointer;
+      }
+      .opt input {
+        margin: 3px 0 0;
+        width: 16px;
+        height: 16px;
+      }
+      .opt span {
+        min-width: 0;
+      }
+      .opt small {
+        display: block;
+        color: var(--muted);
+      }
+
+      .note {
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        border-left: 3px solid var(--accent);
+        background: var(--surface-2);
+        border-radius: 0 6px 6px 0;
+        font-size: 12px;
+      }
+      .note b {
+        display: block;
+        margin-bottom: 2px;
+      }
+
+      .confirm-body {
+        padding: 16px;
+        max-width: 420px;
+      }
+      .confirm-body p {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#gantt-root">Skip to the chart</a>
+
+    <header class="appbar">
+      <div class="brand">
+        <strong>StarGantt v2 — full-featured chart</strong>
+      </div>
+
+      <div class="group">
+        <span class="group-label" id="lblHistory">History</span>
+        <button type="button" class="btn" id="undoBtn" aria-describedby="lblHistory">Undo</button>
+        <button type="button" class="btn" id="redoBtn" aria-describedby="lblHistory">Redo</button>
+      </div>
+
+      <div class="group">
+        <label class="group-label" for="viewModeSel">View</label>
+        <select class="sel" id="viewModeSel">
+          <option value="split">Split</option>
+          <option value="grid">Table</option>
+          <option value="gantt">Chart</option>
+        </select>
+      </div>
+
+      <div class="group">
+        <span class="group-label" id="lblExport">Export</span>
+        <button type="button" class="btn" id="pngBtn" aria-describedby="lblExport">PNG</button>
+        <button type="button" class="btn" id="csvBtn" aria-describedby="lblExport">CSV</button>
+        <button type="button" class="btn" id="printBtn" aria-describedby="lblExport">Print</button>
+      </div>
+
+      <div class="group">
+        <span class="group-label" id="lblReports">Reports</span>
+        <button type="button" class="btn" id="dashboardBtn" aria-describedby="lblReports">Dashboard</button>
+        <button type="button" class="btn" id="evmBtn" aria-describedby="lblReports">EVM</button>
+        <button type="button" class="btn" id="costBtn" aria-describedby="lblReports">Cost</button>
+        <button type="button" class="btn" id="utilBtn" aria-describedby="lblReports">Workload</button>
+        <button type="button" class="btn" id="trendBtn" aria-describedby="lblReports">Trend</button>
+      </div>
+
+      <div class="group">
+        <span class="group-label" id="lblCalendar">Calendar</span>
+        <button type="button" class="btn" id="calendarBtn" aria-describedby="lblCalendar">Edit</button>
+        <button type="button" class="btn" id="rescheduleBtn" aria-describedby="lblCalendar">
+          Re-run scheduler
+        </button>
+      </div>
+      <button type="button" class="btn btn--primary" id="settingsBtn">Settings</button>
+
+      <span class="readout" id="status" role="status" aria-live="polite"></span>
+    </header>
+
+    <main>
+      <div id="gantt-root"></div>
+    </main>
+
+    <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+      <form id="settingsForm">
+        <div class="dlg-head">
+          <div>
+            <h2 id="settingsTitle">Composition settings</h2>
+            <p>One choice per group; applying rebuilds the chart from a fresh plugin list.</p>
+          </div>
+        </div>
+        <div class="dlg-body">
+          <div class="note">
+            <b>Why these are radio buttons, not checkboxes.</b>
+            Most groups below collect options that fight for the same surface — a bar's fill, a
+            double-click, the bottom region's height, the store's contents. The library cannot
+            arbitrate those for a host, so this page makes the broken combinations unreachable
+            rather than letting you build one and then explaining the mess. The one exception is
+            <em>Overlays</em>: v2's core arbitrates chart-pane corners itself through
+            <code>claimSlot("overlay-corner", …)</code> and moves a displaced overlay to a free
+            corner, so those groups are a layout preference, not a correctness constraint.
+            Everything <em>not</em> in this dialog is set to a fixed, good value in the page source.
+          </div>
+          <div id="settingsSections"></div>
+        </div>
+        <div class="dlg-foot">
+          <span class="readout" id="settingsHint"></span>
+          <button type="button" class="btn" id="settingsReset">Reset to defaults</button>
+          <button type="button" class="btn" id="settingsCancel">Cancel</button>
+          <button type="submit" class="btn btn--primary" id="settingsApply">Apply &amp; rebuild</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="confirmDialog" aria-labelledby="confirmTitle">
+      <div class="dlg-head"><h2 id="confirmTitle">Delete tasks</h2></div>
+      <div class="confirm-body"><p id="confirmText"></p></div>
+      <div class="dlg-foot">
+        <button type="button" class="btn" id="confirmNo">Keep them</button>
+        <button type="button" class="btn btn--primary" id="confirmYes">Delete</button>
+      </div>
+    </dialog>
+
+    <!-- A single file containing core + all fifteen official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+
+    <script>
+      (function () {
+        "use strict";
+
+        /* ================================================================
+         * 1. The data
+         * ================================================================
+         * The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+         * §6.2), so anchoring every date at a fixed offset from the day-floored current UTC day
+         * keeps the page deterministic under a pinned clock while still opening on "today".
+         * No Math.random(), no unpinned Date.now() variation.
+         */
+
+        var DAY = 86400000;
+        var T0 = Math.floor(Date.now() / DAY) * DAY;
+        function day(n) {
+          return T0 + n * DAY;
+        }
+
+        /** The reference date every "how are we doing" surface is evaluated against. */
+        var STATUS_DATE = day(12);
+
+        /**
+         * One project, sized so every feature has something to show: three summaries, two
+         * milestones, all four link types, actual dates for the baseline variance bars, per-task
+         * cost/EVM budgets, task-field values (status / priority / tags / deadline), RAG
+         * classifications for the progress badges, and a `meta.project` attribution the resource
+         * view and the dashboard group by.
+         *
+         * Meta keys are verified against the plugin sources:
+         * `meta.taskFields` (tree-grid), `meta.customFields` (data-store),
+         * `meta.progressTracking` / `meta.costTracking` / `meta.evm` (tracking), plus plain
+         * `meta.actualStart` / `meta.actualEnd` and `meta.priority`.
+         */
+        function buildDataset() {
+          function task(id, parentId, name, from, to, extra) {
+            var t = { id: id, parentId: parentId, name: name, start: day(from), end: day(to) };
+            for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) t[k] = extra[k];
+            return t;
+          }
+          function meta(fields, money, extra) {
+            var m = { taskFields: fields, project: (extra && extra.project) || "Atlas" };
+            if (money) {
+              m.costTracking = { fixedCost: money[0], actualCost: money[1] };
+              m.evm = { bac: money[0], actualCost: money[1] };
+            }
+            if (extra && extra.actualStart !== undefined) m.actualStart = day(extra.actualStart);
+            if (extra && extra.actualEnd !== undefined) m.actualEnd = day(extra.actualEnd);
+            if (extra && extra.priority !== undefined) m.priority = extra.priority;
+            if (extra && extra.rag !== undefined) m.progressTracking = { rag: extra.rag };
+            if (extra && extra.custom !== undefined) m.customFields = extra.custom;
+            return m;
+          }
+
+          return {
+            tasks: [
+              task("phase-1", null, "Discovery", 0, 11, { type: "summary" }),
+              task("t-brief", "phase-1", "Kick-off brief", 0, 2, {
+                progress: 1,
+                meta: meta(
+                  {
+                    status: "done",
+                    priority: "high",
+                    tags: ["planning"],
+                    deadline: day(2),
+                    actualStart: day(0),
+                    actualEnd: day(2),
+                    customId: "ATL-001",
+                  },
+                  [4800, 4650],
+                  {
+                    actualStart: 0,
+                    actualEnd: 2,
+                    priority: "high",
+                    rag: "green",
+                    custom: { riskLevel: "low", vendor: "In-house" },
+                  },
+                ),
+              }),
+              task("t-research", "phase-1", "User research", 2, 7, {
+                progress: 1,
+                meta: meta(
+                  {
+                    status: "done",
+                    priority: "medium",
+                    tags: ["research"],
+                    deadline: day(7),
+                    actualStart: day(2),
+                    actualEnd: day(8),
+                  },
+                  [9200, 10100],
+                  {
+                    actualStart: 2,
+                    actualEnd: 8,
+                    priority: "medium",
+                    rag: "amber",
+                    custom: { riskLevel: "medium", vendor: "Northwind" },
+                  },
+                ),
+              }),
+              task("t-scope", "phase-1", "Scope agreed", 11, 11, {
+                type: "milestone",
+                meta: meta({ status: "done", priority: "high", tags: ["gate"] }, null, {
+                  priority: "high",
+                  rag: "green",
+                }),
+              }),
+
+              task("phase-2", null, "Build", 8, 30, { type: "summary" }),
+              task("t-arch", "phase-2", "Architecture", 8, 13, {
+                progress: 0.9,
+                meta: meta(
+                  {
+                    status: "in-progress",
+                    priority: "high",
+                    tags: ["design"],
+                    deadline: day(12),
+                    actualStart: day(8),
+                  },
+                  [11000, 8800],
+                  {
+                    actualStart: 8,
+                    priority: "high",
+                    rag: "green",
+                    custom: { riskLevel: "low", vendor: "In-house" },
+                  },
+                ),
+              }),
+              task("t-api", "phase-2", "API surface", 13, 21, {
+                progress: 0.45,
+                meta: meta(
+                  {
+                    status: "in-progress",
+                    priority: "high",
+                    tags: ["backend"],
+                    deadline: day(20),
+                    actualStart: day(13),
+                  },
+                  [18400, 9100],
+                  {
+                    actualStart: 13,
+                    priority: "high",
+                    rag: "amber",
+                    custom: { riskLevel: "medium", vendor: "In-house" },
+                  },
+                ),
+              }),
+              task("t-ui", "phase-2", "Interface", 15, 25, {
+                progress: 0.3,
+                meta: meta(
+                  {
+                    status: "in-progress",
+                    priority: "medium",
+                    tags: ["frontend"],
+                    deadline: day(24),
+                  },
+                  [16200, 5400],
+                  { priority: "medium", rag: "amber", custom: { riskLevel: "medium", vendor: "Lumen" } },
+                ),
+              }),
+              task("t-import", "phase-2", "Importers", 18, 24, {
+                progress: 0.1,
+                meta: meta(
+                  {
+                    status: "on-hold",
+                    priority: "low",
+                    tags: ["backend", "risk"],
+                    deadline: day(22),
+                  },
+                  [7300, 900],
+                  {
+                    priority: "low",
+                    project: "Beacon",
+                    rag: "red",
+                    custom: { riskLevel: "high", vendor: "Northwind" },
+                  },
+                ),
+              }),
+              task("t-docs", "phase-2", "Documentation", 22, 30, {
+                progress: 0,
+                meta: meta(
+                  { status: "not-started", priority: "low", tags: ["docs"], deadline: day(28) },
+                  [5600, 0],
+                  { priority: "low", rag: "amber", custom: { riskLevel: "low", vendor: "In-house" } },
+                ),
+              }),
+
+              task("phase-3", null, "Release", 26, 40, { type: "summary" }),
+              task("t-qa", "phase-3", "QA pass", 26, 33, {
+                progress: 0,
+                meta: meta(
+                  { status: "not-started", priority: "high", tags: ["quality"], deadline: day(31) },
+                  [12800, 0],
+                  { priority: "high", rag: "red", custom: { riskLevel: "high", vendor: "Lumen" } },
+                ),
+              }),
+              task("t-beta", "phase-3", "Beta programme", 30, 37, {
+                progress: 0,
+                meta: meta(
+                  { status: "not-started", priority: "medium", tags: ["quality"], deadline: day(36) },
+                  [6400, 0],
+                  {
+                    priority: "medium",
+                    project: "Beacon",
+                    rag: "amber",
+                    custom: { riskLevel: "medium", vendor: "Northwind" },
+                  },
+                ),
+              }),
+              task("t-launch", "phase-3", "Launch", 39, 39, {
+                type: "milestone",
+                meta: meta({ status: "not-started", priority: "high", tags: ["gate"] }, null, {
+                  priority: "high",
+                  rag: "red",
+                }),
+              }),
+              task("t-retro", "phase-3", "Retrospective", 39, 40, {
+                progress: 0,
+                meta: meta({ status: "not-started", priority: "low", tags: ["process"] }, [1600, 0], {
+                  priority: "low",
+                  rag: "green",
+                  custom: { riskLevel: "low", vendor: "In-house" },
+                }),
+              }),
+            ],
+
+            // All four link types, one lead (negative lag, which the diagnostics panel reports) and
+            // one deliberately violated constraint so `dependencies.highlightConflicts` has
+            // something to draw: t-docs must finish before t-qa starts, and today it does not.
+            links: [
+              { id: "k1", sourceId: "t-brief", targetId: "t-research", type: "FS" },
+              { id: "k2", sourceId: "t-research", targetId: "t-scope", type: "FS" },
+              { id: "k3", sourceId: "t-scope", targetId: "t-arch", type: "FS", lag: -3 * DAY },
+              { id: "k4", sourceId: "t-arch", targetId: "t-api", type: "FS" },
+              { id: "k5", sourceId: "t-arch", targetId: "t-ui", type: "SS", lag: 2 * DAY },
+              { id: "k6", sourceId: "t-api", targetId: "t-import", type: "SS", lag: 5 * DAY },
+              { id: "k7", sourceId: "t-ui", targetId: "t-docs", type: "FF" },
+              { id: "k8", sourceId: "t-api", targetId: "t-qa", type: "FS" },
+              { id: "k9", sourceId: "t-docs", targetId: "t-qa", type: "FS" },
+              { id: "k10", sourceId: "t-qa", targetId: "t-beta", type: "FS" },
+              { id: "k11", sourceId: "t-beta", targetId: "t-launch", type: "FS" },
+              { id: "k12", sourceId: "t-launch", targetId: "t-retro", type: "SF" },
+            ],
+
+            resources: [
+              { id: "r-ada", name: "Ada", capacity: 1 },
+              { id: "r-bo", name: "Bo", capacity: 1 },
+              { id: "r-cy", name: "Cy", capacity: 0.5 },
+              { id: "r-dee", name: "Dee", capacity: 1 },
+              { id: "r-rig", name: "Test rig", capacity: 2 },
+            ],
+
+            // Ada is deliberately over-allocated across the build phase, which is what the workload
+            // lanes, the Overallocation column and the utilization warnings exist to make visible.
+            assignments: [
+              { taskId: "t-brief", resourceId: "r-ada", units: 1 },
+              { taskId: "t-research", resourceId: "r-bo", units: 1 },
+              { taskId: "t-research", resourceId: "r-cy", units: 0.5 },
+              { taskId: "t-arch", resourceId: "r-ada", units: 1 },
+              { taskId: "t-api", resourceId: "r-ada", units: 1 },
+              { taskId: "t-api", resourceId: "r-bo", units: 0.5 },
+              { taskId: "t-ui", resourceId: "r-dee", units: 1 },
+              { taskId: "t-ui", resourceId: "r-ada", units: 0.5 },
+              { taskId: "t-import", resourceId: "r-bo", units: 1 },
+              { taskId: "t-docs", resourceId: "r-cy", units: 0.5 },
+              { taskId: "t-qa", resourceId: "r-dee", units: 1 },
+              { taskId: "t-qa", resourceId: "r-rig", units: 2 },
+              { taskId: "t-beta", resourceId: "r-bo", units: 1 },
+              { taskId: "t-retro", resourceId: "r-ada", units: 0.5 },
+            ],
+          };
+        }
+
+        var DATASET = buildDataset();
+
+        /**
+         * Task id -> its first assigned resource, built once.
+         *
+         * The bar-avatar provider is called for every visible bar on every paint, so it must not
+         * scan the assignment and resource lists there — the rule the library's own draw paths
+         * follow.
+         */
+        var FIRST_RESOURCE = (function () {
+          var byId = {};
+          DATASET.resources.forEach(function (r) {
+            byId[r.id] = r;
+          });
+          var out = {};
+          DATASET.assignments.forEach(function (a) {
+            if (out[a.taskId] === undefined && byId[a.resourceId]) out[a.taskId] = byId[a.resourceId];
+          });
+          return out;
+        })();
+
+        /** Task id -> task, for the tooltip provider. */
+        var TASK_BY_ID = (function () {
+          var out = {};
+          DATASET.tasks.forEach(function (t) {
+            out[t.id] = t;
+          });
+          return out;
+        })();
+
+        /** The baseline the variance bars and the slip indicators compare today's plan against. */
+        var BASELINE = {
+          id: "b-approved",
+          name: "Approved plan",
+          capturedAt: day(0),
+          tasks: DATASET.tasks.map(function (t) {
+            // Every task was planned two days shorter than it now is, so the baseline bars and the
+            // slip indicators have a real difference to draw rather than an invisible zero.
+            return {
+              id: t.id,
+              start: t.start,
+              end: Math.max(t.start, t.end - 2 * DAY),
+              type: t.type,
+            };
+          }),
+        };
+
+        /* ================================================================
+         * 2. The settings schema
+         * ================================================================
+         * One entry per group of mutually exclusive choices. The dialog, the validation and the
+         * localStorage round-trip are all generated from this array, so adding a group is one edit.
+         */
+
+        var STORAGE_KEY = "stargantt.v2.example.full-featured";
+
+        var SECTIONS = [
+          {
+            title: "Appearance",
+            open: true,
+            groups: [
+              {
+                id: "colorScheme",
+                label: "Colour scheme",
+                hint: "Pins the chart's palette. Each high-contrast preset also pins its own scheme.",
+                def: "auto",
+                options: [
+                  { v: "auto", l: "Follow the page" },
+                  { v: "light", l: "Light" },
+                  { v: "dark", l: "Dark" },
+                  { v: "contrast", l: "High contrast (light)" },
+                  { v: "contrastDark", l: "High contrast (dark)" },
+                  { v: "atlas", l: "Atlas blue", d: "a page-supplied preset" },
+                ],
+              },
+              {
+                id: "direction",
+                label: "Text direction",
+                hint: "RTL mirrors the panes, the header and the scrollbar edge. Fixed at creation.",
+                def: "ltr",
+                options: [
+                  { v: "ltr", l: "Left to right" },
+                  { v: "rtl", l: "Right to left" },
+                ],
+              },
+              {
+                id: "density",
+                label: "Row density",
+                hint: "Grid rows and chart rows always share this height — they cannot drift apart.",
+                def: "comfortable",
+                options: [
+                  { v: "compact", l: "Compact", d: "24px rows" },
+                  { v: "comfortable", l: "Comfortable", d: "32px rows" },
+                ],
+              },
+              {
+                id: "locale",
+                label: "Locale",
+                hint: "Drives the chart language, the header calendar, the display time zone and the first day of the week together — they read wrong apart.",
+                def: "en",
+                options: [
+                  { v: "en", l: "English", d: "Gregorian, UTC, weeks start Sunday" },
+                  { v: "ja-JP", l: "日本語", d: "Japanese era, Asia/Tokyo, weeks start Sunday" },
+                  { v: "de-DE", l: "Deutsch", d: "Gregorian, Europe/Berlin, weeks start Monday" },
+                ],
+              },
+              {
+                id: "barLabels",
+                label: "Bar labels",
+                hint: "Name, duration and percentage each take a different side of the bar; all three at once is what overprints.",
+                def: "full",
+                options: [
+                  { v: "full", l: "Name + duration + %", d: "right / left / inside" },
+                  { v: "nameOnly", l: "Name only" },
+                  { v: "none", l: "No labels", d: "Densest reading" },
+                ],
+              },
+              {
+                id: "barEmphasis",
+                label: "Bar colour meaning",
+                hint: "Four features can repaint the same bar and `taskbars/style` is first-wins, so only the winner is composed with its colouring on.",
+                def: "conditional",
+                options: [
+                  { v: "conditional", l: "Rules & priority", d: "treeGrid.conditionalFormat" },
+                  { v: "rag", l: "Schedule health", d: "tracking.progress RAG" },
+                  { v: "critical", l: "Critical path", d: "thicker stroke too, not colour alone" },
+                  { v: "baseline", l: "Baseline variance", d: "overlay bars + slip marks" },
+                  { v: "plain", l: "Plain bars" },
+                ],
+              },
+            ],
+          },
+          {
+            title: "Editing",
+            open: true,
+            groups: [
+              {
+                id: "editing",
+                label: "Edit mode",
+                hint: "Read-only vetoes user transactions at the store (export.viewerEmbed), so no surface can slip an edit past it.",
+                def: "full",
+                options: [
+                  { v: "full", l: "Full editing" },
+                  { v: "readOnly", l: "Read-only viewer" },
+                ],
+              },
+              {
+                id: "taskEditor",
+                label: "Task editor",
+                hint: "Both open on the same double-click, so exactly one of them may claim it.",
+                def: "inline",
+                options: [
+                  { v: "inline", l: "Inline grid cells", d: "dialog stays available as a command" },
+                  { v: "dialog", l: "Modal edit dialog", d: "grid runs read-only" },
+                ],
+              },
+              {
+                id: "scheduling",
+                label: "Dependency reconciliation",
+                hint: "The snap push-out stands down while the scheduler is propagating, so picking both means only one runs.",
+                def: "auto",
+                options: [
+                  { v: "auto", l: "Auto-schedule", d: "downstream follows, one undo step" },
+                  { v: "manualPush", l: "Manual + push successors", d: "only violated links move" },
+                  { v: "manual", l: "Manual only", d: "nothing moves but what you dragged" },
+                ],
+              },
+              {
+                id: "verticalDrag",
+                label: "Vertical drag on a bar",
+                hint: "Row reordering and resource reassignment are the same gesture; the host picks which one it means.",
+                def: "rows",
+                options: [
+                  { v: "rows", l: "Reorder / re-parent rows" },
+                  { v: "resource", l: "Reassign to a resource lane", d: "needs the resource lanes below" },
+                  { v: "none", l: "Horizontal drags only" },
+                ],
+              },
+            ],
+          },
+          {
+            title: "Overlays — the four chart-pane corners",
+            open: false,
+            groups: [
+              {
+                id: "cornerTL",
+                label: "Top-left",
+                hint: "The only overlay that requests this corner.",
+                def: "diagnostics",
+                options: [
+                  { v: "diagnostics", l: "Schedule diagnostics" },
+                  { v: "none", l: "Empty" },
+                ],
+              },
+              {
+                id: "cornerTR",
+                label: "Top-right",
+                hint: "Two overlays request top-right. Composing both is legal in v2 — the core grants the loser a free corner instead — but only one of them lands where you expect it.",
+                def: "search",
+                options: [
+                  { v: "search", l: "Search & filter" },
+                  { v: "heatmap", l: "Load heatmap" },
+                  { v: "none", l: "Empty" },
+                ],
+              },
+              {
+                id: "cornerBR",
+                label: "Bottom-right",
+                hint: "Two request bottom-right. At the 720px viewport floor the zoom toolbar is nearly as wide as the chart pane, which is a good reason to empty this corner there.",
+                def: "zoom",
+                options: [
+                  { v: "zoom", l: "Zoom controls" },
+                  { v: "cfLegend", l: "Colour-rule legend" },
+                  { v: "none", l: "Empty" },
+                ],
+              },
+              {
+                id: "cornerBL",
+                label: "Bottom-left",
+                hint: "Free in the official corner map; the frame HUD is parked here so it never displaces another overlay.",
+                def: "none",
+                options: [
+                  { v: "perfHud", l: "Frame-rate HUD" },
+                  { v: "none", l: "Empty" },
+                ],
+              },
+            ],
+          },
+          {
+            title: "Panes",
+            open: false,
+            groups: [
+              {
+                id: "bottomPane",
+                label: "Bottom region",
+                hint: "Strips stack in a fixed order — resource lanes, total load, per-resource load — and each one takes its height off the chart. Every combination below is legal; the tall ones just need a tall window.",
+                def: "band",
+                options: [
+                  { v: "band", l: "Workload band", d: "about 64px" },
+                  { v: "loadChart", l: "Workload band + per-resource lanes", d: "about 170px" },
+                  { v: "resourceLanes", l: "Resource assignment lanes", d: "about 200px" },
+                  { v: "both", l: "All three strips", d: "about 370px; needs a tall window" },
+                  { v: "none", l: "Chart only" },
+                ],
+              },
+              {
+                id: "sidePane",
+                label: "Right pane",
+                hint: "280px wide. On a 720px-wide window the grid and the chart have to share what is left.",
+                def: "details",
+                options: [
+                  { v: "details", l: "Task details panel" },
+                  { v: "none", l: "No right pane" },
+                ],
+              },
+              {
+                id: "viewMode",
+                label: "Start-up view",
+                hint: "Also switchable from the app bar at any time.",
+                def: "split",
+                options: [
+                  { v: "split", l: "Split", d: "panes and chart" },
+                  { v: "grid", l: "Table", d: "left panes only" },
+                  { v: "gantt", l: "Chart", d: "panes hidden" },
+                ],
+              },
+              {
+                id: "columns",
+                label: "Grid columns",
+                hint: "Five plugins contribute columns. All of them at once is wider than the pane.",
+                def: "essential",
+                options: [
+                  { v: "essential", l: "Essential", d: "name, dates, progress" },
+                  { v: "full", l: "Every contributed column", d: "19 columns; expect to scroll" },
+                ],
+              },
+            ],
+          },
+          {
+            title: "Data & advanced",
+            open: false,
+            groups: [
+              {
+                id: "dataOrigin",
+                label: "Where the tasks come from",
+                hint: "Each of these replaces the store's content, so only one may be active. All four backends are in-page shims — no network request is ever made.",
+                def: "builtin",
+                options: [
+                  { v: "builtin", l: "Loaded directly" },
+                  { v: "dataSource", l: "Data-source adapter" },
+                  { v: "lazyLoad", l: "Paged lazy loader", d: "4 rows per page" },
+                  { v: "offline", l: "IndexedDB snapshot", d: "restores and auto-saves" },
+                  { v: "realtime", l: "Realtime push", d: "one update arrives after connect" },
+                ],
+              },
+              {
+                id: "replacements",
+                label: "Built-in surfaces",
+                hint: "Eleven config fields do not extend the library's UI, they replace it: the grid's columns, the zoom ladder, the context menu, the filterable fields, five render seams and the load matrix hooks. Turning them on is what proves they exist.",
+                def: "library",
+                options: [
+                  { v: "library", l: "Keep the library's own", d: "those eleven fields stay unset" },
+                  {
+                    v: "custom",
+                    l: "Use this page's replacements",
+                    d: "custom columns, 3-level ladder, custom menu and panels",
+                  },
+                ],
+              },
+            ],
+          },
+        ];
+
+        /** Flat index of every group, for validation and defaults. */
+        var GROUPS = SECTIONS.reduce(function (all, s) {
+          return all.concat(s.groups);
+        }, []);
+
+        function defaultSettings() {
+          var out = {};
+          GROUPS.forEach(function (g) {
+            out[g.id] = g.def;
+          });
+          return out;
+        }
+
+        /**
+         * Reads the stored settings, keeping only values the schema still offers.
+         *
+         * Anything unrecognised — a hand-edited entry, a value from an older version of this page —
+         * falls back to that group's default rather than booting a composition nobody designed.
+         */
+        function loadSettings() {
+          var settings = defaultSettings();
+          var raw;
+          try {
+            raw = window.localStorage.getItem(STORAGE_KEY);
+          } catch (e) {
+            return settings;
+          }
+          if (!raw) return settings;
+          var parsed;
+          try {
+            parsed = JSON.parse(raw);
+          } catch (e) {
+            return settings;
+          }
+          if (!parsed || typeof parsed !== "object") return settings;
+          GROUPS.forEach(function (g) {
+            var value = parsed[g.id];
+            var known = g.options.some(function (o) {
+              return o.v === value;
+            });
+            if (known) settings[g.id] = value;
+          });
+          return settings;
+        }
+
+        function saveSettings(settings) {
+          try {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+            return true;
+          } catch (e) {
+            // Private-browsing quota refusals are not a reason to lose the chart; the composition
+            // still applies, it just will not survive the reload.
+            return false;
+          }
+        }
+
+        /* ================================================================
+         * 3. Locale-dependent constants and the dictionary
+         * ================================================================ */
+
+        var LOCALES = {
+          en: { tag: "en", calendar: "gregory", timeZone: "UTC", firstDay: 0 },
+          "ja-JP": { tag: "ja-JP", calendar: "japanese", timeZone: "Asia/Tokyo", firstDay: 0 },
+          "de-DE": { tag: "de-DE", calendar: "gregory", timeZone: "Europe/Berlin", firstDay: 1 },
+        };
+
+        /**
+         * The translation tables. Passing `i18n()` alone does not re-label the chart
+         * (docs/specs/plugins/i18n.md §2 — every plugin resolves its `messages` catalog once at
+         * setup from its own factory config). The
+         * supply side is `createDictionary()`, built below before `create()` and read through
+         * `catalog(prefix, defaults)` into each sibling factory's `messages`.
+         */
+        var TRANSLATIONS = {
+          "ja-JP": {
+            "treeGrid.nameColumn": "タスク",
+            "treeGrid.startColumn": "開始",
+            "treeGrid.endColumn": "終了",
+            "treeGrid.progressColumn": "進捗",
+          },
+          "de-DE": {
+            "treeGrid.nameColumn": "Vorgang",
+            "treeGrid.startColumn": "Beginn",
+            "treeGrid.endColumn": "Ende",
+            "treeGrid.progressColumn": "Fortschritt",
+          },
+        };
+
+        /** The English defaults `catalog()` merges translations over. */
+        var TREE_GRID_DEFAULT_MESSAGES = {
+          nameColumn: "Task",
+          startColumn: "Start",
+          endColumn: "Finish",
+          progressColumn: "Done",
+        };
+
+        /* ================================================================
+         * 4. Shared helpers used by the config below
+         * ================================================================ */
+
+        function isoDate(t) {
+          return new Date(t).toISOString().slice(0, 10);
+        }
+
+        function percent(p) {
+          return Math.round(p * 100) + "%";
+        }
+
+        /** Working-time density used by the cost model and by nothing else. */
+        var HOURS_PER_DAY = 8;
+
+        /** The one working calendar the shading, the snapping and the scheduler all follow. */
+        var CALENDAR = {
+          id: "standard",
+          name: "Standard week",
+          isDefault: true,
+          workingDays: [1, 2, 3, 4, 5],
+          // 09:00-12:00 and 13:00-17:30 UTC, so the off-hours hatch has gaps to draw inside a day.
+          workingHours: [
+            [9 * 3600000, 12 * 3600000],
+            [13 * 3600000, 17.5 * 3600000],
+          ],
+          exceptions: [
+            { date: isoDate(day(17)), working: false },
+            { date: isoDate(day(18)), working: false },
+          ],
+        };
+
+        /**
+         * A second registry calendar, so the calendar editor has something to move a task onto: a
+         * six-day week of early shifts. Nothing references it until a task is assigned to it, so the
+         * default composition looks and schedules exactly as it did without it.
+         */
+        var SHIFT_CALENDAR = {
+          id: "early-shift",
+          name: "Early shift (Mon-Sat, 06:00-14:00)",
+          workingDays: [1, 2, 3, 4, 5, 6],
+          workingHours: [[6 * 3600000, 14 * 3600000]],
+        };
+
+        /** The calendars the registry is built from, in the order the editor's picker lists them. */
+        var CALENDARS = [CALENDAR, SHIFT_CALENDAR];
+
+        /* ---- the in-page data backends (no network is ever contacted) ---- */
+
+        function localDocument() {
+          return {
+            tasks: DATASET.tasks,
+            links: DATASET.links,
+            resources: DATASET.resources,
+            assignments: DATASET.assignments,
+          };
+        }
+
+        /** A paged range adapter over the same task list, resolved synchronously in-page. */
+        var LAZY_ADAPTER = {
+          fetchRange: function (request) {
+            var rows = DATASET.tasks.slice(request.offset, request.offset + request.limit);
+            return Promise.resolve({ tasks: rows, total: DATASET.tasks.length });
+          },
+        };
+
+        /**
+         * A push transport that opens, delivers one upsert, and then stays quiet — enough to show
+         * the connection status and a live store update without a server or a timer that never
+         * settles.
+         */
+        var REALTIME_TRANSPORT = {
+          connect: function (handlers) {
+            this._handlers = handlers;
+            var self = this;
+            this._timer = window.setTimeout(function () {
+              if (!self._handlers) return;
+              self._handlers.onOpen();
+              self._handlers.onMessage({
+                type: "changes",
+                changes: [
+                  {
+                    type: "upsert",
+                    task: {
+                      id: "t-ui",
+                      parentId: "phase-2",
+                      name: "Interface (pushed update)",
+                      start: day(15),
+                      end: day(25),
+                      progress: 0.4,
+                    },
+                  },
+                ],
+              });
+            }, 120);
+          },
+          disconnect: function () {
+            this._handlers = null;
+            if (this._timer) window.clearTimeout(this._timer);
+          },
+        };
+
+        /* ================================================================
+         * 5. The composition
+         * ================================================================
+         * Every published config field of every official plugin is written out below. The values
+         * are chosen to produce one coherent, readable chart — not to probe boundaries — so this
+         * page doubles as a worked example of what a sensible full configuration looks like.
+         */
+
+        /** Promise-based bulk-delete confirmation, replacing the built-in dialog. */
+        function confirmDelete(request) {
+          var dialog = document.getElementById("confirmDialog");
+          var text = document.getElementById("confirmText");
+          text.textContent =
+            request.count === 1
+              ? "Delete this task? Undo can bring it back."
+              : "Delete " + request.count + " tasks? Undo can bring them back.";
+          return new Promise(function (resolve) {
+            function finish(answer) {
+              dialog.removeEventListener("close", onClose);
+              document.getElementById("confirmYes").onclick = null;
+              document.getElementById("confirmNo").onclick = null;
+              if (dialog.open) dialog.close();
+              resolve(answer);
+            }
+            function onClose() {
+              finish(false);
+            }
+            dialog.addEventListener("close", onClose);
+            document.getElementById("confirmYes").onclick = function () {
+              finish(true);
+            };
+            document.getElementById("confirmNo").onclick = function () {
+              finish(false);
+            };
+            dialog.showModal();
+          });
+        }
+
+        function buildComposition(s) {
+          var G = window.StarGantt;
+          var loc = LOCALES[s.locale];
+          var custom = s.replacements === "custom";
+          var readOnly = s.editing === "readOnly";
+          var rowHeight = s.density === "compact" ? 24 : 32;
+
+          var dateFmt = new Intl.DateTimeFormat(loc.tag, {
+            dateStyle: "medium",
+            timeZone: loc.timeZone,
+            calendar: loc.calendar,
+          });
+          function formatDate(t) {
+            return dateFmt.format(t);
+          }
+
+          // The dictionary is the supply side of localization; the catalogs it produces are what
+          // actually move pixels (i18n.md §1.5's documented pattern).
+          var dict = G.createDictionary({
+            locale: loc.tag,
+            fallbacks: ["en"],
+            translations: TRANSLATIONS,
+          });
+
+          /* ---- which feature owns the bar's fill -------------------------------- */
+          var cfColours = s.barEmphasis === "conditional";
+          var ragColours = s.barEmphasis === "rag";
+          var criticalColours = s.barEmphasis === "critical";
+          var baselineColours = s.barEmphasis === "baseline";
+
+          /* ---- bar labels ------------------------------------------------------ */
+          var labelsFull = s.barLabels === "full";
+          var labelsAny = s.barLabels !== "none";
+
+          /* ---- corners --------------------------------------------------------- */
+          var tl = s.cornerTL;
+          var tr = s.cornerTR;
+          var br = s.cornerBR;
+          var bl = s.cornerBL;
+
+          /* ---- bottom region --------------------------------------------------- */
+          // The aggregate band, the per-resource load lanes and the resource-assignment strip are
+          // three separate strips of the one bottom region; each is priced in chart height.
+          var wantBand = s.bottomPane === "band" || s.bottomPane === "loadChart" || s.bottomPane === "both";
+          var wantLoadLanes = s.bottomPane === "loadChart" || s.bottomPane === "both";
+          var wantResourceLanes = s.bottomPane === "resourceLanes" || s.bottomPane === "both";
+
+          /* ---- data origin ----------------------------------------------------- */
+          var origin = s.dataOrigin;
+
+          /* ================= the nine preset plugins ================= */
+
+          var presetConfig = {
+            /* --- data-store (includes custom-fields) ---------------------- */
+            dataStore: {
+              // Transaction labels surface in the undo announcements and in the diagnostics panel.
+              messages: {
+                taskMove: "Move task",
+                taskUpdate: "Edit task",
+                taskAdd: "Add task",
+                taskRemove: "Delete task",
+                taskSetProgress: "Set progress",
+                linkAdd: "Link tasks",
+                linkUpdate: "Edit link",
+                linkRemove: "Unlink tasks",
+                assignmentSet: "Assign resource",
+                assignmentRemove: "Unassign resource",
+              },
+              // Custom field definitions for this dataset.
+              customFields: {
+                fields: [
+                  {
+                    key: "riskLevel",
+                    type: "select",
+                    label: "Risk",
+                    options: ["low", "medium", "high"],
+                    width: 90,
+                    column: true,
+                  },
+                  { key: "vendor", type: "text", label: "Vendor", width: 120, column: true },
+                ],
+              },
+            },
+
+            /* --- view (renderer + panes + theme + timeline-scale + grid-lines +
+                        today-line, all five folded into one plugin) ---------------- */
+            view: {
+              scroll: { wheelSpeedFactor: 1, scrollbar: true },
+              direction: s.direction,
+              // The three scheduling optimisations are all safe to leave on: they change when work
+              // is done, never what is drawn.
+              progressive: true,
+              dirtyRegions: true,
+              prefetch: true,
+
+              panes: { initialViewMode: s.viewMode },
+
+              theme: {
+                preset:
+                  s.colorScheme === "contrast"
+                    ? "high-contrast"
+                    : s.colorScheme === "contrastDark"
+                      ? "high-contrast-dark"
+                      : s.colorScheme === "atlas"
+                        ? "atlas-blue"
+                        : undefined,
+                // A preset that pins its own colour scheme never trips the partial-palette warning.
+                presets: {
+                  "atlas-blue": {
+                    colorScheme: "light",
+                    tokens: { "--sg-bar-fill": "#2563eb", "--sg-bar-summary-fill": "#1e3a8a" },
+                  },
+                },
+                // Windows High Contrast wins over every palette on this page, as it should.
+                forcedColors: true,
+                colorScheme:
+                  s.colorScheme === "light" ? "light" : s.colorScheme === "dark" ? "dark" : "auto",
+                diagnostics: true,
+              },
+
+              timeline: (function () {
+                var cfg = {
+                  // A week before the first task, so the project is fully visible without scrolling.
+                  origin: day(-7),
+                  // Keeps a bar dragged past the left edge reachable instead of stranding it at a
+                  // negative position.
+                  autoExtendOrigin: true,
+                  // Week, not day: the project runs forty days, and a chart that opens showing a
+                  // third of its own subject asks the reader to scroll before they have understood
+                  // anything.
+                  initialZoom: "week",
+                  firstDayOfWeek: loc.firstDay,
+                  // The coarse row carries the month and needs less room than the day numbers below.
+                  headerRowRatio: 0.45,
+                  headerLabelPadding: 6,
+                  fiscalYearStartMonth: 4,
+                  calendar: loc.calendar,
+                  displayTimeZone: loc.timeZone,
+                };
+                if (custom) {
+                  // Replacing the ladder drops all six built-in levels, so a replacement has to
+                  // carry every zoom the toolbar and the keyboard offer. It also opts out of the
+                  // calendar / time-zone / fiscal-year wording the built-in rows do for free —
+                  // which is exactly why this is behind a switch rather than always on.
+                  cfg.zoomLevels = [
+                    {
+                      id: "month",
+                      pxPerDay: 4,
+                      scales: [
+                        {
+                          unit: "year",
+                          format: function (t) {
+                            return String(new Date(t).getUTCFullYear());
+                          },
+                        },
+                        {
+                          unit: "month",
+                          format: function (t) {
+                            return String(new Date(t).getUTCMonth() + 1);
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      id: "week",
+                      pxPerDay: 14,
+                      scales: [
+                        {
+                          unit: "month",
+                          format: function (t) {
+                            return String(new Date(t).getUTCMonth() + 1);
+                          },
+                        },
+                        {
+                          unit: "week",
+                          format: function (t) {
+                            return "W" + new Date(t).getUTCDate();
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      id: "day",
+                      pxPerDay: 40,
+                      scales: [
+                        {
+                          unit: "month",
+                          format: function (t) {
+                            return String(new Date(t).getUTCMonth() + 1);
+                          },
+                        },
+                        {
+                          unit: "day",
+                          format: function (t) {
+                            return String(new Date(t).getUTCDate());
+                          },
+                        },
+                      ],
+                    },
+                  ];
+                }
+                return cfg;
+              })(),
+
+              gridLines: {
+                // Major only: a rule at every column turns into a mesh past a few rows.
+                vertical: "major",
+                horizontal: false,
+                rowStripes: true,
+                // Ground, never figure: the shading follows the working calendar and stays under
+                // the bars' contrast.
+                nonWorkingDays: { calendar: CALENDAR.id },
+                nonWorkingHours: true,
+                zones: [{ start: day(13), end: day(20), color: "--sg-grid-zone" }],
+                rowHover: true,
+              },
+
+              todayLine: { statusDate: STATUS_DATE },
+            },
+
+            /* --- tree-grid (includes task-fields + conditional-format) ------ */
+            treeGrid: (function () {
+              var cfg = {
+                // The dictionary supplies the words; `Intl` (driven by the chart-wide locale)
+                // supplies the formats. The two are independent axes — i18n.md's stated principle.
+                messages: dict.catalog("treeGrid", TREE_GRID_DEFAULT_MESSAGES),
+                rowHeight: rowHeight,
+                // Wide enough for the visible column set without crowding the chart. Measured, not
+                // guessed: the essential four are 220+110+110+90 = 530px of columns, so anything
+                // narrower silently clips the last one — and every px spent here is a px the chart
+                // does not get.
+                paneWidth: s.columns === "full" ? 640 : 534,
+                indent: 16,
+                // The dialog owns the double-click when it is the chosen editor, so the inline cell
+                // editor must stand down; read-only mode disables both.
+                readOnly: readOnly || s.taskEditor === "dialog",
+                formatDate: formatDate,
+                formatProgress: percent,
+                // Five plugins contribute columns and their sum is far wider than any sane pane, so
+                // the host decides what is displayed. `hidden` never changes what is contributed —
+                // every column below is still composed, sortable and reachable through the service.
+                columnLayout:
+                  s.columns === "full"
+                    ? {
+                        order: [
+                          "wbs",
+                          "name",
+                          "taskfields-id",
+                          "taskfields-status",
+                          "taskfields-priority",
+                          "start",
+                          "end",
+                          "taskfields-duration",
+                          "progress",
+                          "resource.resources",
+                          "resource.overallocation",
+                          "scheduling.mode",
+                          "taskfields-deadline",
+                          "taskfields-tags",
+                          "taskfields-assignees",
+                          "taskfields-actualStart",
+                          "taskfields-actualEnd",
+                          "customfields-riskLevel",
+                          "customfields-vendor",
+                        ],
+                      }
+                    : {
+                        hidden: [
+                          "wbs",
+                          "taskfields-id",
+                          "taskfields-status",
+                          "taskfields-priority",
+                          "taskfields-tags",
+                          "taskfields-assignees",
+                          "taskfields-duration",
+                          "taskfields-deadline",
+                          "taskfields-actualStart",
+                          "taskfields-actualEnd",
+                          "customfields-riskLevel",
+                          "customfields-vendor",
+                          "resource.resources",
+                          "resource.overallocation",
+                          "scheduling.mode",
+                        ],
+                      },
+                cellRenderers: {
+                  // Only the name cell is overridden, and only to add a type marker — the column
+                  // keeps its own header, editing and sorting.
+                  name: function (el, task) {
+                    var mark = task.type === "milestone" ? "◆ " : task.type === "summary" ? "▸ " : "";
+                    el.textContent = mark + task.name;
+                  },
+                },
+                rowClass: function (task) {
+                  return task.type === "summary" ? "row-summary" : undefined;
+                },
+                wbs: true,
+                collapsedBadge: true,
+                outlineEditing: !readOnly,
+                collation: { locales: loc.tag, options: { numeric: true, sensitivity: "base" } },
+
+                /* --- task-fields config, nested --- */
+                taskFields: {
+                  columns: [
+                    "id",
+                    "status",
+                    "priority",
+                    "tags",
+                    "assignees",
+                    "deadline",
+                    "duration",
+                    "actualStart",
+                    "actualEnd",
+                  ],
+                  // task-bars' own end icons already carry the status on the left end (one plugin,
+                  // one end), so this one stands down rather than drawing a second glyph there.
+                  showStatusOnBars: false,
+                  showDeadlineWarnings: true,
+                  // task-bars draws the assignee badge, so this one stands down as well.
+                  showAssigneeAvatars: false,
+                  detailFields: s.sidePane === "details",
+                  durationUnit: "days",
+                  idNumbering: { prefix: "ATL-", start: 1, minDigits: 3 },
+                  autoRecordCompletion: true,
+                  templates: {
+                    review: {
+                      name: "Review",
+                      durationMs: 2 * DAY,
+                      fields: { status: "not-started", priority: "medium" },
+                    },
+                  },
+                },
+
+                /* --- conditional-format config, nested --- */
+                conditionalFormat: {
+                  rules: cfColours
+                    ? [
+                        {
+                          when: { field: "meta.taskFields.status", op: "eq", value: "on-hold" },
+                          style: { color: "#64748b" },
+                          legend: "On hold",
+                        },
+                        {
+                          when: { field: "progress", op: "gte", value: 1 },
+                          style: { color: "#15803d" },
+                          legend: "Complete",
+                        },
+                      ]
+                    : [],
+                  // Red is reserved for the overdue warning below. A high-priority task that is
+                  // running fine is not an alarm, so priority reads as a warm-to-cool ramp instead
+                  // of borrowing the alarm colour — and the priority column carries the word as
+                  // well, never the hue alone.
+                  priorityColors: cfColours
+                    ? { high: "#b45309", medium: "#1d4ed8", low: "#64748b" }
+                    : {},
+                  overdue: cfColours ? { color: "#b91c1c", icon: true } : false,
+                  // The progress-status colouring is tracking's job on this page, not this nest's —
+                  // two owners of the same pixels is the whole reason the group exists.
+                  progress: false,
+                  legend: br === "cfLegend",
+                  now: function () {
+                    return STATUS_DATE;
+                  },
+                },
+              };
+              if (custom) {
+                // Replacing the columns retires formatDate, formatProgress and collation with them
+                // — they only ever applied to the built-in four.
+                cfg.columns = [
+                  {
+                    id: "name",
+                    header: "Task",
+                    width: 220,
+                    render: function (el, t) {
+                      el.textContent = t.name;
+                    },
+                    getValue: function (t) {
+                      return t.name;
+                    },
+                    setValue: function (t, v) {
+                      return { name: String(v) };
+                    },
+                  },
+                  {
+                    id: "window",
+                    header: "Window",
+                    width: 190,
+                    render: function (el, t) {
+                      el.textContent = isoDate(t.start) + " → " + isoDate(t.end);
+                    },
+                    getValue: function (t) {
+                      return t.start;
+                    },
+                  },
+                  {
+                    id: "done",
+                    header: "Done",
+                    width: 70,
+                    render: function (el, t) {
+                      el.textContent = percent(t.progress || 0);
+                    },
+                    getValue: function (t) {
+                      return t.progress || 0;
+                    },
+                  },
+                ];
+              }
+              return cfg;
+            })(),
+
+            /* --- task-bars ------------------------------------------------------- */
+            taskBars: {
+              // Three labels, three different sides — the arrangement that does not overprint.
+              label: labelsAny
+                ? {
+                    text: function (task) {
+                      return task.name;
+                    },
+                    placement: "right",
+                  }
+                : {
+                    text: function () {
+                      return undefined;
+                    },
+                    placement: "right",
+                  },
+              messages: { empty: "No tasks match the current filter." },
+              // A halo keeps an outside label readable where a dependency line crosses it.
+              labelBackdrop: { padding: 3, radius: 3 },
+              durationLabel: labelsFull ? { placement: "left" } : false,
+              progressLabel: labelsFull ? { placement: "inside" } : false,
+              // Decorates around the built-in look rather than redrawing it, so whichever feature
+              // owns the fill still owns it.
+              renderBar: function (g, a) {
+                a.defaultPaint();
+                if (a.box.height < 8 || a.box.width < 6) return;
+                g.save();
+                g.globalAlpha = 0.18;
+                g.fillStyle = "#ffffff";
+                g.fillRect(a.box.x + 1, a.box.y + 1, a.box.width - 2, 1);
+                g.restore();
+              },
+              milestoneShape: function (task) {
+                // Gate milestones get a distinct shape, so the two kinds are told apart without
+                // colour.
+                var tags = (task.meta && task.meta.taskFields && task.meta.taskFields.tags) || [];
+                return tags.indexOf("gate") >= 0 ? "star" : "diamond";
+              },
+              // Texture as well as colour, but only where it reads as texture: the built-in mapping
+              // cross-hatches a summary across its whole band, which at this row height paints a
+              // solid dark block and inverts the figure/ground the bars depend on.
+              patternFill: function (task) {
+                return task.type === "summary" || task.type === "milestone" ? "none" : "diagonal";
+              },
+              barRadius: 3,
+              // A bar has two ends and three features want them. This page's arbitration: the left
+              // end carries the status glyph (drawn here rather than by task-fields, so one plugin
+              // owns one end) and the right end carries the assignee badge below.
+              barIcons: function (task) {
+                var status = (task.meta && task.meta.taskFields && task.meta.taskFields.status) || "";
+                if ((task.progress || 0) >= 1) return { left: "✓" };
+                if (status === "on-hold") return { left: "⏸" };
+                return undefined;
+              },
+              avatar: function (task) {
+                // Only in the dense label mode, and only where there is room: a 20px badge on a
+                // two-day bar at week zoom covers the bar it is meant to annotate. Duration is the
+                // host-side proxy for width the seam does not hand out.
+                if (!labelsFull) return undefined;
+                if (task.end - task.start < 4 * DAY) return undefined;
+                var res = FIRST_RESOURCE[task.id];
+                return res ? { initials: res.name.slice(0, 2) } : undefined;
+              },
+              // A folded phase still shows what it contains and when.
+              collapsedSummary: "split",
+              // Milestones and one-day bars stay grabbable (WCAG 2.5.8's 24x24 floor).
+              expandedHitArea: true,
+            },
+
+            /* --- interaction (selection + drag-edit + snap + tooltip +
+                        context-menu + zoom-controls + clipboard + filter-search +
+                        edit-dialog + side-panel: ten concerns, one config) ----------- */
+            interaction: (function () {
+              var cfg = {
+                messages: {
+                  deleteConfirmButton: "Delete",
+                  searchPlaceholder: "Find a task…",
+                  dialogTitle: "Edit task",
+                  dialogErrorDateOrder: "The finish date has to come after the start date.",
+                  copied: function (count) {
+                    return count + " task" + (count === 1 ? "" : "s") + " copied";
+                  },
+                },
+
+                selection: {
+                  mode: "multi",
+                  shortcuts: { selectAll: true, clearOnEscape: true, deleteSelected: !readOnly },
+                  confirmDelete: confirmDelete,
+                  revealSelected: true,
+                },
+
+                dragEdit: {
+                  enabled: !readOnly,
+                  // The store follows the pointer so dependent bars move with it, still one undo
+                  // step.
+                  liveUpdate: true,
+                  // The dates a release would commit, read off the cursor instead of after the drop.
+                  dragTooltip: true,
+                  minDuration: DAY,
+                  rowDrag: s.verticalDrag === "rows",
+                  // WCAG 2.5.7's single-pointer alternative to dragging.
+                  clickMove: true,
+                  multiDrag: true,
+                  autoScroll: true,
+                  // The first-order knock-on of the edit, visible before it is committed.
+                  dependencyPreview: true,
+                  resourceDrag: s.verticalDrag === "resource",
+                  frameSync: true,
+                },
+
+                snap: {
+                  enabled: true,
+                  // Follows the zoom: coarse at month level, fine at hour level.
+                  unit: "scale",
+                  // Delegates to the built-in behaviour, so `unit` above still decides the rounding.
+                  rule: function (base) {
+                    return {
+                      snap: function (t) {
+                        return base.snap(t);
+                      },
+                      step: function (t, d) {
+                        return base.step(t, d);
+                      },
+                    };
+                  },
+                  workingDays: { calendar: CALENDAR.id },
+                  // Sticking to neighbouring task edges is what makes bars line up exactly.
+                  alignToTasks: { tolerancePx: 8 },
+                  // Stands down by itself while the scheduler propagates; only meaningful in manual
+                  // mode.
+                  pushSuccessors: s.scheduling === "manualPush",
+                },
+
+                tooltip: {
+                  content: function (hit) {
+                    var task = hit.kind === "bar" ? TASK_BY_ID[hit.id] : undefined;
+                    if (!task) return undefined;
+                    var fields = (task.meta && task.meta.taskFields) || {};
+                    return (
+                      task.name +
+                      "\n" +
+                      formatDate(task.start) +
+                      " → " +
+                      formatDate(task.end) +
+                      (fields.status ? "\n" + fields.status : "")
+                    );
+                  },
+                  // Click shows at once; a resting pointer shows after the dwell.
+                  trigger: "both",
+                  showDelay: 400,
+                  hideDelay: 150,
+                },
+
+                contextMenu: { insertMode: "sibling" },
+
+                clipboard: {
+                  fields: ["name", "start", "end", "progress"],
+                  systemClipboard: !readOnly,
+                },
+
+                filterSearch: {
+                  searchBox: tr === "search",
+                  filterPanel: tr === "search",
+                  views: { "At risk": { query: "", criteria: null } },
+                },
+
+                editDialog: {
+                  // Composed either way; it only claims the double-click when it is the chosen
+                  // editor.
+                  openOnDoubleClick: s.taskEditor === "dialog" && !readOnly,
+                },
+              };
+
+              // The zoom toolbar and the side panel are composed only when they are wanted: an
+              // omitted nest is how interaction.md says a peripheral is left out.
+              if (br === "zoom") {
+                cfg.zoomControls = {
+                  levels: custom
+                    ? ["month", "week", "day"]
+                    : ["year", "quarter", "month", "week", "day", "hour"],
+                  slider: true,
+                  zoomButtons: true,
+                  fitButton: true,
+                  todayButton: true,
+                  selectionButton: true,
+                  position: "bottom-right",
+                };
+              }
+              if (s.sidePane === "details") {
+                cfg.sidePanel = { formatDate: formatDate };
+              }
+
+              if (custom) {
+                // A provider replaces the built-in insert / duplicate / delete entries outright —
+                // other plugins' contributed entries still follow it.
+                cfg.contextMenu.items = function (target) {
+                  if (target.kind !== "hit") return undefined;
+                  return [
+                    {
+                      id: "reveal",
+                      label: "Reveal in the grid",
+                      run: function (t) {
+                        var selection = instance && instance.getService("stargantt.selection");
+                        if (selection && t.kind === "hit") selection.select([t.id]);
+                      },
+                    },
+                  ];
+                };
+                // Replaces the built-in assigned-resource / task-type fields.
+                cfg.filterSearch.fields = [
+                  {
+                    id: "status",
+                    label: "Status",
+                    value: function (t) {
+                      return (t.meta && t.meta.taskFields && t.meta.taskFields.status) || "—";
+                    },
+                  },
+                  {
+                    id: "priority",
+                    label: "Priority",
+                    value: function (t) {
+                      return (t.meta && t.meta.priority) || "—";
+                    },
+                  },
+                ];
+                cfg.editDialog.renderBody = function (host, ctx) {
+                  host.textContent = "Editing " + ctx.draft.name;
+                };
+                if (cfg.sidePanel) {
+                  // Replaces the whole built-in detail form, the field editing included.
+                  cfg.sidePanel.renderBody = function (host, ctx) {
+                    if (!ctx.task) {
+                      host.textContent = "Select a task.";
+                      return;
+                    }
+                    var h = document.createElement("h3");
+                    h.textContent = ctx.task.name;
+                    var p = document.createElement("p");
+                    p.textContent = formatDate(ctx.task.start) + " → " + formatDate(ctx.task.end);
+                    host.append(h, p);
+                  };
+                }
+              }
+              return cfg;
+            })(),
+
+            /* --- undo-redo -------------------------------------------------------- */
+            undoRedo: {
+              messages: { undone: "Undone", redone: "Redone" },
+              limit: 200,
+              keys: {
+                undo: ["Ctrl+Z", "Meta+Z"],
+                redo: ["Ctrl+Shift+Z", "Meta+Shift+Z", "Ctrl+Y"],
+              },
+            },
+
+            /* --- a11y -------------------------------------------------------------- */
+            a11y: {
+              label: "Atlas project plan",
+              messages: {
+                // `progress` arrives as 0..1 here, so the percentage is formatted in the builder.
+                rowText: function (parts) {
+                  return (
+                    (parts.name || "") +
+                    (parts.progress === undefined ? "" : ", " + percent(parts.progress))
+                  );
+                },
+              },
+              // Focus and selection move together, so the focused row is always visibly the
+              // selected one — the chart draws no second indicator for it.
+              syncSelection: true,
+              describeDependencies: true,
+              // `?` lists every shortcut currently in force, contributed ones included.
+              shortcutHelp: true,
+              // Takes +/- from expand/collapse, which stay on ArrowRight / ArrowLeft.
+              zoomKeys: true,
+              summaryTable: true,
+            },
+
+            /* --- scheduling (dependencies + auto-schedule + calendars +
+                        critical-path + schedule-diagnostics) ------------------------ */
+            scheduling: {
+              messages: { inspectorLabel: "Dependencies", editorTitle: "Working calendar" },
+
+              dependencies: {
+                allowLinkCreate: !readOnly,
+                routingStyle: "elbow",
+                defaultLinkType: "FS",
+                defaultLag: 0,
+                showLinks: true,
+                linkStyle: { width: 1.5, dash: [], arrowHead: "filled" },
+                // Type by colour *and* by attachment point — colour is never the only signal.
+                typeColors: { FS: "#0ea5e9", SS: "#16a34a", FF: "#f59e0b", SF: "#a855f7" },
+                linkEditing: !readOnly,
+                // Hovering or selecting lights the whole chain up and fades the rest.
+                highlightPaths: true,
+                inspector: s.sidePane === "details",
+                highlightDropTargets: true,
+                highlightConflicts: true,
+                conflictColor: "#dc2626",
+                highlightDriving: true,
+                // Both are pure paint-cost optimisations; neither changes a visible pixel.
+                cullLines: true,
+                avoidBars: true,
+              },
+
+              autoSchedule: {
+                enabled: s.scheduling === "auto",
+                modeColumn: s.columns === "full",
+              },
+
+              calendars: {
+                calendars: CALENDARS,
+                shadeCalendar: CALENDAR.id,
+                // The scheduler and the shading follow the same calendar, so a bar can never be
+                // scheduled onto a day the chart has shaded as non-working.
+                scheduling: true,
+                // Every section: the weekly pattern, the intra-day windows, special periods with
+                // the exception list, and putting the selected tasks on a calendar. The panel is
+                // hidden until the app bar's Edit button opens it, so it costs no corner until then
+                // — which is why it is not one of the corner choices in the settings dialog.
+                editor: true,
+              },
+
+              criticalPath: {
+                // The analysis service answers either way; this only governs the visuals.
+                enabled: criticalColours,
+                thresholdDays: 0,
+                nearCriticalDays: 2,
+                criticalColor: "#c62828",
+                nearCriticalColor: "#ef6c00",
+                negativeFloatColor: "#7f1d1d",
+                highlightBars: true,
+                highlightLinks: true,
+                showFloat: criticalColours,
+                floatColor: "rgba(96, 125, 139, 0.3)",
+              },
+
+              diagnostics: { panel: tl === "diagnostics" },
+            },
+
+            /* --- export (export-image + export-print + import-export +
+                        msproject-io + excel-io + viewer-embed: six concerns, one
+                        facade) ----------------------------------------------------- */
+            export: {
+              messages: { legendTitle: "Legend", dialogTitle: "Import tasks" },
+              image: { background: "#ffffff", pixelRatio: 2, range: "full" },
+              print: {
+                paper: "a4",
+                orientation: "landscape",
+                scale: 100,
+                marginMm: 10,
+                pixelRatio: 2,
+                header: { left: "Atlas project plan", right: isoDate(STATUS_DATE) },
+                columns: ["name", "start", "end"],
+                legend: true,
+                criticalPathOnly: false,
+              },
+              importExport: { csvDelimiter: "," },
+              excel: { sheetName: "Atlas plan" },
+              viewerEmbed: {
+                // The read-only veto sits at the store, below every editing surface.
+                readOnly: readOnly,
+                // Not an iframe embed: this page owns its own layout.
+                embed: false,
+                snapshotParam: "sg-snapshot",
+                // Reading a snapshot out of the URL would make the first paint depend on the
+                // address bar.
+                autoRestore: false,
+                // The built-in data-layer origins are always exempt; this only adds to them.
+                readOnlyExemptOrigins: ["host-import"],
+              },
+            },
+          };
+
+          /* ================= the six opt-in plugins, in dependency order =================
+           * `resource` first: `tracking`'s cost-rate fallback names it as an optional edge, and
+           * `portfolio`'s dashboard names `tracking`. `i18n` and `perf-tools` depend on nothing.
+           */
+
+          var plugins = G.presetStandard(presetConfig).slice();
+
+          /* --- resource (resource-pool + resource-assign + resource-view +
+                      resource-utilization + load-chart) ---------------------------- */
+          plugins.push(
+            G.resource({
+              messages: {
+                assignColumnHeader: "Assigned",
+                utilizationColumnHeader: "Overallocated",
+                panelLabel: "Resource lanes",
+                bandResizeLabel: "Resize the workload band",
+              },
+
+              pool: {
+                resources: [
+                  {
+                    id: "r-ada",
+                    name: "Ada",
+                    kind: "person",
+                    capacity: 1,
+                    skills: ["architecture", "backend"],
+                    costRate: 9600,
+                    billable: true,
+                  },
+                  {
+                    id: "r-bo",
+                    name: "Bo",
+                    kind: "person",
+                    capacity: 1,
+                    skills: ["backend"],
+                    costRate: 8800,
+                    billable: true,
+                  },
+                  {
+                    id: "r-cy",
+                    name: "Cy",
+                    kind: "person",
+                    capacity: 0.5,
+                    skills: ["research", "docs"],
+                    costRate: 7200,
+                    billable: true,
+                  },
+                  {
+                    id: "r-dee",
+                    name: "Dee",
+                    kind: "person",
+                    capacity: 1,
+                    skills: ["frontend", "quality"],
+                    costRate: 8000,
+                    billable: true,
+                  },
+                  {
+                    id: "r-rig",
+                    name: "Test rig",
+                    kind: "equipment",
+                    capacity: 2,
+                    skills: ["quality"],
+                    costRate: 2400,
+                    billable: false,
+                  },
+                ],
+                bookings: [
+                  {
+                    id: "bk-1",
+                    resourceId: "r-rig",
+                    taskId: "t-qa",
+                    start: day(26),
+                    end: day(33),
+                    state: "confirmed",
+                    units: 2,
+                  },
+                  {
+                    id: "bk-2",
+                    resourceId: "r-cy",
+                    taskId: "t-docs",
+                    start: day(20),
+                    end: day(24),
+                    state: "tentative",
+                    units: 0.5,
+                  },
+                ],
+                // Mirrors the pool into the store's resource list so assignments can target the
+                // same ids.
+                syncToStore: true,
+              },
+
+              assign: { column: true, columnWidth: 150, dragReassign: !readOnly },
+
+              view: {
+                startOpen: wantResourceLanes,
+                resizable: true,
+                teams: [
+                  { name: "Delivery", members: ["r-ada", "r-bo", "r-cy", "r-dee"] },
+                  { name: "Shared kit", members: ["r-rig"] },
+                ],
+                projectOf: function (task) {
+                  return (task.meta && task.meta.project) || null;
+                },
+              },
+
+              utilization: {
+                bucket: "day",
+                weekStart: loc.firstDay === 0 ? "sunday" : "monday",
+                threshold: 1,
+                // Both hooks take the built-in figure as their baseline, so returning it unchanged
+                // is the identity — the seam is wired without altering a single number.
+                resourceLoad: function (input) {
+                  return input.allocated;
+                },
+                resourceCapacity: function (input) {
+                  return input.capacity;
+                },
+                warnings: true,
+                column: s.columns === "full",
+                // These are on-demand PANELS opened through `stargantt.utilization`, not
+                // corner-slot overlays, so they stay closed at setup and the app bar's
+                // Workload / Trend buttons open them.
+                summaryPanel: false,
+                trendPanel: false,
+                role: function (entry) {
+                  return (entry.skills && entry.skills[0]) || entry.kind;
+                },
+                team: function (entry) {
+                  return entry.kind === "equipment" ? "Shared kit" : "Delivery";
+                },
+                range: { start: day(-7), end: day(45) },
+              },
+
+              loadChart: (function () {
+                var cfg = {
+                  // Follows the zoom, so the bars stay legible at every level instead of turning
+                  // into a hairline comb at month zoom.
+                  bucket: "auto",
+                  // An explicit allow-list, so the bars and the capacity line are demonstrably
+                  // summed over the same set. It is a list, not the empty array: `[]` is a scope of
+                  // *no* resources, which leaves the band flat and the lanes strip zero rows tall.
+                  resources: ["r-ada", "r-bo", "r-cy", "r-dee", "r-rig"],
+                  axisLabels: true,
+                  valueLabels: false,
+                  load: function (input) {
+                    var active = new Set(
+                      input.tasks.map(function (t) {
+                        return t.id;
+                      }),
+                    );
+                    return input.assignments.reduce(function (sum, a) {
+                      return active.has(a.taskId) ? sum + (a.units || 0) : sum;
+                    }, 0);
+                  },
+                  capacity: function (input) {
+                    return input.resources.reduce(function (sum, r) {
+                      return sum + (r.capacity || 0);
+                    }, 0);
+                  },
+                  heatmap: tr === "heatmap",
+                  lanes: wantLoadLanes,
+                  total: wantBand,
+                  // Every lane fits one shared ceiling as a fraction of its own capacity, so a
+                  // half-time resource is directly comparable with a full-time one.
+                  laneScale: "ratio",
+                  laneValueLabels: false,
+                  resizable: true,
+                };
+                if (custom) {
+                  // Supplying either matrix hook switches the band to summing the per-resource
+                  // matrix and retires `load` / `capacity` above.
+                  cfg.resourceLoad = function (input) {
+                    return input.allocated;
+                  };
+                  cfg.resourceCapacity = function (input) {
+                    return input.capacity;
+                  };
+                }
+                return cfg;
+              })(),
+            }),
+          );
+
+          /* --- tracking (baselines + progress-tracking + cost-tracking + evm) --- */
+          plugins.push(
+            G.tracking({
+              messages: {
+                reportTask: "Task",
+                bulkTitle: "Update progress",
+                tableTitle: "Budget vs actual",
+                dashboardTitle: "Earned value",
+              },
+
+              baselines: {
+                baselines: [BASELINE],
+                active: BASELINE.id,
+                bars: baselineColours,
+                // Overlay is the read that answers "did this move?"; "under" is quieter but harder
+                // to compare against.
+                barStyle: "overlay",
+                actualBars: baselineColours,
+                slipIndicators: baselineColours,
+                slipThresholdMs: DAY,
+                criticalPath: false,
+              },
+
+              progress: {
+                statusDate: STATUS_DATE,
+                // The zigzag line reads as a second today-line unless it is asked for deliberately.
+                progressLine: ragColours,
+                colorBars: ragColours,
+                progressWeighting: "duration",
+                // The lettered badge is the non-colour half of the RAG signal, so it stays on
+                // whichever feature owns the fill.
+                showRagOnBars: true,
+                snapshots: [
+                  { date: day(4), percentComplete: 0.12, completedCount: 1, lateCount: 0, taskCount: 15 },
+                  { date: day(8), percentComplete: 0.28, completedCount: 2, lateCount: 1, taskCount: 15 },
+                ],
+              },
+
+              cost: (function () {
+                var cfg = {
+                  rates: [
+                    { resourceId: "r-ada", standard: 9600, overtime: 14400 },
+                    { resourceId: "r-bo", standard: 8800, overtime: 13200 },
+                    { resourceId: "r-cy", standard: 7200 },
+                    { resourceId: "r-dee", standard: 8000 },
+                    { resourceId: "r-rig", standard: 2400 },
+                  ],
+                  hoursPerDay: HOURS_PER_DAY,
+                  budget: 120000,
+                  budgets: { labor: 96000, other: 24000 },
+                  // Warn at 90% consumed rather than after the overrun has happened.
+                  alertThreshold: 0.9,
+                  statusDate: STATUS_DATE,
+                  formulas: [
+                    {
+                      id: "burnPerDay",
+                      label: "Burn / day",
+                      evaluate: function (input) {
+                        var days = Math.max(1, Math.round((STATUS_DATE - day(0)) / DAY));
+                        return Math.round((input.totals.actualCost || 0) / days);
+                      },
+                      format: function (v) {
+                        return String(v);
+                      },
+                    },
+                  ],
+                };
+                if (custom) {
+                  cfg.renderPanel = function (host) {
+                    host.textContent = "Budget vs actual (host-rendered)";
+                  };
+                }
+                return cfg;
+              })(),
+
+              evm: (function () {
+                var cfg = {
+                  // Percent-complete accrual matches the progress the bars already show, so the two
+                  // surfaces cannot disagree about how far along the project is.
+                  method: "percentComplete",
+                  eacMethod: "cpi",
+                  statusDate: STATUS_DATE,
+                  projectBac: 120000,
+                  snapshots: [
+                    { t: day(4), ev: 9000, ac: 9700 },
+                    { t: day(8), ev: 21000, ac: 23400 },
+                  ],
+                  formulas: [
+                    {
+                      id: "spiPct",
+                      label: "SPI %",
+                      evaluate: function (input) {
+                        // `spi` is undefined when there is no planned value yet, so the guard is
+                        // part of the contract rather than defensive padding.
+                        return Math.round((input.indices.spi || 0) * 100);
+                      },
+                      format: function (v) {
+                        return v + "%";
+                      },
+                    },
+                  ],
+                };
+                if (custom) {
+                  cfg.renderPanel = function (host) {
+                    host.textContent = "Earned value (host-rendered)";
+                  };
+                }
+                return cfg;
+              })(),
+            }),
+          );
+
+          /* --- data-sync (data-source + data-source-graphql + lazy-load +
+                      offline-storage + realtime-sync) ------------------------------ */
+          plugins.push(
+            G.dataSync({
+              sources: { local: G.localAdapter(localDocument()) },
+              active: origin === "dataSource" ? "local" : undefined,
+              autoLoad: origin === "dataSource",
+              rollbackOnError: true,
+              // Server-side filtering follows the search box, debounced so typing does not thrash
+              // it.
+              followFilter: origin === "dataSource",
+              followFilterDebounceMs: 250,
+
+              // The GraphQL data source is registered as a source but
+              // never activated, and never listed in the Data origin group above — a request would
+              // need a real endpoint and this page contacts nothing. The nest only registers when
+              // it carries both a url and a `load` document, so both are supplied; the adapter is
+              // simply never called. A host `fetch` that refuses outright makes that guarantee
+              // explicit rather than trusting the url to be unreachable.
+              graphql: {
+                name: "graphql",
+                activate: false,
+                url: "https://example.invalid/graphql",
+                operations: { load: "query Load { tasks { id name start end } }" },
+                select: { load: "tasks" },
+                headers: { "x-demo": "full-featured" },
+                fetch: function () {
+                  return Promise.reject(new Error("This example never contacts a network."));
+                },
+              },
+
+              lazyLoad: {
+                sources: { paged: LAZY_ADAPTER },
+                active: origin === "lazyLoad" ? "paged" : undefined,
+                // Small enough that paging is observable on a 15-row project.
+                pageSize: 4,
+                autoLoad: origin === "lazyLoad",
+                followViewport: origin === "lazyLoad",
+                prefetchPages: 1,
+              },
+
+              offline: {
+                databaseName: "stargantt-v2-example-full-featured",
+                documentKey: "atlas",
+                // Only the IndexedDB origin persists the project; every other origin leaves the
+                // browser's storage exactly as it found it.
+                autoRestore: origin === "offline",
+                autoSave: origin === "offline",
+                autoSaveDebounceMs: 500,
+                registerSource: true,
+                sourceName: "offline",
+                indexedDB: window.indexedDB,
+              },
+
+              realtime: {
+                transports: { demo: REALTIME_TRANSPORT },
+                connect: origin === "realtime" ? "demo" : undefined,
+                autoReconnect: true,
+                reconnectDelayMs: 1000,
+                maxReconnectAttempts: 5,
+                resyncViaDataSource: true,
+              },
+            }),
+          );
+
+          /* --- portfolio (includes dashboard) ------------------------------- */
+          plugins.push(
+            G.portfolio({
+              messages: {
+                panelTitle: "Project dashboard",
+                goalName: function (ordinal) {
+                  return "Goal " + ordinal;
+                },
+              },
+              nodes: [
+                { id: "pf-program", name: "Platform programme", kind: "program" },
+                { id: "pf-atlas", name: "Atlas", kind: "project", parentId: "pf-program" },
+                { id: "pf-beacon", name: "Beacon", kind: "project", parentId: "pf-program" },
+              ],
+              goals: [
+                {
+                  id: "pf-goal",
+                  name: "Ship by the launch milestone",
+                  nodeIds: ["pf-atlas"],
+                  taskIds: ["t-launch"],
+                  target: 0.9,
+                },
+              ],
+              views: { "Programme roll-up": { nodeIds: ["pf-atlas", "pf-beacon"] } },
+              dashboard: (function () {
+                var cfg = {
+                  // Opened from the app bar rather than on load — a KPI panel over the chart on
+                  // first paint hides the thing the reader came for.
+                  open: false,
+                  widgets: [
+                    "summary",
+                    "overdue",
+                    "burndown",
+                    "workload",
+                    "status",
+                    "milestones",
+                    "goals",
+                    "portfolio",
+                    "groups",
+                    "formulas",
+                  ],
+                  formulas: [
+                    {
+                      id: "atRisk",
+                      label: "At risk",
+                      evaluate: function (tasks) {
+                        return tasks.filter(function (t) {
+                          var f = (t.meta && t.meta.taskFields) || {};
+                          return f.deadline !== undefined && t.end > f.deadline;
+                        }).length;
+                      },
+                      format: function (v) {
+                        return String(v);
+                      },
+                    },
+                  ],
+                  groupOf: function (task) {
+                    return (task.meta && task.meta.project) || undefined;
+                  },
+                };
+                if (custom) {
+                  cfg.renderWidget = function (host, ctx) {
+                    host.textContent = ctx.widget;
+                  };
+                }
+                return cfg;
+              })(),
+            }),
+          );
+
+          /* --- i18n --------------------------------------------------------------- */
+          // Composed so `gantt.service("stargantt.i18n")` exists at runtime (`t()`, `catalog()`,
+          // `setLocale()`), NOT because composing it re-labels anything — the catalogs above,
+          // resolved from `dict` before `create()`, are what put translated words on screen.
+          plugins.push(
+            G.i18n({ locale: loc.tag, fallbacks: ["en"], translations: TRANSLATIONS }),
+          );
+
+          /* --- perf-tools --------------------------------------------------------- */
+          plugins.push(
+            G.perfTools({
+              overlay: bl === "perfHud",
+              sparkline: true,
+              // Parked in the one corner nothing else requests, so it can never displace another
+              // overlay whatever else is switched on.
+              position: "bottom-left",
+              budgetMs: 16.7,
+              windowSize: 120,
+              performanceMarks: true,
+              messages: {
+                readout: function (stats) {
+                  return Math.round(stats.fps) + " fps";
+                },
+              },
+            }),
+          );
+
+          return { plugins: plugins, locale: loc.tag };
+        }
+
+        /* ================================================================
+         * 6. Boot, rebuild, and the app-bar wiring
+         * ================================================================ */
+
+        var mount = document.getElementById("gantt-root");
+        var statusEl = document.getElementById("status");
+        var instance = null;
+        var settings = loadSettings();
+
+        function say(text) {
+          statusEl.textContent = text;
+        }
+
+        /**
+         * Copies the live registry back into the page's calendar constants.
+         *
+         * The composition is rebuilt from those objects whenever the settings dialog applies, so
+         * without this an edit made in the plugin's calendar editor would silently disappear on the
+         * next rebuild. The registry is read through the `calendars` member of the
+         * `stargantt.calendars` service's `state` store.
+         */
+        function snapshotCalendars() {
+          var service = instance && instance.getService("stargantt.calendars");
+          if (!service) return;
+          service.state.get().calendars.forEach(function (live) {
+            CALENDARS.forEach(function (target) {
+              if (String(target.id) !== String(live.id)) return;
+              target.workingDays = (live.workingDays || []).slice();
+              if (live.workingHours) {
+                target.workingHours = live.workingHours.map(function (w) {
+                  return [w[0], w[1]];
+                });
+              } else {
+                delete target.workingHours;
+              }
+              if (live.exceptions) {
+                target.exceptions = live.exceptions.map(function (e) {
+                  var out = { date: e.date, working: e.working };
+                  if (e.hours) {
+                    out.hours = e.hours.map(function (w) {
+                      return [w[0], w[1]];
+                    });
+                  }
+                  return out;
+                });
+              } else {
+                delete target.exceptions;
+              }
+            });
+          });
+        }
+
+        /** Store subscriptions of the current instance, dropped on every rebuild. */
+        var subscriptions = [];
+
+        function boot() {
+          if (instance) {
+            snapshotCalendars();
+            subscriptions.forEach(function (d) {
+              d.dispose();
+            });
+            subscriptions = [];
+            instance.dispose();
+            instance = null;
+          }
+          var composed = buildComposition(settings);
+          instance = window.StarGantt.create({
+            element: mount,
+            plugins: composed.plugins,
+            // The chart-wide locale drives every `Intl` formatter inside the library; the words
+            // come from the message catalogs the dictionary produced.
+            locale: composed.locale,
+          });
+
+          // The IndexedDB and paged origins fill the store themselves; loading here first would
+          // show one project and then replace it. The push origin only ever delivers a delta, so it
+          // still needs the base project loaded.
+          if (settings.dataOrigin === "builtin" || settings.dataOrigin === "realtime") {
+            instance.service("stargantt.data").load(DATASET);
+          }
+
+          document.getElementById("viewModeSel").value = settings.viewMode;
+
+          // The history service publishes a store instead of a change event; readouts
+          // subscribe to `history.state`.
+          var history = instance.getService("stargantt.history");
+          if (history) {
+            subscriptions.push(
+              history.state.subscribe(function (next) {
+                document.getElementById("undoBtn").disabled = !next.canUndo;
+                document.getElementById("redoBtn").disabled = !next.canRedo;
+              }),
+            );
+            var initial = history.state.get();
+            document.getElementById("undoBtn").disabled = !initial.canUndo;
+            document.getElementById("redoBtn").disabled = !initial.canRedo;
+          }
+
+          // The realtime connection status is a store too.
+          var sync = instance.getService("stargantt.data-sync");
+          if (sync && settings.dataOrigin === "realtime") {
+            subscriptions.push(
+              sync.realtime.status.subscribe(function (next) {
+                say("Realtime: " + next.status + ".");
+              }),
+            );
+          }
+
+          say("Composed " + composed.plugins.length + " plugins.");
+          window.gantt = instance;
+        }
+
+        /**
+         * Runs `fn` against a named service, reporting rather than throwing when it is not composed.
+         *
+         * `getService` is the whole reason this is four lines: a composition assembled from a
+         * settings dialog cannot promise that any given plugin is present, and asking the registry
+         * is not the same as catching the answer.
+         */
+        function withService(key, fn) {
+          var service = instance && instance.getService(key);
+          if (!service) {
+            say("That feature is not in the current composition.");
+            return;
+          }
+          fn(service);
+        }
+
+        document.getElementById("undoBtn").addEventListener("click", function () {
+          if (instance) instance.dispatch("history/undo", undefined);
+        });
+        document.getElementById("redoBtn").addEventListener("click", function () {
+          if (instance) instance.dispatch("history/redo", undefined);
+        });
+        document.getElementById("viewModeSel").addEventListener("change", function (event) {
+          if (instance) instance.dispatch("view/setViewMode", { mode: event.target.value });
+        });
+
+        // One facade for all six export/IO concerns. It returns bytes; `StarGantt.downloadFile`
+        // (the SDK's public `downloadFile`, re-exported on the IIFE global) saves them — that
+        // step is left to the host.
+        document.getElementById("pngBtn").addEventListener("click", function () {
+          withService("stargantt.export", function (service) {
+            say("Rendering the PNG…");
+            service.toPng().then(
+              function (blob) {
+                StarGantt.downloadFile(document, blob, "atlas-plan.png", "image/png");
+                say("PNG downloaded.");
+              },
+              function () {
+                say("The PNG export failed.");
+              },
+            );
+          });
+        });
+        document.getElementById("csvBtn").addEventListener("click", function () {
+          withService("stargantt.export", function (service) {
+            StarGantt.downloadFile(document, service.exportCsv(), "atlas-plan.csv", "text/csv");
+            say("CSV downloaded.");
+          });
+        });
+        document.getElementById("printBtn").addEventListener("click", function () {
+          withService("stargantt.export", function (service) {
+            service.printPreview();
+          });
+        });
+
+        document.getElementById("dashboardBtn").addEventListener("click", function () {
+          withService("stargantt.dashboard", function (service) {
+            service.open();
+          });
+        });
+        document.getElementById("evmBtn").addEventListener("click", function () {
+          withService("stargantt.evm", function (service) {
+            service.openDashboardPanel();
+          });
+        });
+        document.getElementById("costBtn").addEventListener("click", function () {
+          withService("stargantt.cost", function (service) {
+            service.openCostTablePanel();
+          });
+        });
+        document.getElementById("utilBtn").addEventListener("click", function () {
+          withService("stargantt.utilization", function (service) {
+            service.openSummaryPanel();
+          });
+        });
+        document.getElementById("trendBtn").addEventListener("click", function () {
+          withService("stargantt.utilization", function (service) {
+            service.openTrendPanel();
+          });
+        });
+
+        /* ================================================================
+         * 7. The settings dialog
+         * ================================================================ */
+
+        var dialog = document.getElementById("settingsDialog");
+        var sectionsHost = document.getElementById("settingsSections");
+        var hintEl = document.getElementById("settingsHint");
+
+        function renderSettings(current) {
+          sectionsHost.textContent = "";
+          SECTIONS.forEach(function (section) {
+            var changed = section.groups.filter(function (group) {
+              return current[group.id] !== group.def;
+            });
+
+            var details = document.createElement("details");
+            details.className = "section";
+            // A collapsed section must never hide a choice the reader has already made — a restored
+            // setting they cannot see is a setting they cannot find their way back out of.
+            details.open = section.open || changed.length > 0;
+
+            var summary = document.createElement("summary");
+            summary.append(document.createTextNode(section.title));
+            if (changed.length > 0) {
+              var badge = document.createElement("span");
+              badge.className = "badge";
+              badge.textContent = changed.length + " changed";
+              summary.append(badge);
+            }
+            details.append(summary);
+
+            var body = document.createElement("div");
+            body.className = "section-body";
+
+            section.groups.forEach(function (group) {
+              var set = document.createElement("fieldset");
+              var legend = document.createElement("legend");
+              legend.textContent = group.label;
+              set.append(legend);
+
+              if (group.hint) {
+                var hint = document.createElement("p");
+                hint.className = "hint";
+                hint.textContent = group.hint;
+                set.append(hint);
+              }
+
+              group.options.forEach(function (option) {
+                var label = document.createElement("label");
+                label.className = "opt";
+
+                var input = document.createElement("input");
+                input.type = "radio";
+                input.name = group.id;
+                input.value = option.v;
+                input.checked = current[group.id] === option.v;
+
+                var text = document.createElement("span");
+                text.append(document.createTextNode(option.l));
+                if (option.d) {
+                  var small = document.createElement("small");
+                  small.textContent = option.d;
+                  text.append(small);
+                }
+
+                label.append(input, text);
+                set.append(label);
+              });
+
+              body.append(set);
+            });
+
+            details.append(body);
+            sectionsHost.append(details);
+          });
+          hintEl.textContent = "";
+        }
+
+        function readForm() {
+          var next = {};
+          GROUPS.forEach(function (group) {
+            var checked = sectionsHost.querySelector('input[name="' + group.id + '"]:checked');
+            next[group.id] = checked ? checked.value : group.def;
+          });
+          return next;
+        }
+
+        document.getElementById("settingsBtn").addEventListener("click", function () {
+          renderSettings(settings);
+          dialog.showModal();
+        });
+
+        document.getElementById("settingsCancel").addEventListener("click", function () {
+          dialog.close();
+        });
+
+        document.getElementById("settingsReset").addEventListener("click", function () {
+          renderSettings(defaultSettings());
+          hintEl.textContent = "Defaults restored — apply to rebuild.";
+        });
+
+        // Submit rather than click, so Enter inside the dialog applies the choices instead of
+        // dismissing them — a settings form that throws work away on Enter is a trap.
+        document.getElementById("settingsForm").addEventListener("submit", function (event) {
+          event.preventDefault();
+          settings = readForm();
+          var stored = saveSettings(settings);
+          dialog.close();
+          boot();
+          if (!stored) {
+            say("Applied. This browser refused to store the settings, so they will not survive a reload.");
+          }
+        });
+
+        /* ================================================================
+         * 8. The working calendar
+         * ================================================================
+         * There is no host-owned calendar dialog here: the scheduling plugin's own calendar editor
+         * covers the whole service surface (the weekly pattern, the intra-day windows, special
+         * periods with the exception list, and putting the selected tasks on a calendar), so the app
+         * bar just opens it. Registry edits are outside the undo model (the library keeps them
+         * there); task assignment is inside it, because it is an ordinary task edit — and a calendar
+         * edit does not move a bar until something reschedules, which is what the button beside it
+         * is for.
+         */
+
+        document.getElementById("calendarBtn").addEventListener("click", function () {
+          withService("stargantt.calendars", function (service) {
+            service.openEditor(CALENDAR.id);
+          });
+        });
+
+        document.getElementById("rescheduleBtn").addEventListener("click", function () {
+          if (!instance) return;
+          instance.dispatch("schedule/reschedule", { statusDate: STATUS_DATE });
+          say("Scheduler re-run from the status date — one undo step.");
+        });
+
+        boot();
+
+        // A debug handle for manual poking and for an E2E spec; `window.gantt` (set in `boot`)
+        // matches the other example pages.
+        window.ganttDemo = {
+          get instance() {
+            return instance;
+          },
+          get settings() {
+            return Object.assign({}, settings);
+          },
+          rebuild: boot,
+        };
+      })();
+    </script>
+  </body>
+</html>

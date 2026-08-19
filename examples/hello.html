@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Hello example</title>
+    <!--
+      The smallest possible chart, no bells. The data-store service's `load()` expects the
+      { tasks, links } shape (docs/specs/plugins/data-store.md), so tasks and links are passed as
+      separate arrays here. This page is self-contained, per the example-page convention (see
+      examples/basic.html, examples/interaction.html).
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: system-ui, sans-serif;
+      }
+      #chart {
+        height: 420px;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt</h1>
+    <p>One HTML file + one script tag. Styles are injected by <code>create()</code>.</p>
+    <div id="chart"></div>
+
+    <footer>
+      Loads <code>../packages/stargantt/dist/stargantt.iife.js</code> (core + all fifteen official
+      plugins + CSS; this page composes the nine-plugin <code>presetStandard()</code>).
+    </footer>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard(),
+      });
+
+      const DAY = 86400000;
+      // The time-axis origin defaults to "start of the current UTC day" (docs/specs/plugins/
+      // view.md, `timeline.origin`). Anchoring the data there puts the chart in the initial view
+      // with zero configuration.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+      gantt.service("stargantt.data").load({
+        tasks: [
+          { id: "root", parentId: null, name: "Release prep", type: "summary", start: T0, end: T0 + 20 * DAY },
+          { id: "spec", parentId: "root", name: "Design", start: T0, end: T0 + 5 * DAY, progress: 1 },
+          { id: "impl", parentId: "root", name: "Implementation", start: T0 + 5 * DAY, end: T0 + 15 * DAY, progress: 0.4 },
+          { id: "qa", parentId: "root", name: "Verification", start: T0 + 15 * DAY, end: T0 + 20 * DAY },
+          { id: "ship", parentId: "root", name: "Release", type: "milestone", start: T0 + 20 * DAY, end: T0 + 20 * DAY },
+        ],
+        links: [
+          { id: "l1", sourceId: "spec", targetId: "impl", type: "FS" },
+          { id: "l2", sourceId: "impl", targetId: "qa", type: "FS" },
+          { id: "l3", sourceId: "qa", targetId: "ship", type: "FS" },
+        ],
+      });
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

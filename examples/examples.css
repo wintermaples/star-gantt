@@ -1,0 +1,891 @@
+/*
+ * Shared page chrome for the StarGantt example pages (examples/*.html).
+ *
+ * Scope: page chrome ONLY. Never style `.sg-*` internals or override `--sg-*` custom properties
+ * here — every example must render the chart with its stock look. Each example is still free to
+ * declare its own chart-sizing rules (e.g. `#gantt-root { height: 600px }`) locally, since that is
+ * layout the chart needs, not a chart-internals override.
+ *
+ * Namespaces: `.ex-*` / `--ex-*` are page chrome; `.pg-*` / `--pg-*` are reserved for a playground
+ * shell's namespace (a live Data-selector/Code-drawer script) — no page currently has any `.pg-*`
+ * markup, so these rules are currently unused; kept only in case a future page reintroduces an
+ * equivalent shell. Page-local classes/ids remain allowed.
+ *
+ * Scheme handling mirrors the library's own (theme.md §4.2): `color-scheme: light dark` plus
+ * `light-dark()` pairs, so the OS drives the scheme and the top bar's toggle overrides it by
+ * writing `color-scheme` onto <html> — one set of values rather than a hand-mirrored dark block.
+ *
+ * Screenshot baselines capture the full 1280x800 viewport (e2e/screenshot.spec.ts,
+ * e2e/zoom-levels.spec.ts).
+ */
+
+:root {
+  color-scheme: light dark;
+}
+
+.ex-body {
+  /* Warm neutrals and one teal accent, matching the chart's own default palette. The
+     site is not themed *by* the chart — it declares its own tokens — it merely agrees with it. */
+  --ex-bg: light-dark(#faf9f7, #141312);
+  --ex-surface: light-dark(#ffffff, #1a1917);
+  --ex-surface-raised: light-dark(#ffffff, #211f1d);
+  --ex-border: light-dark(#e7e5e4, #322e2b);
+  --ex-fg: light-dark(#1c1917, #e7e5e4);
+  --ex-muted: light-dark(#78716c, #a8a29e);
+  /* 5.47:1 on the light surface, 4.69:1 on the dark one — the same pair, and the same reason,
+     as the chart's --sg-bar-fill. */
+  --ex-accent: light-dark(#0f766e, #2dd4bf);
+  --ex-accent-hover: light-dark(#115e59, #5eead4);
+  --ex-accent-soft: light-dark(#e6f0ee, #1d2f2c);
+  /*
+   * Foreground for a control *filled* with `--ex-accent`. The accent flips from a dark teal to a
+   * light one, so this has to flip the opposite way: white on the light-scheme teal is 5.5:1,
+   * while white on the dark-scheme teal would be 1.9:1. A filled control therefore writes
+   * `background: var(--ex-accent); color: var(--ex-on-accent)` and stays correct in both schemes.
+   */
+  --ex-on-accent: light-dark(#ffffff, #14130f);
+  --ex-shadow: light-dark(0 1px 2px rgba(28, 25, 23, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5));
+  --ex-font:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ex-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  /* Width of the persistent sidebar (site.js). It narrows on a narrow window so the chart keeps
+     room: at the 720px viewport floor the full 224px left the chart pane pinned to its own 240px
+     minimum. Not a breakpoint — a continuous clamp, so there is no width at which the layout
+     jumps, and no sub-720px case is introduced. */
+  --ex-sidebar-width: clamp(176px, 16vw, 224px);
+  --ex-topbar-height: 48px;
+
+  margin: 0;
+  /* The Code drawer is `position: fixed` at the viewport bottom, so without reserved space the
+     last drawer-height of the document (footer, notes) can never be scrolled out from under it.
+     A playground shell would write the live drawer height into `--pg-drawer-h` while the drawer
+     was open and remove it when it closed; no page has that shell, so this always falls back to 0. */
+  padding-bottom: var(--pg-drawer-h, 0px);
+  background: var(--ex-bg);
+  color: var(--ex-fg);
+  font-family: var(--ex-font);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ex-body * {
+  box-sizing: border-box;
+}
+
+/* ---------- skip link ---------- */
+
+/* Off-screen until it takes focus, then pinned to the viewport's top-left. Deliberately not
+   `display: none` or `visibility: hidden`: either would take it out of the tab order, which is the
+   one thing it exists to be in. */
+.ex-skip {
+  position: fixed;
+  top: 0;
+  left: -9999px;
+  z-index: 100;
+  padding: 8px 14px;
+  background: var(--ex-surface-raised);
+  color: var(--ex-fg);
+  border: 1px solid var(--ex-border);
+  border-radius: 0 0 6px 0;
+  text-decoration: none;
+}
+
+.ex-skip:focus {
+  left: 0;
+  outline: 2px solid var(--ex-accent);
+  outline-offset: -2px;
+}
+
+/* ---------- top bar ---------- */
+
+.ex-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--ex-topbar-height);
+  padding: 0 16px;
+  background: var(--ex-surface);
+  border-bottom: 1px solid var(--ex-border);
+}
+
+.ex-brand {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: var(--ex-fg);
+}
+
+.ex-brand-accent {
+  color: var(--ex-accent);
+}
+
+.ex-search {
+  width: 260px;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ex-fg);
+  background: var(--ex-bg);
+  border: 1px solid var(--ex-border);
+  border-radius: 6px;
+}
+
+.ex-search::placeholder {
+  color: var(--ex-muted);
+}
+
+.ex-topbar-spacer {
+  flex: 1;
+}
+
+.ex-theme-toggle {
+  height: 30px;
+  min-width: 72px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ex-fg);
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ex-theme-toggle:hover {
+  border-color: var(--ex-accent);
+  color: var(--ex-accent);
+}
+
+.ex-search:focus-visible,
+.ex-theme-toggle:focus-visible,
+.ex-nav-link:focus-visible,
+.ex-card:focus-visible {
+  outline: 2px solid var(--ex-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- shell: sidebar + main column ---------- */
+
+.ex-shell {
+  display: flex;
+  align-items: flex-start;
+  min-height: calc(100vh - var(--ex-topbar-height));
+}
+
+.ex-sidebar {
+  position: sticky;
+  top: var(--ex-topbar-height);
+  flex: 0 0 var(--ex-sidebar-width);
+  width: var(--ex-sidebar-width);
+  /* Same reservation as `.ex-body`: the sticky sidebar spans to the viewport bottom, which the
+     open drawer covers, so shorten its scroll box by the drawer height. */
+  max-height: calc(100vh - var(--ex-topbar-height) - var(--pg-drawer-h, 0px));
+  overflow-y: auto;
+  padding: 12px 0 24px;
+  background: var(--ex-surface);
+  border-right: 1px solid var(--ex-border);
+}
+
+.ex-nav-group[hidden] {
+  display: none;
+}
+
+.ex-nav-heading {
+  padding: 14px 16px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ex-muted);
+}
+
+.ex-nav-link {
+  display: block;
+  padding: 4px 16px;
+  font-size: 13px;
+  color: var(--ex-fg);
+  text-decoration: none;
+}
+
+.ex-nav-link[hidden] {
+  display: none;
+}
+
+.ex-nav-link:hover {
+  background: var(--ex-bg);
+  color: var(--ex-accent);
+}
+
+.ex-nav-link--current {
+  background: var(--ex-accent-soft);
+  color: var(--ex-accent);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--ex-accent);
+}
+
+.ex-main {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 28px 40px;
+}
+
+/* ---------- page content ---------- */
+
+/*
+ * No max-width here on purpose: the chart wants every pixel the column has, and several pages
+ * mount a side panel beside it. Line length is bounded on the prose blocks themselves
+ * (`.ex-description`, `.ex-footer`) instead, which is where over-long measure actually hurts.
+ */
+.ex-page {
+  width: 100%;
+}
+
+.ex-title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.ex-description {
+  /* A prose measure rather than the full column: past ~85 characters a line is hard to track
+     back to the start of the next one. */
+  max-width: 78ch;
+  margin: 0 0 20px;
+  color: var(--ex-muted);
+}
+
+.ex-description code,
+.ex-footer code {
+  padding: 1px 5px;
+  font-family: var(--ex-mono);
+  font-size: 0.9em;
+  background: var(--ex-surface-raised);
+  border: 1px solid var(--ex-border);
+  border-radius: 4px;
+}
+
+.ex-footer {
+  max-width: 78ch;
+  margin: 24px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--ex-border);
+  font-size: 12.5px;
+  color: var(--ex-muted);
+}
+
+/* site.js could render a page heading from a catalog entry into this class. Demo pages carry
+   their own in-page heading markup instead (site.js only mounts on index.html, which owns its own
+   heading directly), so this is currently unused; kept for a future page that wants it. */
+.ex-header {
+  margin: 0 0 4px;
+}
+
+/*
+ * The per-page back-link the pages carried before the sidebar existed. The sidebar is the
+ * navigation now and marks the current page, so the link is redundant; it stays in the markup
+ * (41 files) and is hidden here rather than removed page by page.
+ */
+.ex-corner-link {
+  display: none;
+}
+
+.ex-relative {
+  position: relative;
+}
+
+/* ---------- chart stage and chrome slots ---------- */
+
+/*
+ * The shell composes the column; a page's own markup carries only `.ex-chart`. The slots are
+ * created empty and hidden until the chrome template fills them, so a page with no chrome pays
+ * nothing for them.
+ */
+.ex-slot-above {
+  margin: 0 0 16px;
+}
+
+.ex-slot-below {
+  margin: 16px 0 0;
+}
+
+.ex-slot-above:empty,
+.ex-slot-below:empty,
+.ex-slot-aside:empty {
+  display: none;
+}
+
+.ex-stage {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.ex-chart {
+  flex: 1;
+  min-width: 0;
+  /* Pages set their own height by overriding this custom property inline; 600px is the height
+     most pages used before the unification. */
+  height: var(--ex-chart-height, 600px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-border);
+  border-radius: 8px;
+}
+
+/* The mount element fills the wrapper. This is chart *sizing*, which page chrome is allowed to
+   do, not a chart-internals override. */
+.ex-chart > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * A continuous clamp, not a breakpoint: at the 720px viewport floor the sidebar takes 176px and
+ * the aside 240px, which still leaves the chart column above its own minimum.
+ */
+.ex-slot-aside {
+  flex: 0 0 clamp(240px, 22vw, 320px);
+  max-height: var(--ex-chart-height, 600px);
+  overflow-y: auto;
+}
+
+/* ---------- shared chrome vocabulary ---------- */
+
+/*
+ * One definition for the controls every demo page used to redeclare: toolbars, grouped buttons,
+ * selects, readouts, note boxes, key hints and side panels. Every colour rides an `--ex-*`
+ * `light-dark()` pair, so no page needs a `prefers-color-scheme` block.
+ *
+ * Contrast: component outlines use `--ex-muted`, not the faint `--ex-border` — a control boundary
+ * needs 3:1 against its background and the border grey does not reach it on a surface fill in
+ * either scheme. Filled controls pair `--ex-accent` with `--ex-on-accent`.
+ * Target size: interactive controls are >= 32px tall, above the 24px WCAG 2.2 2.5.8 floor.
+ */
+
+.ex-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  row-gap: 12px;
+  padding: 12px 16px;
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-border);
+  border-radius: 8px;
+}
+
+.ex-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ex-group-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ex-muted);
+}
+
+.ex-btn {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 6px 14px;
+  font: 500 14px var(--ex-font);
+  color: var(--ex-fg);
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-muted);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ex-btn:hover:not(:disabled) {
+  color: var(--ex-accent);
+  border-color: var(--ex-accent);
+}
+
+.ex-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*
+ * Filled variants. A pressed toggle must also say so in its own label text or its accessible
+ * name — `aria-pressed` plus the fill is the pair, never the fill alone (WCAG 1.4.1).
+ */
+.ex-btn-primary,
+.ex-btn[aria-pressed="true"] {
+  background: var(--ex-accent);
+  border-color: var(--ex-accent);
+  color: var(--ex-on-accent);
+}
+
+.ex-btn-primary:hover:not(:disabled),
+.ex-btn[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--ex-accent-hover);
+  border-color: var(--ex-accent-hover);
+  color: var(--ex-on-accent);
+}
+
+.ex-select,
+.ex-input {
+  min-height: 32px;
+  padding: 6px 10px;
+  font: 500 14px var(--ex-font);
+  color: var(--ex-fg);
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-muted);
+  border-radius: 4px;
+}
+
+.ex-select {
+  cursor: pointer;
+}
+
+.ex-field,
+.ex-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 13px;
+  color: var(--ex-fg);
+}
+
+.ex-checkbox {
+  cursor: pointer;
+}
+
+.ex-checkbox input,
+.ex-field input[type="checkbox"],
+.ex-field input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ex-accent);
+}
+
+.ex-readout {
+  max-width: 44ch;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ex-muted);
+}
+
+/* The "How to use" box every page used to declare as `.instructions`. The accent bar carries the
+   emphasis, so the fill stays light enough for 4.5:1 body text in both schemes. */
+.ex-note {
+  padding: 12px 16px;
+  background: var(--ex-accent-soft);
+  border: 1px solid var(--ex-border);
+  border-left: 3px solid var(--ex-accent);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ex-fg);
+}
+
+.ex-note-title {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ex-note ul,
+.ex-note ol {
+  margin: 6px 0 0 20px;
+  padding: 0;
+}
+
+.ex-note li {
+  margin-bottom: 6px;
+}
+
+.ex-note code,
+.ex-panel code {
+  padding: 1px 5px;
+  font-family: var(--ex-mono);
+  font-size: 0.9em;
+  background: var(--ex-surface-raised);
+  border: 1px solid var(--ex-border);
+  border-radius: 4px;
+}
+
+.ex-kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font: 12px var(--ex-mono);
+  color: var(--ex-fg);
+  background: var(--ex-surface-raised);
+  border: 1px solid var(--ex-muted);
+  border-radius: 3px;
+}
+
+.ex-panel {
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ex-fg);
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-border);
+  border-radius: 8px;
+}
+
+.ex-panel-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ex-btn:focus-visible,
+.ex-select:focus-visible,
+.ex-input:focus-visible,
+.ex-checkbox input:focus-visible,
+.ex-field input:focus-visible {
+  outline: 2px solid var(--ex-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- index catalog ---------- */
+
+.ex-catalog-group {
+  margin: 0 0 28px;
+}
+
+.ex-catalog-heading {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ex-fg);
+}
+
+.ex-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.ex-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--ex-fg);
+}
+
+.ex-card:hover {
+  border-color: var(--ex-accent);
+}
+
+.ex-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ex-accent);
+}
+
+.ex-card-blurb {
+  font-size: 12.5px;
+  color: var(--ex-muted);
+}
+
+/* ---------- playground shell (currently unused — see the header note) ---------- */
+
+/*
+ * A playground shell (`playground.js`) does not exist, so none of these `.pg-*` rules
+ * currently apply to any page. Kept only in case a future page reintroduces an equivalent shell.
+ *
+ * The toolbar is in flow above the chart; the menu and drawer are overlaid and never reflow
+ * the mount. Colors ride the `--ex-*` pairs above so the shell follows `.ex-body`'s
+ * light/dark schemes.
+ */
+
+/* In flow, directly above the chart — present from first paint, so screenshots are
+   deterministic and the chart pane is never overlapped. `position: relative` anchors the
+   absolute .pg-menu below. */
+.pg-toolbar {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.pg-btn {
+  min-height: 24px;
+  padding: 4px 12px;
+  font: 600 12px var(--ex-font);
+  color: var(--ex-fg);
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pg-btn:hover {
+  color: var(--ex-accent);
+  border-color: var(--ex-accent);
+}
+
+.pg-btn-primary {
+  background: var(--ex-accent);
+  border-color: var(--ex-accent);
+  color: var(--ex-on-accent);
+}
+
+.pg-btn-primary:hover {
+  background: var(--ex-accent-hover);
+  border-color: var(--ex-accent-hover);
+  color: var(--ex-on-accent);
+}
+
+.pg-btn:focus-visible,
+.pg-menu-item:focus-visible,
+.pg-tab:focus-visible,
+.pg-drawer-handle:focus-visible,
+.pg-textarea:focus-visible {
+  outline: 2px solid var(--ex-accent);
+  outline-offset: 1px;
+}
+
+.pg-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  background: var(--ex-surface);
+  border: 1px solid var(--ex-border);
+  border-radius: 6px;
+  box-shadow: var(--ex-shadow);
+  padding: 4px;
+  z-index: 41;
+}
+
+.pg-menu-item {
+  min-height: 28px;
+  padding: 4px 12px;
+  font: 13px var(--ex-font);
+  text-align: left;
+  color: var(--ex-fg);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pg-menu-item:hover {
+  background: var(--ex-bg);
+  color: var(--ex-accent);
+}
+
+.pg-menu-item-edit {
+  border-top: 1px solid var(--ex-border);
+  border-radius: 0 0 4px 4px;
+  margin-top: 4px;
+}
+
+.pg-drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40vh;
+  min-height: 160px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ex-surface);
+  border-top: 1px solid var(--ex-border);
+  box-shadow: var(--ex-shadow);
+  z-index: 50;
+}
+
+/* 8px visible ridge, 24px hit area (WCAG 2.5.8) via negative-margin padding overlay. */
+.pg-drawer-handle {
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: none;
+  border: none;
+  cursor: ns-resize;
+  z-index: 51;
+}
+
+.pg-drawer-handle::after {
+  content: "";
+  display: block;
+  margin: 0 auto;
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ex-border);
+}
+
+.pg-drawer-handle:hover::after {
+  background: var(--ex-accent);
+}
+
+.pg-drawer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px 4px;
+}
+
+.pg-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.pg-tab {
+  min-height: 24px;
+  padding: 4px 12px;
+  font: 12px var(--ex-font);
+  color: var(--ex-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pg-tab[aria-selected="true"] {
+  color: var(--ex-fg);
+  font-weight: 600;
+  border-color: var(--ex-border);
+  background: var(--ex-bg);
+}
+
+.pg-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pg-status {
+  align-self: center;
+  margin-right: 8px;
+  font: 12px var(--ex-mono);
+  text-align: right;
+  /* #b3261e on the light --ex-bg (#faf9f7) = 6.1:1; #ff8f88 on the dark one (#141312) = 8.6:1.
+     A `light-dark()` pair, like the rest of the chrome, rather than a mirrored media block. */
+  color: light-dark(#b3261e, #ff8f88);
+}
+
+/* Two columns: the JS/HTML tab pane on the left, the Data editor always on the right. */
+.pg-columns {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 0 16px 12px;
+}
+
+.pg-col-left {
+  flex: 0 0 var(--pg-split, 55%);
+  min-width: 280px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pg-col-right {
+  flex: 1;
+  min-width: 280px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 4px visible ridge inside a 24px hit area (WCAG 2.5.8), mirroring the drawer's own handle. */
+.pg-splitter {
+  position: relative;
+  flex: 0 0 24px;
+  align-self: stretch;
+  background: none;
+  border: none;
+  cursor: ew-resize;
+}
+
+.pg-splitter::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ex-border);
+}
+
+.pg-splitter:hover::after,
+.pg-splitter:focus-visible::after {
+  background: var(--ex-accent);
+}
+
+.pg-splitter:focus-visible {
+  outline: 2px solid var(--ex-accent);
+  outline-offset: -2px;
+}
+
+.pg-col-label {
+  padding: 0 0 4px;
+  font: 600 11px var(--ex-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ex-muted);
+}
+
+.pg-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.pg-textarea {
+  flex: 1;
+  resize: none;
+  font: 13px/1.4 var(--ex-mono);
+  color: var(--ex-fg);
+  background: var(--ex-bg);
+  border: 1px solid var(--ex-border);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+/* CodeMirror mounts as .cm-editor inside the pane (upgrade path); size it like the textarea.
+   Structural sizing only — theme/colors stay CodeMirror's own. */
+.pg-pane .cm-editor {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--ex-border);
+  border-radius: 4px;
+}
+
+.pg-pane .cm-editor .cm-scroller {
+  font: 13px/1.4 var(--ex-mono);
+}
+
+/* `display: flex` on .pg-menu/.pg-drawer would defeat the UA's `[hidden] { display: none }`. */
+.pg-menu[hidden],
+.pg-drawer[hidden],
+.pg-pane[hidden] {
+  display: none;
+}

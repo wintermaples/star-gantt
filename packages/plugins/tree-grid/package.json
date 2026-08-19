@@ -1,0 +1,55 @@
+{
+  "name": "@stargantt/plugin-tree-grid",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "Official StarGantt plugin: the left-hand grid pane and row model, standard field columns, cell editing, and rule-driven bar colouring.",
+  "keywords": [
+    "gantt",
+    "gantt-chart",
+    "project-management",
+    "timeline",
+    "scheduling",
+    "typescript",
+    "plugin-architecture",
+    "zero-dependencies"
+  ],
+  "author": "wintermaples",
+  "homepage": "https://wintermaples.github.io/star-gantt/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wintermaples/star-gantt.git",
+    "directory": "packages/plugins/tree-grid"
+  },
+  "bugs": "https://github.com/wintermaples/star-gantt/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@stargantt/core": "workspace:*",
+    "@stargantt/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@stargantt/plugin-data-store": "workspace:*",
+    "@stargantt/plugin-task-bars": "workspace:*",
+    "@stargantt/plugin-view": "workspace:*"
+  },
+  "main": "./dist/tree-grid.umd.js",
+  "module": "./dist/tree-grid.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/tree-grid.js",
+      "default": "./dist/tree-grid.umd.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

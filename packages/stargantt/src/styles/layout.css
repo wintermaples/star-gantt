@@ -1,0 +1,800 @@
+/* Part 2/3 of the default stylesheet, split from tokens.css at a rule boundary (a blank line between two complete rules) so each part parses standalone — see tokens.css's header. */
+/* The token block, declared once and applied to three selectors (theme.md §4.2).
+   A `light-dark()` value resolves against the computed `color-scheme` of the element the
+   declaration sits on, and a registered custom property inherits as an already-resolved colour —
+   so pinning `color-scheme` on the chart element alone would change nothing. Re-declaring the same
+   list on the two scheme classes is what makes a per-chart scheme real, and putting all three
+   selectors on one rule is what keeps every value written exactly once.
+
+   Consequence, documented in theme.md §4.2: on a chart that carries a scheme class the tokens are
+   declared *on the element*, and a declaration beats inheritance whatever its specificity — so a
+   host theming such a chart writes its overrides on a selector that matches the chart element, not
+   on `:root`. Any such selector wins: these are `:where()`, specificity (0,0,0). */
+:where(:root),
+:where(.sg-scheme-light),
+:where(.sg-scheme-dark) {
+  --sg-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sg-font-size: 13px;
+  --sg-line-height: 1.4;
+
+  /* The family every canvas `-font` token below derives from, so one declaration re-faces
+     the timeline header, the bar labels and the baseline slip marks together. Separate from
+     --sg-font-family (DOM text) so re-facing canvas text never disturbs the grid and the panels. */
+  --sg-canvas-font-family: system-ui, sans-serif;
+
+  --sg-bg: light-dark(#ffffff, #1a1917);
+  --sg-fg: light-dark(#1c1917, #e7e5e4);
+  --sg-muted-fg: light-dark(#78716c, #a8a29e);
+  --sg-border: light-dark(#e7e5e4, #322e2b);
+
+  --sg-header-bg: light-dark(#ffffff, #1a1917);
+  --sg-header-fg: light-dark(#1c1917, #d6d3d1);
+  /* Header cell separators and row rules: a dedicated token, stepped to >=3:1 against
+     --sg-header-bg in both schemes, so the boundary cue survives low vision and dim screens
+     while --sg-border keeps its subtle grid/panel role. */
+  --sg-header-tick: light-dark(#8a8580, #736d66);
+  /* Shared height of the grid header and the timeline header:
+     the timeline-scale plugin reads it, draws its scale rows inside it, and contributes it to the
+     renderer's top inset, so both panes' rows start at the same y. */
+  --sg-header-height: 44px;
+  /* Whole 2D-context `font` strings for the timeline header's label text.
+     Scheme-shared: typography does not invert with the colour scheme. The fine tier (days, hours)
+     uses --sg-header-font; the coarse tier above it (months, weeks) uses --sg-header-major-font,
+     which differs only in weight so the two tiers separate without a second family or size. Both
+     sit at 12px because the canvas 2D default of 10px falls below the legibility floor for real
+     content. */
+  --sg-header-font: 12px var(--sg-canvas-font-family);
+  --sg-header-major-font: 600 12px var(--sg-canvas-font-family);
+  --sg-row-hover-bg: light-dark(#f2f0ec, #2b2825);
+  /* A grid row in the reflected selection set (`stargantt.grid-rows`). CSS-only — no
+     plugin reads it through ThemeService.get. */
+  --sg-row-selected-bg: light-dark(#d6ebe8, #24403c);
+  /* Alternating row background (grid-lines' `rowStripes`, tree-grid's row elements). It
+     replaces the row separator lines the chart used to draw: the stripe tracks a row across the
+     two panes without adding a rule per row. It stays the faintest of the four row states —
+     plain 1.00, stripe 1.05, hover 1.14, selected 1.24 against --sg-bg in the light scheme — so
+     hover and selection always read on top of it. */
+  --sg-row-stripe-bg: light-dark(#faf9f7, #211f1d);
+
+  /* Built-in task-bar fills; read at paint time by
+     task-bars. All three flip with the scheme: the teal bar fill measures 3.2:1 on the
+     dark chart background where the blue it replaced measured 4.2:1, so unlike that blue it
+     cannot stay scheme-shared and still clear the graphical-contrast floor with room to spare. */
+  --sg-bar-fill: light-dark(#0f766e, #0d9488);
+  --sg-summary-fill: light-dark(#44403c, #d6d3d1);
+  --sg-milestone-fill: light-dark(#292524, #e7e5e4);
+  /* How opaque the *uncompleted* part of a bar is painted, as a fraction of the bar's own fill. A bar is drawn as a full-length track at this alpha with the completed part painted
+     over it at full opacity, so progress reads as more of the same colour rather than as a second
+     colour laid on top. Deriving the track from the bar's own fill is what makes a recoloured bar
+     (conditional formatting, per-task colour, critical path) keep a matching track with no second
+     token to maintain. The values are the highest that keep the completed/uncompleted boundary at
+     or above 3:1 — measured 4.00:1 light, 3.36:1 dark — while leaving a 0%-complete bar plainly
+     visible against the chart background. */
+  --sg-bar-track-alpha: light-dark(0.22, 0.26);
+  /* The bar label's text colour. Read by task-bars only when `TaskBarsConfig.label` is
+     supplied, which is not the default — a default composition paints nothing with it. It tracks
+     --sg-fg without being defined as var(--sg-fg), so restyling bar labels never disturbs the
+     grid's and the panel's body text; it is opaque text on the chart background, so it inverts
+     with the scheme. */
+  --sg-bar-label-fg: light-dark(#1c1917, #e7e5e4);
+  /* The halo painted behind an outside label, so a dependency line crossing the gap between two
+     bars does not cut the text up. It is the chart background at most of its alpha rather than a
+     colour of its own: the point is to hide the few pixels of line directly behind the glyphs
+     while the rest of the line stays visible, and a fully opaque chip would blank the gap. */
+  --sg-bar-label-backdrop: light-dark(rgba(255, 255, 255, 0.82), rgba(20, 19, 18, 0.82));
+  /* Whole 2D-context `font` string for a bar's label text (task-bars — off by default).
+     Scheme-shared, same reasoning as --sg-header-font, and at the same 12px floor. */
+  --sg-bar-label-font: 12px var(--sg-canvas-font-family);
+  /* Inside-placement bar labels, bar icons and avatar initials (task-bars): text on the
+     bar's own fill, not on the chart background. In dark mode the summary and milestone fills
+     lighten (#d6d3d1 / #e7e5e4), where white text would fall to ~2:1, so this token flips the
+     opposite way from --sg-bar-label-fg — the same white-on-dark / near-black-on-light pair as
+     --sg-tooltip-fg. */
+  --sg-bar-inside-label-fg: light-dark(#ffffff, #1a1917);
+  /* Corner radius of ordinary task bars in CSS px (task-bars). A plain shared
+     length — geometry does not invert with the colour scheme. 4px softens the bar without
+     rounding away the day boundaries its edges encode; `0px` still paints the classic square bar
+     for hosts that want it. */
+  --sg-bar-radius: 4px;
+  /* Bar decoration beyond the corner radius. The outline is painted on the same path the
+     fill used, so a rounded bar gets a rounded outline; it is invisible until the width is
+     non-zero, which is why the default look is unchanged. The bevel is a unitless strength for a
+     white->black vertical gradient overlaid on the bar's own shape — an overlay rather than a
+     recoloured fill, so it follows a bar whose colour came from a per-task colour, conditional
+     formatting or the critical path without a second colour token to keep in sync. */
+  --sg-bar-stroke: transparent;
+  --sg-bar-stroke-width: 0px;
+  --sg-bar-fill-bevel: 0;
+
+  --sg-today-line: light-dark(#ea580c, #fb923c);
+  /* The dashed status-date line (today-line, opt-in via TodayLineConfig.statusDate). A
+     blue distinct from the today line's red; the dash pattern carries the distinction independent
+     of colour. The dark value lightens like the other blues (--sg-focus-stroke family). */
+  --sg-status-line: light-dark(#2f6fd6, #60a5fa);
+  /* The chart body's gridlines — the fine-row verticals and the row separators in the minor
+     token, the coarse-row verticals in the major one. Both stay far below the task bars' contrast
+     against --sg-bg: gridlines are ground, not figure. */
+  --sg-grid-line-minor: light-dark(#f5f4f1, #232120);
+  --sg-grid-line-major: light-dark(#e7e5e4, #322e2b);
+  /* Grid-lines ground marks, all deliberately below 3:1 against --sg-bg in both schemes (ground,
+     not figure — the same subordination the light values already had): non-working shading, the
+     off-hours 1 px diagonal hatch (a pattern rather than only a colour), and the default
+     zone band fill. The two non-working surfaces are a translucent red: at 8 % / 12 %
+     alpha the wash names the time as unavailable without competing with a task bar, and it stays
+     well clear of the saturated figure reds that mark critical or slipped work. The zone band's
+     dark value lightens instead of darkening, as the whole dark palette does. */
+  --sg-grid-nonworking: light-dark(rgba(220, 38, 38, 0.08), rgba(248, 113, 113, 0.12));
+  --sg-grid-offhours: light-dark(rgba(220, 38, 38, 0.08), rgba(248, 113, 113, 0.12));
+  --sg-grid-zone: light-dark(rgba(15, 118, 110, 0.1), rgba(45, 212, 191, 0.12));
+  /* Retuned off the scheme-shared amber, which cleared 3:1 against neither the blue bar
+     fill nor the white background — near-black on light / white on dark clears it against every
+     documented adjacent surface, so the token now flips with the scheme. */
+  --sg-selection-stroke: light-dark(#1c1917, #ffffff);
+  /* The selection frame's stroke width and the gap between a bar's edge and that frame.
+     Both are px lengths, scheme-shared (geometry does not invert with colour), and their defaults
+     equal the selection plugin's former internal constants, so the default look is unchanged. */
+  --sg-selection-line-width: 2px;
+  --sg-selection-outset: 2px;
+  --sg-drag-ghost-fill: light-dark(rgba(15, 118, 110, 0.28), rgba(45, 212, 191, 0.3));
+  --sg-drag-ghost-stroke: light-dark(rgba(15, 118, 110, 0.9), rgba(45, 212, 191, 0.95));
+
+  /* The rubber-band selection rectangle drawn while dragging on empty chart space in `"multi"`
+     selection mode, and the keyboard-a11y focus box; both are read at paint time
+     by their own layers. */
+  --sg-rubber-band-fill: light-dark(rgba(15, 118, 110, 0.12), rgba(45, 212, 191, 0.15));
+  --sg-rubber-band-stroke: light-dark(#0f766e, #2dd4bf);
+  --sg-focus-stroke: light-dark(#0f766e, #2dd4bf);
+  /* A rejected side-panel field edit (`.sg-side-panel-input--invalid`). CSS-only — no
+     plugin reads it through ThemeService.get. Distinct from --sg-load-over-fill's light value so
+     retuning the overload shade never disturbs form validation. */
+  --sg-invalid-stroke: light-dark(#c0392b, #e06c68);
+  /* Danger text in dialog surfaces (side-panel dialog cause line and the pane's
+     `.sg-side-panel-error` mirror). Dark value reuses --sg-invalid-stroke's lightened red so
+     the two rejected-edit reds stay one family and the text clears 4.5:1 on the dark --sg-bg. */
+  --sg-dialog-danger: light-dark(#b3261e, #e06c68);
+  /* The rest of the modal dialog family (side-panel's task-edit dialog, selection's delete
+     confirmation), which the plugins read inline. Undeclared until now, they fell back to the
+     plugins' light literals in the dark scheme — a white dialog over a dark chart whose fields
+     paint `var(--sg-bg)` under inherited near-black text, i.e. 1.0:1. Every light value below is
+     that same fallback, so the light rendering is unchanged. The dialog surface borrows
+     --sg-panel-bg's dark value (an elevated surface, like the side panel), the foreground tracks
+     --sg-fg (12.8:1 on that surface; the Save button inverts the pair), and the backdrop dims
+     harder in the dark scheme because 0.4 over an already dark chart barely reads as modal.
+     --sg-dialog-danger-fg flips the *opposite* way — the dark --sg-dialog-danger above is a
+     lightened red on which white text falls to 2.4:1, while the near-black label clears 5.5:1. */
+  --sg-dialog-backdrop: light-dark(rgba(16, 22, 29, 0.4), rgba(0, 0, 0, 0.6));
+  --sg-dialog-bg: light-dark(#ffffff, #232120);
+  --sg-dialog-fg: light-dark(#1c1917, #e7e5e4);
+  /* Read by the export format dialog's secondary text; dark pair follows
+     --sg-muted-fg so the muted tone tracks the scheme like every other dialog surface. */
+  --sg-dialog-muted-fg: light-dark(#78716c, #a8a29e);
+  --sg-dialog-danger-fg: light-dark(#ffffff, #1a1917);
+  /* The shared dialog chrome. The border takes --sg-panel-border's pair outright, because
+     the five plugins this chrome replaces all drew their hairline from that token and the
+     migration must not move it. The header band is the one genuinely new surface: a step off
+     --sg-dialog-bg just far enough to read as a grab handle (1.06:1 light, 1.11:1 dark — a
+     boundary cue, not an information-bearing contrast, and the header's text keeps the box's own
+     12.8:1 either way). The shadow deepens in the dark scheme for the same reason the backdrop
+     does: 0.25 black over an already dark chart does not separate the surfaces. */
+  --sg-dialog-border: light-dark(#d6d3d1, #3f3a36);
+  --sg-dialog-header-bg: light-dark(#f4f6f8, #2c2a29);
+  --sg-dialog-shadow: light-dark(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.55));
+  /* The same defect one plugin over. `resource-assign`'s assignment editor floats over the
+     chart and reads these inline; undeclared, it painted a white card on a dark chart (measured
+     17.6:1 against --sg-bg). It takes the elevated-surface pair --sg-panel-bg / --sg-dialog-bg
+     already use, so the floating surfaces read alike, and the hairline flips alpha the way
+     --sg-scrollbar-thumb does. */
+  --sg-ra-editor-bg: light-dark(#ffffff, #232120);
+  --sg-ra-editor-fg: light-dark(#1f2937, #e7e5e4);
+  --sg-ra-editor-border: light-dark(rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.25));
+  /* The assignment chip's wash and the chip drop target's outline: the --sg-rubber-band-fill /
+     --sg-rubber-band-stroke pairs rather than a second teal, since both are the same kind of mark
+     (a translucent wash and its 3:1-or-better affordance stroke) over the same ground. */
+  --sg-ra-chip-bg: light-dark(rgba(15, 118, 110, 0.12), rgba(45, 212, 191, 0.15));
+  --sg-ra-drop-outline: light-dark(#0f766e, #2dd4bf);
+  /* The 1px control border `filter-search`, `import-export` and `schedule-diagnostics`
+     draw around inputs, selects and their panels. Those surfaces already followed the scheme
+     (they read --sg-bg / --sg-fg) — only this border stayed light grey on a dark chart. The dark
+     value is --sg-header-tick's, the stepped boundary cue, at 3.44:1 against --sg-bg; the light
+     value keeps today's rendering, and with it a 1.54:1 gap that stays recorded rather than closed. */
+  --sg-grid-line: light-dark(#d0d0d0, #736d66);
+
+  /* Dependency arrows, connector ports and the link-creation rubber band; read at paint
+     time by the dependencies plugin. Line and port share a value but stay two tokens so a host can
+     tint the interactive ports without restyling the arrows; both track --sg-muted-fg without
+     being defined as var(--sg-muted-fg), so restyling links never disturbs the grid's muted text.
+     The band lightens its blue in dark mode so the active gesture keeps its prominence. */
+  --sg-link-line: light-dark(#78716c, #a8a29e);
+  --sg-link-port: light-dark(#78716c, #a8a29e);
+  --sg-link-band: light-dark(#0f766e, #2dd4bf);
+  /* Path-emphasized links (highlightPaths) get their own blue, distinct from the teal
+     --sg-link-band selection color, so an emphasized line never reads as a selected one; driving
+     links (highlightDriving) stay in the muted --sg-link-line family, one step stronger. */
+  --sg-link-emphasis: light-dark(#1d4ed8, #60a5fa);
+  --sg-link-driving: light-dark(#44403c, #d6d3d1);
+
+  --sg-tooltip-bg: light-dark(#1c1917, #e7e5e4);
+  --sg-tooltip-fg: light-dark(#ffffff, #1a1917);
+
+  --sg-divider-width: 5px;
+  --sg-divider-bg: transparent;
+  --sg-divider-hover-bg: light-dark(#c4beb8, #3f3a36);
+  /* The chart pane's width floor: a plain shared length, not a colour, so — like
+     --sg-divider-width — it carries no @property registration (§4.1 covers light-dark() tokens
+     only). The `panes` plugin reads this same computed value back to clamp divider drag, so the
+     drag floor and the layout floor cannot diverge. */
+  --sg-chart-min-width: 240px;
+  /* The pane row's height floor: the same treatment
+     as --sg-chart-min-width, one axis over — a plain shared length, so no @property registration
+     (§4.1 covers light-dark() tokens only). The stylesheet applies it as min-height on
+     .sg-pane-row below, and the `panes` plugin reads the same computed value back to clamp a
+     horizontal divider drag, so a bottom pane can never squeeze the grid-and-chart row away and
+     the drag floor and the layout floor cannot diverge. */
+  --sg-pane-row-min-height: 120px;
+
+  /* Tree-grid layout lengths. Both are plain shared lengths — geometry does not invert with
+     the colour scheme, so neither carries an @property registration (§4.1 covers light-dark()
+     tokens only). The `tree-grid` plugin reads these same computed values back for the expand
+     toggle's gutter width, the tree column's indent base and the 24px content-box minimum column
+     width the indent saturates against, so a restyle here can no longer disagree with the
+     geometry the plugin computes. The `treegrid` prefix keeps them apart from the chart body's
+     --sg-grid-line-* tokens. */
+  --sg-treegrid-toggle-width: 24px;
+  --sg-treegrid-cell-padding: 8px;
+  /* The renderer's synthetic overlay scrollbar: idle and scroll-in-progress thumb
+     colours, translucent so the chart content reads through them. */
+  --sg-scrollbar-thumb: light-dark(rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.25));
+  --sg-scrollbar-thumb-active: light-dark(rgba(0, 0, 0, 0.5), rgba(255, 255, 255, 0.5));
+
+  /* Load-chart band (opt-in `stargantt.load-chart` plugin). The height token is the single
+     source of truth for the band's total height (the same treatment as --sg-header-height);
+     the colour tokens are read at paint time. The bars
+     keep a blue legible on both schemes; the near-black capacity line flips to a light grey and
+     the band background matches the dark header. */
+  --sg-load-chart-height: 64px;
+  /* Resource lanes. --sg-load-lanes-height is the strip's MAXIMUM: the plugin reserves
+     min(that, laneCount * --sg-load-lane-height), and a roster taller than the strip scrolls
+     inside it rather than squeezing the lanes. 28px keeps a lane in the dense row band with
+     12px text still legible. The lane names live in the bottom pane's gutter column,
+     so --sg-load-lane-label-width sizes only the in-plot fallback name column used when that
+     gutter resolves to zero width; it stays wide enough for a typical first name. */
+  --sg-load-lanes-height: 96px;
+  --sg-load-lane-height: 28px;
+  --sg-load-lane-label-width: 96px;
+  /* Lane furniture and the aggregate band's y-axis gridlines (registered in the theme token
+     registry). The separator, the zebra wash and the
+     gridline are GROUND: translucent hairlines/washes compositing at roughly 1.1-1.5:1 against
+     --sg-load-bg in both schemes, far below the bars' >=3:1 figure contrast, so none of them
+     ever competes with a bar — and no meaning rests on them alone (overload is carried by the
+     hatch and --sg-load-over-fill). The reference line is NOT ground: it is the capacity / 100%
+     threshold the bars are read against, a graphical object required to understand the content
+     (WCAG 1.4.11), so it gets --sg-load-capacity-line's own pair — measured 12.2:1 light,
+     10.8:1 dark on --sg-load-bg and 3.9:1 / 3.4:1 where it crosses a --sg-load-fill bar — and it
+     stays subordinate to the bars through its dashed stroke, not through weak contrast (the same
+     treatment as --sg-load-capacity-line). */
+  --sg-load-lane-separator: light-dark(rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.12));
+  --sg-load-gridline: light-dark(rgba(0, 0, 0, 0.10), rgba(255, 255, 255, 0.10));
+  /* The zebra is a background a bar is drawn ON, so the binding constraint is the bar's
+     contrast over it, not the wash's own. --sg-load-fill clears 3:1 against --sg-load-bg with
+     almost no headroom (3.11:1 light / 3.17:1 dark), so the wash is kept faint enough that
+     the bar still measures 3.03:1 / 3.05:1 over a zebra lane; the banding cue itself survives at
+     1.03:1 / 1.04:1, which is what a zebra needs. */
+  --sg-load-lane-zebra: light-dark(#f7f6f4, #272423);
+  /* Retuned onto --sg-load-capacity-line's pair so the dashed mark keeps >=3:1 where it
+     crosses --sg-load-fill / --sg-load-over-fill bars, the same crossing-contrast case fixed for
+     the aggregate band's own line; the dash is what keeps it visually subordinate, not weak contrast. */
+  --sg-load-lane-reference: light-dark(#2b3240, #d6d3d1);
+  /* Light value darkened from #9db8dd so the load bar clears 3:1 against --sg-load-bg;
+     the dark value already passed and is unchanged. */
+  --sg-load-fill: light-dark(#6f90c0, #56718f);
+  /* Light value: >=3:1 where the line crosses the --sg-load-fill bars, not only the band
+     background. */
+  --sg-load-capacity-line: light-dark(#2b3240, #d6d3d1);
+  --sg-load-over-fill: light-dark(#d9534f, #e06c68);
+  --sg-load-bg: light-dark(#faf9f7, #232120);
+
+  /* Shade-calendar non-working day columns (calendars plugin). Same ground pair as
+     --sg-grid-nonworking, kept a separate token so retuning one shading never disturbs the other. */
+  --sg-calendar-nonworking: light-dark(rgba(220, 38, 38, 0.08), rgba(248, 113, 113, 0.12));
+
+  /* task-fields bar decorations. The warning glyph is an attention mark, so its dark
+     value lightens like the other reds (--sg-invalid-stroke family, >=3:1 on the dark background;
+     the triangle shape carries the meaning, not the colour alone). The avatar circles are filled
+     under hardcoded white initials, so the fill must keep >=4.5:1 under white text in BOTH
+     schemes — #5b6b7b does (5.5:1 under white, 3.25:1 against the dark background), so the token
+     is deliberately scheme-shared like --sg-bar-fill. */
+  --sg-taskfields-warning: light-dark(#d32f2f, #e06c68);
+  --sg-taskfields-avatar: #5b6b7b;
+
+  /* zoom-controls DOM toolbar. Consumed as var() fallbacks in inline styles, not through
+     ThemeService — declaring the tokens here is what gives the toolbar a dark scheme at all (the
+     var() fallbacks are light values). The border's #767676 clears 3:1 against BOTH surfaces
+     (4.5:1 on the light #ffffff, 3.6:1 on the dark #232120), so it stays scheme-shared. */
+  --sg-zoom-controls-bg: light-dark(#ffffff, #232120);
+  --sg-zoom-controls-fg: light-dark(#1c1917, #e7e5e4);
+  --sg-zoom-controls-border: #767676;
+
+  /* Baselines plugin. The underlay marks stay ground in both schemes — the ghost bar
+     ~2.5-3:1 against --sg-bg (subordinate to task bars, matching its light subordination), the
+     overlay a translucent grey that lightens like --sg-drag-ghost-fill, the overlay stroke and
+     the removed-from-critical-path ring stepping to the grey/muted family. The figure marks
+     invert: the actual bar joins the light steel family of the dark summary/milestone fills, and
+     the slip-label reds/greens lighten to >=4.5:1 text on the dark background (late shares the
+     --sg-invalid-stroke dark red; early is its green counterpart). The slip font is typography
+     and stays scheme-shared. */
+  --sg-baseline-bar: light-dark(#9aa5b1, #5a646f);
+  --sg-baseline-overlay-fill: light-dark(rgba(154, 165, 177, 0.28), rgba(174, 185, 200, 0.3));
+  --sg-baseline-overlay-stroke: light-dark(#7b8794, #8b98a6);
+  --sg-actual-bar: light-dark(#334e68, #9db4cc);
+  --sg-baseline-slip-late: light-dark(#b3261e, #e06c68);
+  --sg-baseline-slip-early: light-dark(#1b6e53, #4fc08d);
+  --sg-baseline-slip-font: 10px var(--sg-canvas-font-family);
+  --sg-baseline-cp-added: light-dark(#b3261e, #e06c68);
+  --sg-baseline-cp-removed: light-dark(#52606d, #a8a29e);
+
+  /* critical-path plugin (out of this package's
+     scope). Light values are byte-identical to the plugin's own built-in fallback constants. */
+  --sg-critical-bar: light-dark(#c62828, #e06c68);
+  --sg-near-critical-bar: light-dark(#ef6c00, #ffb74d);
+  --sg-negative-float: light-dark(#7f1d1d, #ff8a80);
+  --sg-critical-float: light-dark(rgba(96, 125, 139, 0.3), rgba(158, 178, 191, 0.35));
+
+  /* resource-utilization's overlay warning glyph and grid-cell text (out of scope). */
+  --sg-ru-warning: light-dark(#c62828, #e06c68);
+  /* progress-tracking's trend-panel canvas line (out of scope). */
+  --sg-progress-line: light-dark(#d81b60, #f06292);
+  /* evm's PV/EV/AC curve strokes (out of scope). */
+  --sg-evm-pv: light-dark(#1565c0, #60a5fa);
+  --sg-evm-ev: light-dark(#2e7d32, #4fc08d);
+  --sg-evm-ac: light-dark(#c62828, #e06c68);
+  /* cost-tracking's planned/actual curve and category-breakdown strokes (out of scope;
+     light values byte-identical to the plugin's built-in fallback constants). */
+  --sg-cost-planned: light-dark(#1565c0, #60a5fa);
+  --sg-cost-actual: light-dark(#c62828, #e06c68);
+  --sg-cost-labor: light-dark(#1565c0, #60a5fa);
+  --sg-cost-fixed: light-dark(#6a1b9a, #ba68c8);
+  --sg-cost-variable: light-dark(#b45309, #ffb74d);
+  --sg-cost-material: light-dark(#2e7d32, #4fc08d);
+  /* progress-tracking's RAG bar recolor and badge fills (out of scope). Scheme-shared:
+     the badge letter (--sg-rag-badge-fg, white by default) is also scheme-shared, so each fill
+     must keep that letter at or above 4.5:1 in both schemes — exactly the plugin's built-in
+     fallback constants (white on these fills: 5.62 / 5.02 / 5.13). */
+  --sg-rag-red: #c62828;
+  --sg-rag-amber: #b45309;
+  --sg-rag-green: #2e7d32;
+  /* progress-tracking's RAG badge letter (out of scope). Scheme-shared with the fills:
+     a palette that retunes the --sg-rag-* fills must retune this token to keep >=4.5:1 on all
+     three. The letter R/A/G, not the color, carries the classification. */
+  --sg-rag-badge-fg: #ffffff;
+  /* resource-utilization's demand/supply trend strokes (out of scope). */
+  --sg-ru-demand: light-dark(#1d4ed8, #60a5fa);
+  --sg-ru-supply: light-dark(#2e7d32, #4fc08d);
+
+  /* resource-view panel (out of scope). Every value equals what the plugin's own
+     `var(--sg-rv-X, var(--sg-CORE-TOKEN, LITERAL))` fallback chain already resolved to, so
+     declaring these changes no rendered pixel — they merely make the panel independently
+     restylable without touching the shared core tokens. */
+  --sg-rv-bg: light-dark(#ffffff, #1a1917);
+  --sg-rv-fg: light-dark(#1c1917, #e7e5e4);
+  --sg-rv-font: 12px/1.4 system-ui, sans-serif;
+  --sg-rv-team-bg: light-dark(#f2f0ec, #232120);
+  --sg-rv-team-fg: light-dark(#1c1917, #d6d3d1);
+  --sg-rv-border: light-dark(#e7e5e4, #322e2b);
+  --sg-rv-row-border: light-dark(#e7e5e4, #322e2b);
+  --sg-rv-seg-bg: light-dark(#0f766e, #0d9488);
+  --sg-rv-seg-fg: light-dark(#ffffff, #1a1917);
+  /* Over-allocated segment surface: values track --sg-dialog-danger / --sg-bar-inside-label-fg
+     (the chains the plugin's own fallbacks resolve through) in both schemes. */
+  --sg-rv-seg-over-bg: light-dark(#b3261e, #e06c68);
+  --sg-rv-seg-over-fg: light-dark(#ffffff, #1a1917);
+  --sg-rv-row-height: 28px;
+  --sg-rv-height: 200px;
+  --sg-rv-label-width: 160px;
+  /* The panel's header-band edge mark and container top accent border, chaining through
+     --sg-focus-stroke's pair. */
+  --sg-rv-accent: light-dark(#0f766e, #2dd4bf);
+  /* The lane scrim's at-rest opacity, chaining through --sg-rv-bg so it follows the scheme
+     via its parent rather than carrying its own light/dark pair. The plugin's own stylesheet swaps
+     this same expression's percentage to 65% while a lane drag is in progress (`[data-dragging]`),
+     which is why this token stays a shared color-mix() rather than a value this file could pin to
+     two states. */
+  --sg-rv-lane-bg: light-dark(#ffffff, #1a1917);
+
+  /* context-menu's `--sg-menu-*` family. */
+  --sg-menu-bg: light-dark(#ffffff, #232120);
+  --sg-menu-fg: light-dark(#1f2328, #e7e5e4);
+  --sg-menu-border: light-dark(#ddd9d5, #3f3a36);
+
+  /* The `--sg-panel-*` family: calendars' exception-day editor reads it in this package's
+     scope; dashboard, cost-tracking, progress-tracking and evm read the same three tokens out of
+     scope, with the same fallback literals, so this registration is shared without a code change
+     to any of them. */
+  --sg-panel-bg: light-dark(#ffffff, #232120);
+  --sg-panel-fg: light-dark(#1d2733, #e7e5e4);
+  --sg-panel-border: light-dark(#d6d3d1, #3f3a36);
+
+  /* dev-only frame-time overlay (perf-tools). Deliberately scheme-shared: a dark,
+     semi-opaque backdrop with light text reads clearly over either scheme's chart background. */
+  --sg-perf-tools-bg: rgba(15, 23, 42, 0.85);
+  --sg-perf-tools-fg: #f8fafc;
+
+  /* load-chart's heatmap panel (out of scope). */
+  --sg-load-heatmap-bg: light-dark(#ffffff, #232120);
+  --sg-load-heatmap-fg: light-dark(#1c1917, #e7e5e4);
+  --sg-load-heatmap-border: light-dark(rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.25));
+}
+
+/* ------------------------------------------------------------------ *
+ * Chart root and pane row
+ *
+ * The root is the element the host passes to `create()`; StarGantt puts no class on it, so it is
+ * selected by what it directly contains. `:where()` keeps the specificity at zero. Two shapes
+ * exist:
+ *
+ * - With `stargantt.panes` composed, the plugin wraps the chart pane and every side pane in
+ *   `<div class="sg-pane-row">`, a direct child of the root, and the root becomes a VERTICAL
+ *   stack: the pane row takes the remaining height and the bottom region sits under it.
+ *   The root then matches the `:has(> .sg-pane-row)` rule below, while the historical
+ *   `:has(> .sg-pane--chart)` rule matches the ROW — the element that now directly contains the
+ *   chart pane — which is exactly what makes the row the horizontal flex line the root used to
+ *   be.
+ * - Without `stargantt.panes`, the chart pane stays a direct child of the root, the
+ *   `:has(> .sg-pane--chart)` rule styles the root exactly as it always did, and nothing below
+ *   this comment's first two rules applies.
+ * ------------------------------------------------------------------ */
+
+:where(:has(> .sg-pane--chart)) {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  font-family: var(--sg-font-family);
+  font-size: var(--sg-font-size);
+  line-height: var(--sg-line-height);
+}
+
+:where(:has(> .sg-pane--chart)) * {
+  box-sizing: border-box;
+}
+
+/* The root once `stargantt.panes` has wrapped the panes in the row. The same base styling
+   the rule above gave the root, plus the column direction — without the flex display and the
+   stretch alignment the column direction would be inert. */
+:where(:has(> .sg-pane-row)) {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  font-family: var(--sg-font-family);
+  font-size: var(--sg-font-size);
+  line-height: var(--sg-line-height);
+}
+
+/* The universal border-box, re-anchored on the root. With the pane row in place the
+   `.sg-pane--chart`-keyed companion above reaches only the ROW's subtree, while the bottom
+   region is the row's SIBLING — left at content-box, any padding or hairline border on
+   `.sg-bottom-pane` or its three columns would add to the widths the panes plugin writes and break the gutter/body/trailing alignment the whole bottom-region design rests
+   on. */
+:where(:has(> .sg-pane-row)) * {
+  box-sizing: border-box;
+}
+
+/* The pane row: the horizontal flex line holding the grid pane, the chart pane and the
+   side panes. Its display, direction and alignment come from the `:has(> .sg-pane--chart)` rule
+   above, which now matches it; this rule only sizes it in the root's column. It takes whatever
+   height the bottom region leaves, and its floor is the same token the `panes` plugin reads
+   back to clamp a horizontal divider drag, so a bottom pane can never squeeze the row
+   away — the token also replaces the flex min-content floor (`min-height: auto`), which would
+   otherwise keep the row from shrinking at all. */
+.sg-pane-row {
+  flex: 1 1 0%;
+  min-height: var(--sg-pane-row-min-height, 120px);
+}
+
+/* ------------------------------------------------------------------ *
+ * Panes
+ * ------------------------------------------------------------------ */
+
+.sg-pane {
+  position: relative;
+  /* Shrinkable (not flex: 0 0 auto) so a contributed pane gives up width before the chart
+     pane is squeezed below its floor — see .sg-pane--chart's min-width below. Flex-basis stays
+     `auto`, which resolves to the pane's inline `style.width` (its current width), so a pane that
+     is not being squeezed is unaffected. */
+  flex: 0 1 auto;
+  /* Flex items default to min-width:auto (min-content floor); without this, wide nowrap content
+     could push a contributed pane past its initialWidth and defeat the divider's minWidth clamp. */
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sg-pane--grid {
+  position: relative;
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--sg-border);
+  outline: none;
+  /* The grid pane is a row-selection surface, not a document. Without this, a Shift-click
+     range extension (selection's `mode: "multi"`) also extended the *browser's* text selection
+     across the rows it passed, painting every cell's text in the highlight colour on top of the
+     row-selection fill, and a plain press-and-drag smeared the same highlight across the pane.
+     Every grid product suppresses it for the same reason; the inline editors below opt back in,
+     since typing into one has to allow ordinary text selection. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The pane keeps its tab stop but is never left `outline: none` without a replacement —
+   the focused-row class below (`.sg-grid-row--focused`) marks the specific row, and this ring
+   marks the pane as a whole when it (not a row) holds keyboard focus. */
+.sg-pane--grid:focus-visible {
+  outline: 2px solid var(--sg-focus-stroke);
+  outline-offset: -2px;
+}
+
+.sg-pane--chart {
+  flex: 1 1 auto;
+  /* The chart pane's width floor. Contributed panes shrink first (their own flex-shrink
+     above); once they reach their own minWidth, this floor is what stops the chart pane from
+     collapsing to nothing on a narrow root. `panes` reads the same computed value back to clamp
+     divider drag, so the drag floor and this layout floor cannot diverge. */
+  min-width: var(--sg-chart-min-width, 240px);
+}
+
+/* The chart pane carries `tabindex="-1"` so a press on the canvas leaves the DOM focus
+   inside the chart root. That focus is a pointer focus and is never keyboard-reachable, so it gets
+   no ring — the focused row's own indicator (`.sg-grid-row--focused` in the grid, keyboard-a11y's
+   focus box on the canvas) is what marks where the user is. The rule is scoped to
+   `:not(:focus-visible)` so a scripted focus that a browser does judge keyboard-driven still
+   shows one, and it exists at all because a hosting page's own `:focus` rule would otherwise
+   outline the whole chart on every click. */
+.sg-pane--chart:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.sg-pane-divider {
+  flex: 0 0 var(--sg-divider-width);
+  background: var(--sg-divider-bg);
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  /* The pointer/touch hit target is at least 24 CSS px wide, enlarged around the painted
+     line by the two transparent bands below. The element itself keeps exactly the painted width
+     (--sg-divider-width stays the flex-basis above), so neither the paint nor any pane's layout
+     width changes; the bands are absolutely positioned, so they reserve no layout width either and
+     overlay the neighboring panes' edges instead of displacing them.
+     `position`/`z-index` are what make the bands actually hit-testable: as a non-positioned in-flow
+     item the divider paints below the positioned descendants of both neighbors (the chart pane's
+     canvas layers, the grid pane's body), so only the painted line itself answered to the pointer.
+     Its own stacking context above them makes the whole band answer; the bands paint nothing, so
+     the composite is unchanged.
+     Symmetric slack, used below the header strip. The extra 1px inside the halving is a ceiling:
+     the two halves must not sum to less than the required 24. */
+  --sg-divider-hit-pad: max(0px, calc((24px - var(--sg-divider-width, 5px) + 1px) / 2));
+  /* One-sided slack, used across the header strip — see the ::before rule. */
+  --sg-divider-hit-slack: max(0px, calc(24px - var(--sg-divider-width, 5px)));
+  min-height: 24px;
+  position: relative;
+  z-index: 2;
+}
+
+/* The hit band across the top `--sg-header-height` of the divider — the strip a contributed
+   pane fills with its own header. A contributed pane may put a control flush against its inner
+   edge there (`tree-grid` puts a column-resize handle on every header-cell boundary), and a
+   band overhanging into that strip would sit on top of it and swallow the gesture. So across the
+   strip the whole slack goes to the chart side instead, leaving the two hit bands disjoint rather
+   than stacked — both gestures stay operable. Nothing is lost on the chart
+   side: the strip is where the timeline header canvas paints, and that canvas is `pointer-events:
+   none`. `data-side` says which side the contributed pane is on; the declarations without it are
+   the symmetric fallback for a divider that carries no side. */
+.sg-pane-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  height: var(--sg-header-height, 44px);
+  left: calc(-1 * var(--sg-divider-hit-pad));
+  right: calc(-1 * var(--sg-divider-hit-pad));
+}
+
+.sg-pane-divider[data-side="left"]::before {
+  left: 0;
+  right: calc(-1 * var(--sg-divider-hit-slack));
+}
+
+.sg-pane-divider[data-side="right"]::before {
+  left: calc(-1 * var(--sg-divider-hit-slack));
+  right: 0;
+}
+
+/* The hit band below the header strip. It is the mirror image of the ::before band above:
+   there the contributed pane carries the edge controls (its header-cell resize handles) so the
+   slack yields to the chart side, while here it is the *chart* that does — a task bar scrolled to
+   the pane's leading edge puts its start-resize handle, and its connector port, within
+   a few px of it — so the slack yields to the contributed pane instead. A contributed pane's inner
+   edge below its header is inert (a grid row's trailing edge is text), so nothing is lost there.
+   Same rule as above: the two hit bands stay disjoint rather than stacked, and
+   the declarations without `data-side` are the symmetric fallback for a divider carrying no side. */
+.sg-pane-divider::after {
+  content: "";
+  position: absolute;
+  top: var(--sg-header-height, 44px);
+  bottom: 0;
+  left: calc(-1 * var(--sg-divider-hit-pad));
+  right: calc(-1 * var(--sg-divider-hit-pad));
+}
+
+.sg-pane-divider[data-side="left"]::after {
+  left: calc(-1 * var(--sg-divider-hit-slack));
+  right: 0;
+}
+
+.sg-pane-divider[data-side="right"]::after {
+  left: 0;
+  right: calc(-1 * var(--sg-divider-hit-slack));
+}
+
+.sg-pane-divider:hover {
+  background: var(--sg-divider-hover-bg);
+}
+
+/* Both divider orientations carry an explicit focus ring — a 5px-wide (or -tall) element
+   cannot rely on the UA outline, which hugs a box too thin to read as focused. The shared
+   --sg-focus-stroke clears 3:1 against every adjacent chart surface in both schemes. */
+.sg-pane-divider:focus-visible {
+  outline: 2px solid var(--sg-focus-stroke);
+  /* Inset by a pixel so the ring is drawn inside the divider's own box: the bottom region clips
+     its overflow, and at offset 0 the topmost horizontal divider's ring lost its top edge to that
+     clip. An inset ring keeps all four sides visible on both orientations. */
+  outline-offset: -1px;
+}
+
+/* The horizontal divider on a resizable bottom pane's top edge. The base rule above is
+   written for the vertical axis; this modifier restates every axis-specific declaration on the
+   horizontal one. The selector doubles the class — matching the element's documented class pair
+   `.sg-pane-divider.sg-pane-divider--horizontal` — so it also outweighs the `[data-side]` band
+   rules above at equal specificity (a horizontal divider carries no `data-side`; its steering
+   is fixed, see the ::before band below). */
+.sg-pane-divider.sg-pane-divider--horizontal {
+  /* The same basis, now sizing the height: the bottom region is a column flex container, so flex-basis resolves against the vertical axis there. */
+  flex: 0 0 var(--sg-divider-width);
+  cursor: row-resize;
+  /* Neutralise the vertical rule's 24px min-height floor — kept there so a short divider stays
+     a usable target, here it would paint a 24px-TALL divider. The 24px minimum pointer target
+     lives in the transparent ::before band below (WCAG 2.5.8), and the along-axis floor moves
+     to the cross axis as min-width. */
+  min-height: 0;
+  min-width: 24px;
+}
+
+/* The >=24 CSS px hit band — one transparent overlay spanning the divider's full width,
+   replacing the vertical divider's two data-side-steered bands. The slack always yields
+   DOWNWARD, into the bottom pane's own top edge, which the pane's contributor keeps inert:
+   the band must never overhang
+   the surface above the divider — above the topmost divider sits the renderer's synthetic
+   horizontal scrollbar thumb (`.sg-scrollbar--horizontal`, pointer-events: auto), which this
+   element's higher z-index would otherwise cover and make ungrabbable — and the inert top edge
+   below keeps a contributed tabindex="0" scroll surface's wheel input out of the band. */
+.sg-pane-divider.sg-pane-divider--horizontal::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: auto;
+  bottom: calc(-1 * var(--sg-divider-hit-slack));
+}
+
+/* The vertical divider needs two disjoint bands (header strip vs body); the horizontal
+   one is covered by ::before alone, so its ::after is retired. */
+.sg-pane-divider.sg-pane-divider--horizontal::after {
+  content: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * Bottom region
+ *
+ * `stargantt.panes` owns this full-width region below the pane row. Each pane in it is a flex
+ * row of gutter / body / trailing columns whose widths the panes plugin WRITES INLINE to mirror
+ * the pane row's live layout — gutter = the left panes and their dividers, body = the chart
+ * pane, trailing = the right panes and their dividers. Nothing here may fight those
+ * inline widths, and nothing may add padding or border to the pane or its columns: even under
+ * border-box that would shrink the content boxes out of alignment with the panes above. A pane
+ * whose height is 0 carries an inline `display: none`, written by the plugin.
+ * ------------------------------------------------------------------ */
+
+.sg-bottom-region {
+  position: relative;
+  /* The pane row takes the remaining height (its flex: 1 1 0% above); the region keeps exactly
+     the height its panes and dividers sum to. The column direction is what lets the horizontal
+     divider's flex-basis resolve to a height. */
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.sg-bottom-pane {
+  position: relative;
+  /* The pane's height is written inline by the panes plugin after mount; basis
+     `auto` resolves to that inline height, and zero grow/shrink keeps this stylesheet from
+     fighting the written value. */
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.sg-bottom-pane__gutter,
+.sg-bottom-pane__body,
+.sg-bottom-pane__trailing {
+  position: relative;
+  /* The column widths are written inline by the panes plugin; basis `auto` resolves to
+     them, and zero grow/shrink means a squeeze never redistributes what the plugin wrote. */
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------ *
+ * Canvases
+ * ------------------------------------------------------------------ */
+
+.sg-layer,
+.sg-header {
+  display: block;
+}
+
+/* The timeline header canvas is positioned over the chart pane's top-left corner by the plugin. */
+.sg-header {
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Renderer-owned synthetic overlay scrollbars — one per axis. They overlay the
+   chart body at its right and bottom edges and reserve no layout space; the geometry along each
+   bar's own axis (offset and length, for both track and thumb) is set inline by the renderer per
+   frame, while the cross-axis thickness and edge offset live here. The track is
+   `pointer-events: none` (pressing its empty space does nothing — no track-click
+   paging is supported); the thumb opts back in, since it is a drag target. */
+.sg-scrollbar {
+  position: absolute;
+  pointer-events: none;
+}
+
+.sg-scrollbar--vertical {
+  top: 0;
+  right: 2px;
+  width: 8px;
+}
+
+.sg-scrollbar--horizontal {
+  left: 0;
+  bottom: 2px;
+  height: 8px;
+}
+
+.sg-scrollbar__thumb {
+  position: absolute;
+  border-radius: 4px;
+  background: var(--sg-scrollbar-thumb);
+  /* The grab target. `touch-action: none` keeps a touch drag from being taken over by the
+     browser's own panning. */
+  pointer-events: auto;
+  touch-action: none;
+  /* The cursor is the only signifier that the painted 8px strip can be dragged at all — there is
+     no hover fill and no handle glyph. `grab` says so before the press, `grabbing` confirms it
+     during one. `:active` (rather than the track's `--active` class) is what tracks the drag: the
+     class also turns on for wheel scrolling, which is not a grab. */
+  cursor: grab;
+}
+

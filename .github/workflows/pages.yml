@@ -1,0 +1,79 @@
+# GitHub Pages — deploys the user documentation site plus the live examples.
+#
+# Site layout (https://wintermaples.github.io/star-gantt/):
+#   /                              user-docs (hash-routed SPA, so no 404 fallback is needed)
+#   /examples/                     the demo pages, unchanged
+#   /packages/stargantt/dist/      the built IIFE bundle — examples reference it via the
+#                                  same relative path they use inside the repository
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from packageManager in package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            user-docs/pnpm-lock.yaml
+
+      - name: Install library dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the library (docs site and examples consume the shipped bundle)
+        run: pnpm run build
+
+      - name: Install user-docs dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: user-docs
+
+      - name: Build the docs site (served under /star-gantt/)
+        # `pnpm run build -- --base=...` does not reach vite through the compound script,
+        # so the two script steps are invoked directly.
+        run: |
+          pnpm exec tsc --noEmit
+          pnpm exec vite build --base=/star-gantt/
+        working-directory: user-docs
+
+      - name: Assemble the site
+        run: |
+          mkdir -p site/examples site/packages/stargantt
+          cp -r user-docs/dist/. site/
+          cp -r examples/. site/examples/
+          cp -r packages/stargantt/dist site/packages/stargantt/dist
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

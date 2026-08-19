@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Portfolio example</title>
+    <!--
+      Demonstrates the OPT-IN `StarGantt.portfolio()` plugin (this page exercises only the
+      portfolio area; see examples/dashboard.html for the dashboard area). Config shape is
+      `nodes`, `goals`, `views`; `portfolio.nodes.get()` / `portfolio.goals.get()` read the
+      current lists, and `portfolio.nodes.subscribe(...)` / `portfolio.goals.subscribe(...)`
+      observe changes. `gantt.service("stargantt.data").tasks.subscribe(...)` observes task
+      changes.
+
+      Filter-search is the `filterSearch` nested group of the single `interaction` plugin
+      (presence-gated: passing the nest, even `{}`, is what enables the `stargantt.filter`
+      service the portfolio plugin needs), so this page composes
+      `presetStandard({ interaction: { filterSearch: {} } })`. This page is one self-contained
+      boot script, matching `examples/data-sync.html`'s idiom, with a hierarchy tree with health
+      traffic-lights, goals, filter + saved views, and cross-project move + undo.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      #chart {
+        height: 320px;
+        border: 1px solid #ccc;
+      }
+      #pf-status {
+        font-size: 12px;
+        color: #333;
+        margin: 4px 0;
+      }
+      .panels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 6px 0;
+      }
+      .panel {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 6px 8px;
+        min-width: 230px;
+        flex: 1 1 230px;
+      }
+      .panel h2 {
+        font-size: 12px;
+        margin: 0 0 4px;
+      }
+      .panel button,
+      .panel select,
+      .panel input[type="text"] {
+        font: inherit;
+        min-height: 24px;
+      }
+      .panel button {
+        margin: 0 4px 4px 0;
+        cursor: pointer;
+      }
+      ul.tree {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-size: 12px;
+        max-height: 160px;
+        overflow-y: auto;
+      }
+      li.node {
+        margin: 2px 0;
+      }
+      .node-head {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .kind {
+        color: #777;
+        font-size: 10px;
+      }
+      .health {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 2px 0 4px;
+        font-size: 11px;
+      }
+      .status-word.on-track { color: #1a7f37; }
+      .status-word.at-risk { color: #9a6700; }
+      .status-word.late { color: #cf222e; }
+      .bar {
+        width: 60px;
+        height: 6px;
+        background: #eee;
+        border-radius: 3px;
+        overflow: hidden;
+        display: inline-block;
+      }
+      .bar span {
+        display: block;
+        height: 100%;
+        background: #3a7dd6;
+      }
+      .goal {
+        margin: 4px 0;
+        font-size: 12px;
+      }
+      .field {
+        margin: 4px 0;
+      }
+      .field label {
+        display: block;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — portfolio (hierarchy, health, goals, filter)</h1>
+    <details>
+      <summary>What's on this page</summary>
+      One <code>portfolio({ nodes, goals, views })</code> composition over three projects grouped
+      under two programs under one initiative.
+    </details>
+
+    <div id="chart"></div>
+    <p id="pf-status" role="status" aria-live="polite">Ready. Duplicating a project or moving a task is one undoable step.</p>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Hierarchy &amp; health</h2>
+        <ul class="tree" id="pf-tree"></ul>
+        <button id="pf-collapse-all">Collapse all projects</button>
+        <button id="pf-expand-all">Expand all projects</button>
+      </div>
+
+      <div class="panel">
+        <h2>Goals / OKRs</h2>
+        <div id="pf-goals"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Filter &amp; saved views</h2>
+        <p class="readout">
+          Check nodes in the hierarchy card, then narrow the rows to their tasks. Filtering is
+          display state only — it never touches the data or the undo history.
+        </p>
+        <button id="pf-filter-apply">Filter to checked nodes</button>
+        <button id="pf-filter-clear">Clear filter</button>
+        <div class="field">
+          <label for="pf-view-select">Saved view</label>
+          <select id="pf-view-select"></select>
+          <button id="pf-view-apply">Apply</button>
+          <button id="pf-view-delete">Delete</button>
+        </div>
+        <div class="field">
+          <label for="pf-view-name">Save current as</label>
+          <input type="text" id="pf-view-name" size="12" placeholder="My view" />
+          <button id="pf-view-save">Save view</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Cross-project move</h2>
+        <div class="field">
+          <label for="pf-move-task">Task</label>
+          <select id="pf-move-task"></select>
+        </div>
+        <div class="field">
+          <label for="pf-move-target">Into project</label>
+          <select id="pf-move-target"></select>
+        </div>
+        <button id="pf-move-run">Move task</button>
+        <button id="pf-undo">Undo last edit</button>
+      </div>
+    </div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            // Atlas is behind: a leaf whose end has passed with progress < 1 makes the whole
+            // branch "late" under the strictly-worst-wins traffic light.
+            { id: "atlas", parentId: null, name: "Atlas rebuild", type: "summary", start: T0 - 30 * DAY, end: T0 + 10 * DAY },
+            { id: "a1", parentId: "atlas", name: "Auth service", start: T0 - 30 * DAY, end: T0 - 20 * DAY, progress: 1 },
+            { id: "a2", parentId: "atlas", name: "Billing migration", start: T0 - 20 * DAY, end: T0 - 4 * DAY, progress: 0.4 },
+            { id: "a3", parentId: "atlas", name: "Hardening", start: T0 - 4 * DAY, end: T0 + 10 * DAY, progress: 0.2 },
+
+            // Borealis is running but behind its time-linear expected progress: "at risk".
+            { id: "borealis", parentId: null, name: "Borealis mobile", type: "summary", start: T0 - 10 * DAY, end: T0 + 24 * DAY },
+            { id: "b1", parentId: "borealis", name: "Design refresh", start: T0 - 10 * DAY, end: T0 + 2 * DAY, progress: 0.5 },
+            { id: "b2", parentId: "borealis", name: "Offline mode", start: T0 + 2 * DAY, end: T0 + 18 * DAY, progress: 0 },
+            { id: "b3", parentId: "borealis", name: "Public beta", type: "milestone", start: T0 + 24 * DAY, end: T0 + 24 * DAY },
+
+            // Cygnus has not started yet: nothing late, nothing at risk — "on track".
+            { id: "cygnus", parentId: null, name: "Cygnus analytics", type: "summary", start: T0 + 2 * DAY, end: T0 + 30 * DAY },
+            { id: "c1", parentId: "cygnus", name: "Data model", start: T0 + 2 * DAY, end: T0 + 12 * DAY, progress: 0 },
+            { id: "c2", parentId: "cygnus", name: "Dashboards", start: T0 + 12 * DAY, end: T0 + 30 * DAY, progress: 0 },
+          ],
+          links: [
+            { sourceId: "a1", targetId: "a2", type: "FS" },
+            { sourceId: "a2", targetId: "a3", type: "FS" },
+            { sourceId: "b1", targetId: "b2", type: "FS" },
+            { sourceId: "b2", targetId: "b3", type: "FS" },
+            { sourceId: "c1", targetId: "c2", type: "FS" },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          // "atlas"/"a1" start at `T0 - 30 * DAY`, before the default today-anchored origin —
+          // without this, that content sits left of content x = 0 and no scroll gesture can reach it.
+          ...StarGantt.presetStandard({
+            view: { timeline: { origin: T0 - 30 * DAY } },
+            // The portfolio filter writes through the interaction plugin's `stargantt.filter`
+            // service; that service is gated by the `filterSearch` nest's presence — without it
+            // the whole filter/saved-view surface is a documented silent no-op.
+            interaction: { filterSearch: {} },
+          }),
+          StarGantt.portfolio({
+            // Ranks are fixed: initiative > program > project. A `parentId` is honored only when
+            // it names an already-defined node of strictly higher rank, so order matters here.
+            nodes: [
+              { id: "fy26", kind: "initiative", name: "FY26 delivery" },
+              { id: "platform", kind: "program", name: "Platform program", parentId: "fy26" },
+              { id: "growth", kind: "program", name: "Growth program", parentId: "fy26" },
+              // A project node binds one task id; that task's subtree is the project.
+              { id: "atlas", kind: "project", name: "Atlas rebuild", parentId: "platform", taskId: "atlas" },
+              { id: "borealis", kind: "project", name: "Borealis mobile", parentId: "platform", taskId: "borealis" },
+              { id: "cygnus", kind: "project", name: "Cygnus analytics", parentId: "growth", taskId: "cygnus" },
+            ],
+            // Goals link nodes and/or task ids; progress is the duration-weighted mean of the
+            // resolved tasks, recomputed fresh on every read.
+            goals: [
+              { id: "g-platform", name: "Platform 2.0 shipped", nodeIds: ["platform"], target: 0.9 },
+              { id: "g-growth", name: "Analytics self-serve", nodeIds: ["growth"], target: 0.3 },
+              { id: "g-auth", name: "Auth service GA", taskIds: ["a1"], target: 0.9 },
+            ],
+            // Saved views cover the node-id narrowing only, and seed the in-memory view map.
+            views: {
+              "Platform program": { nodeIds: ["platform"] },
+              "Everything": { nodeIds: null },
+            },
+          }),
+        ],
+      });
+
+      const data = gantt.service("stargantt.data");
+      const portfolio = gantt.service("stargantt.portfolio");
+
+      data.load(dataset());
+
+      // -------------------------------------------------------------------- page state / chrome
+      const treeEl = document.getElementById("pf-tree");
+      const goalsEl = document.getElementById("pf-goals");
+      const statusEl = document.getElementById("pf-status");
+      const viewSelect = document.getElementById("pf-view-select");
+      const viewName = document.getElementById("pf-view-name");
+      const taskSelect = document.getElementById("pf-move-task");
+      const targetSelect = document.getElementById("pf-move-target");
+
+      const checked = new Set();
+      const collapsed = new Set();
+
+      function say(message) {
+        statusEl.textContent = message;
+      }
+
+      function pct(value) {
+        return Math.round((value || 0) * 100) + "%";
+      }
+
+      function statusLabel(status) {
+        if (status === "late") return "✕ Late";
+        if (status === "at-risk") return "! At risk";
+        return "✓ On track";
+      }
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function progressBar(value) {
+        const bar = el("span", "bar");
+        const fill = el("span");
+        fill.style.width = Math.round(Math.max(0, Math.min(1, value || 0)) * 100) + "%";
+        bar.appendChild(fill);
+        return bar;
+      }
+
+      function renderNode(node, depth, list) {
+        const item = el("li", "node");
+        item.style.paddingLeft = depth * 14 + "px";
+
+        const head = el("div", "node-head");
+        const label = document.createElement("label");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = checked.has(node.id);
+        // Logical re-focus key: identifies this control across a full re-render, since the DOM
+        // node itself is rebuilt every time and node identity isn't otherwise tracked.
+        box.setAttribute("data-pf-key", "check:" + node.id);
+        box.addEventListener("change", () => {
+          if (box.checked) checked.add(node.id); else checked.delete(node.id);
+        });
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(" " + node.name));
+        head.appendChild(label);
+        head.appendChild(el("span", "kind", node.kind));
+
+        if (node.kind === "project" && node.taskId !== undefined) {
+          const isCollapsed = collapsed.has(node.id);
+          const toggle = el("button", null, "Collapse");
+          toggle.type = "button";
+          toggle.setAttribute("aria-pressed", isCollapsed ? "true" : "false");
+          toggle.setAttribute("aria-label", "Collapse " + node.name);
+          toggle.setAttribute("data-pf-key", "toggle:" + node.id);
+          toggle.addEventListener("click", () => {
+            const next = !collapsed.has(node.id);
+            // Routed through the tree-grid's public `view/rowToggle` command, so grid, chart and
+            // ARIA mirror stay in sync.
+            portfolio.setProjectCollapsed(node.id, next);
+            if (next) collapsed.add(node.id); else collapsed.delete(node.id);
+            toggle.setAttribute("aria-pressed", next ? "true" : "false");
+            say((next ? "Collapsed " : "Expanded ") + node.name + ".");
+          });
+          head.appendChild(toggle);
+
+          const dup = el("button", null, "Duplicate");
+          dup.type = "button";
+          dup.setAttribute("aria-label", "Duplicate " + node.name + " as a new project");
+          dup.setAttribute("data-pf-key", "dup:" + node.id);
+          dup.addEventListener("click", () => {
+            const startAt = Math.floor(Date.now() / DAY) * DAY + 40 * DAY;
+            const copyRoot = portfolio.duplicateProject(node.id, { startAt });
+            if (copyRoot === undefined) {
+              say("Could not duplicate " + node.name + ".");
+              return;
+            }
+            say(
+              "Duplicated " + node.name + ' as task "' + copyRoot +
+                '" — the copied tasks are one undo step. The sibling project node defined for the ' +
+                "copy is plugin registry state, outside the undo pipeline, so undo leaves it behind."
+            );
+          });
+          head.appendChild(dup);
+        }
+
+        item.appendChild(head);
+
+        const health = portfolio.health(node.id);
+        const line = el("div", "health");
+        if (!health || health.taskCount === 0) {
+          line.appendChild(el("span", null, "No dated tasks resolved"));
+        } else {
+          line.appendChild(el("span", "status-word " + health.status, statusLabel(health.status)));
+          line.appendChild(
+            el("span", null, health.taskCount + " tasks · " + health.lateCount + " late · " + health.atRiskCount + " at risk")
+          );
+          line.appendChild(progressBar(health.progress));
+          line.appendChild(el("span", null, pct(health.progress)));
+        }
+        item.appendChild(line);
+
+        list.appendChild(item);
+        for (const child of node.children) renderNode(child, depth + 1, list);
+      }
+
+      function renderTree() {
+        treeEl.textContent = "";
+        const roots = portfolio.tree();
+        if (roots.length === 0) {
+          const empty = el("li", "node");
+          empty.appendChild(el("p", null, "No portfolio nodes are defined."));
+          treeEl.appendChild(empty);
+          return;
+        }
+        for (const root of roots) renderNode(root, 0, treeEl);
+      }
+
+      function renderGoals() {
+        goalsEl.textContent = "";
+        // `goals` is a store — `.get()` reads the current snapshot.
+        const goals = portfolio.goals.get();
+        if (goals.length === 0) {
+          goalsEl.appendChild(el("p", null, "No goals are defined."));
+          return;
+        }
+        for (const goal of goals) {
+          const progress = portfolio.goalProgress(goal.id);
+          const row = el("div", "goal");
+          row.appendChild(el("div", null, goal.name));
+          const line = el("div", "health");
+          line.appendChild(progressBar(progress ? progress.progress : 0));
+          line.appendChild(
+            el("span", null, pct(progress ? progress.progress : 0) + " of " + pct(goal.target) + " target · " + (progress ? progress.taskCount : 0) + " tasks")
+          );
+          line.appendChild(
+            el("span", "status-word " + (progress && progress.achieved ? "on-track" : "at-risk"), progress && progress.achieved ? "✓ Achieved" : "… In progress")
+          );
+          row.appendChild(line);
+          goalsEl.appendChild(row);
+        }
+      }
+
+      function fillSelect(select, options) {
+        const previous = select.value;
+        select.textContent = "";
+        for (const option of options) {
+          const node = document.createElement("option");
+          node.value = String(option.value);
+          node.textContent = option.label;
+          select.appendChild(node);
+        }
+        if (options.some((o) => String(o.value) === previous)) select.value = previous;
+      }
+
+      function renderSelects() {
+        const tasks = [];
+        for (const id of data.taskIds()) {
+          const task = data.getTask(id);
+          if (task) tasks.push({ value: task.id, label: task.name + " (" + task.id + ")" });
+        }
+        fillSelect(taskSelect, tasks);
+
+        // `nodes` is a store — `.get()` reads the current snapshot.
+        const projects = portfolio.nodes.get()
+          .filter((n) => n.kind === "project" && n.taskId !== undefined)
+          .map((n) => ({ value: n.id, label: n.name }));
+        fillSelect(targetSelect, projects);
+
+        fillSelect(viewSelect, portfolio.portfolioViewNames().map((name) => ({ value: name, label: name })));
+      }
+
+      function render() {
+        // Rebuilding the list drops focus; restore it onto the same logical control — node
+        // identity isn't DOM identity across a re-render, so the key, not the element, is what's
+        // tracked.
+        const active = document.activeElement;
+        const focusKey = active && active.getAttribute ? active.getAttribute("data-pf-key") : null;
+
+        renderTree();
+        renderGoals();
+        renderSelects();
+
+        if (focusKey) {
+          const candidates = treeEl.querySelectorAll("[data-pf-key]");
+          for (const candidate of candidates) {
+            if (candidate.getAttribute("data-pf-key") === focusKey) {
+              candidate.focus();
+              break;
+            }
+          }
+        }
+      }
+
+      document.getElementById("pf-collapse-all").addEventListener("click", () => {
+        portfolio.collapseAllProjects();
+        portfolio.nodes.get().forEach((n) => { if (n.kind === "project" && n.taskId !== undefined) collapsed.add(n.id); });
+        render();
+        say("Collapsed every bound project.");
+      });
+
+      document.getElementById("pf-expand-all").addEventListener("click", () => {
+        portfolio.expandAllProjects();
+        collapsed.clear();
+        render();
+        say("Expanded every bound project.");
+      });
+
+      document.getElementById("pf-filter-apply").addEventListener("click", () => {
+        if (checked.size === 0) {
+          say("Check at least one node first.");
+          return;
+        }
+        const ids = Array.from(checked);
+        portfolio.applyPortfolioFilter(ids);
+        if (portfolio.portfolioFilter() === null) {
+          say("Requested a narrowing to " + ids.length + " node(s), but the portfolio reports no active filter — the rows are unchanged in this composition.");
+          return;
+        }
+        say("Filtered the rows to " + ids.length + " node(s): " + ids.join(", ") + ". Filtering is display state only — no undo entry.");
+      });
+
+      document.getElementById("pf-filter-clear").addEventListener("click", () => {
+        portfolio.applyPortfolioFilter(null);
+        checked.clear();
+        render();
+        say("Cleared the portfolio filter — every row is visible again.");
+      });
+
+      document.getElementById("pf-view-save").addEventListener("click", () => {
+        const name = viewName.value.trim();
+        if (name === "") { say("Enter a view name to save."); return; }
+        portfolio.savePortfolioView(name);
+        renderSelects();
+        viewSelect.value = name;
+        const saved = portfolio.portfolioFilter();
+        say('Saved "' + name + '" — ' + (saved ? "nodes " + saved.join(", ") + "." : "an empty narrowing (nothing is filtered)."));
+      });
+
+      document.getElementById("pf-view-apply").addEventListener("click", () => {
+        const name = viewSelect.value;
+        if (!name) { say("No saved view to apply."); return; }
+        const found = portfolio.applyPortfolioView(name);
+        if (!found) { say('No saved view named "' + name + '".'); return; }
+        checked.clear();
+        const current = portfolio.portfolioFilter();
+        if (current) current.forEach((id) => checked.add(id));
+        render();
+        say('Applied the view "' + name + '" — ' + (current ? "narrowed to " + current.join(", ") + "." : "no node narrowing is active."));
+      });
+
+      document.getElementById("pf-view-delete").addEventListener("click", () => {
+        const name = viewSelect.value;
+        const deleted = name ? portfolio.deletePortfolioView(name) : false;
+        renderSelects();
+        say(deleted ? 'Deleted the view "' + name + '".' : "No saved view to delete.");
+      });
+
+      document.getElementById("pf-move-run").addEventListener("click", () => {
+        const taskId = taskSelect.value;
+        const target = targetSelect.value;
+        if (!taskId || !target) { say("Pick a task and a target project first."); return; }
+        const moved = portfolio.moveTaskToProject(taskId, target);
+        say(
+          moved
+            ? 'Moved "' + taskId + '" under ' + target + " in one undoable step (dates unchanged — a portfolio move is structural)."
+            : "Refused: unknown task, unbound target project, or a move into the task's own subtree."
+        );
+      });
+
+      document.getElementById("pf-undo").addEventListener("click", () => {
+        gantt.dispatch("history/undo", undefined);
+        render();
+        say("Undid the last edit. Portfolio nodes are registry state, not transactional, so a project node added by Duplicate stays in the hierarchy.");
+      });
+
+      // Store subscriptions replace the abolished `data/tasksChanged` / `portfolio/nodesChanged` /
+      // `portfolio/goalsChanged` events.
+      data.tasks.subscribe(render);
+      portfolio.nodes.subscribe(render);
+      portfolio.goals.subscribe(render);
+
+      render();
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

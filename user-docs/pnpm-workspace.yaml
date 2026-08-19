@@ -1,0 +1,8 @@
+# The docs site is its own pnpm root, deliberately separate from the library workspace at the
+# repository root. Keeping it out of `packages/*` means its third-party dependencies (React,
+# CodeMirror, Vite) can never be confused with the library's runtime dependencies, which
+# CLAUDE.md requires to stay at zero.
+packages: []
+
+allowBuilds:
+  esbuild: true

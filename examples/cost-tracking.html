@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Cost tracking example</title>
+    <!--
+      One HTML file + one script tag, composed with `presetStandard()` plus the OPT-IN tracking
+      plugin (tracking ships in the bundle but is not preset-composed), configured with only
+      its `cost` nest. The `cost` nested config group of `StarGantt.tracking({...})`
+      (docs/specs/plugins/tracking.md §5.3) exposes the `stargantt.cost` service (tracking.md §1
+      naming note). The timeline origin is configured via `view: { timeline: { origin } }`.
+
+      Design notes:
+      - `budget` and `baselines` are read from the `CostState` store (tracking.md §1.3) rather
+        than from getters: this page reads `cost.state.get().budget` and
+        `cost.state.get().baselines`.
+      - `resources` is a store-ized property, not an iterable method (data-store.md §"Naming
+        resolution"): this page reads `data.resources.get().values()`.
+      - `data.tasks.subscribe(refresh)` and `cost.state.subscribe(refresh)` observe changes (per
+        the cheatsheet's event-rename table and tracking.md §4) — there are no
+        `data/tasksChanged` or `costTracking/changed` events to listen for.
+      - This page is a plain self-contained page like the other v2 reference examples: the chart
+        is created once, and each service is referenced directly.
+
+      The dataset (six tasks + assignments) is small and deterministic (no Math.random(), fixed
+      relative offsets from "today") so a manual pass through this page and any e2e coverage see
+      the same shapes. "t-build" allocates its engineer at 1.25 units, so a quarter of its labor
+      cost is priced at the overtime rate. CLAUDE.md's documented viewport floor is 720x540
+      (tablet and up, no mobile breakpoints) — the chrome below is kept minimal.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 460px;
+        border: 1px solid #ccc;
+      }
+      #toolbar button {
+        min-height: 24px;
+        margin: 0 4px 4px 0;
+        font: inherit;
+        cursor: pointer;
+      }
+      fieldset {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 0 8px 6px 0;
+        padding: 4px 8px 6px;
+        font-size: 11px;
+        vertical-align: top;
+      }
+      fieldset label {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      fieldset input,
+      fieldset select {
+        font: inherit;
+        min-height: 22px;
+      }
+      #cost-status {
+        margin: 4px 0;
+        font-size: 11px;
+        min-height: 14px;
+      }
+      #cost-readout {
+        margin: 0;
+        padding: 6px 8px;
+        font: 11px/1.5 ui-monospace, monospace;
+        background: #f6f6f6;
+        border: 1px solid #ddd;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — cost tracking</h1>
+    <details>
+      <summary>What's on this page</summary>
+      A rate master (per-resource standard/overtime hourly rates), manual cost fields on tasks
+      (fixed / material / actual cost, cost codes, classified items), a project budget with
+      per-code budgets and threshold alerts, cost baselines with variance, and the cumulative cost
+      curve with S-curve forecast. Every control below drives the real `stargantt.cost` service —
+      the readout panel re-renders on every store change.
+    </details>
+    <div id="toolbar">
+      <button id="cost-table" type="button">Budget vs actual table</button>
+      <button id="cost-curve" type="button">Cost curve &amp; forecast</button>
+      <button id="cost-breakdown" type="button">Cost breakdown</button>
+      <button id="cost-close" type="button">Close panel</button>
+    </div>
+    <div>
+      <fieldset>
+        <legend>Rate master</legend>
+        <label>Resource<select id="rate-resource"></select></label>
+        <label>Standard / h<input id="rate-standard" type="number" min="0" step="5" value="110" /></label>
+        <label>Overtime / h<input id="rate-overtime" type="number" min="0" step="5" value="165" /></label>
+        <button id="rate-apply" type="button">Set rate</button>
+      </fieldset>
+      <fieldset>
+        <legend>Cost item</legend>
+        <label>Task<select id="item-task"></select></label>
+        <label
+          >Type
+          <select id="item-type">
+            <option value="labor">labor</option>
+            <option value="fixed">fixed</option>
+            <option value="variable" selected>variable</option>
+            <option value="material">material</option>
+          </select>
+        </label>
+        <label>Amount<input id="item-amount" type="number" min="0" step="100" value="1500" /></label>
+        <button id="item-add" type="button">Add item</button>
+      </fieldset>
+      <fieldset>
+        <legend>Project budget</legend>
+        <label>Amount (empty clears)<input id="budget-amount" type="number" min="0" step="1000" value="50000" /></label>
+        <button id="budget-apply" type="button">Set budget</button>
+      </fieldset>
+      <fieldset>
+        <legend>Cost baselines</legend>
+        <button id="baseline-save" type="button">Save cost baseline</button>
+        <button id="baseline-variance" type="button">Show variance vs latest</button>
+      </fieldset>
+    </div>
+    <p id="cost-status" role="status" aria-live="polite"></p>
+    <div id="chart"></div>
+    <pre id="cost-readout"></pre>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2). "t-survey" starts at `T0 - 14 * DAY`, before that default origin, so the preset's
+      // `view.timeline.origin` is pulled back to cover it — without it that content sits left of
+      // content x = 0 and no scroll gesture can reach it. The same instant drives the cost
+      // plugin's status date, so the curve/forecast split is deterministic instead of drifting
+      // with the wall clock.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            {
+              id: "t-survey",
+              parentId: null,
+              name: "Site survey",
+              start: T0 - 14 * DAY,
+              end: T0 - 10 * DAY,
+              progress: 1,
+              // Manual cost attributes live at task.meta.costTracking and are written through
+              // task/update, so every edit is one undo step (tracking.md §2.1).
+              meta: { costTracking: { costCode: "CC-100", materialCost: 500, actualCost: 4200 } },
+            },
+            {
+              id: "t-design",
+              parentId: null,
+              name: "Design package",
+              start: T0 - 10 * DAY,
+              end: T0 - 2 * DAY,
+              progress: 1,
+              meta: { costTracking: { costCode: "CC-100", fixedCost: 1200, actualCost: 8600 } },
+            },
+            {
+              id: "t-build",
+              parentId: null,
+              name: "Build phase",
+              start: T0 - 2 * DAY,
+              end: T0 + 8 * DAY,
+              progress: 0.35,
+              meta: {
+                costTracking: {
+                  costCode: "CC-200",
+                  actualCost: 5000,
+                  items: [{ id: "ci-crane", label: "Crane rental", amount: 3500, type: "variable" }],
+                },
+              },
+            },
+            {
+              id: "t-fit",
+              parentId: null,
+              name: "Fit-out",
+              start: T0 + 6 * DAY,
+              end: T0 + 14 * DAY,
+              meta: { costTracking: { costCode: "CC-200", materialCost: 4200 } },
+            },
+            {
+              id: "t-qa",
+              parentId: null,
+              name: "Inspection & QA",
+              start: T0 + 12 * DAY,
+              end: T0 + 18 * DAY,
+              meta: { costTracking: { costCode: "CC-200" } },
+            },
+            {
+              id: "t-handover",
+              parentId: null,
+              name: "Handover",
+              type: "milestone",
+              start: T0 + 20 * DAY,
+              end: T0 + 20 * DAY,
+              meta: { costTracking: { costCode: "CC-200", fixedCost: 800 } },
+            },
+          ],
+          links: [
+            { sourceId: "t-survey", targetId: "t-design", type: "FS" },
+            { sourceId: "t-design", targetId: "t-build", type: "FS" },
+            { sourceId: "t-build", targetId: "t-fit", type: "FS" },
+            { sourceId: "t-fit", targetId: "t-qa", type: "FS" },
+            { sourceId: "t-qa", targetId: "t-handover", type: "FS" },
+          ],
+          resources: [
+            { id: "r-eng", name: "Alice - Engineer" },
+            { id: "r-des", name: "Bob - Designer" },
+            { id: "r-qa", name: "Carol - QA" },
+          ],
+          // Labor cost is derived from these assignments: span days x hoursPerDay x units x rate.
+          // "t-build" allocates the engineer at 1.25, so a quarter of it is costed as overtime.
+          assignments: [
+            { taskId: "t-survey", resourceId: "r-eng", units: 1 },
+            { taskId: "t-design", resourceId: "r-des", units: 1 },
+            { taskId: "t-design", resourceId: "r-eng", units: 0.5 },
+            { taskId: "t-build", resourceId: "r-eng", units: 1.25 },
+            { taskId: "t-build", resourceId: "r-des", units: 0.5 },
+            { taskId: "t-fit", resourceId: "r-eng", units: 1 },
+            { taskId: "t-fit", resourceId: "r-des", units: 0.5 },
+            { taskId: "t-qa", resourceId: "r-qa", units: 1 },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          ...StarGantt.presetStandard({ view: { timeline: { origin: T0 - 14 * DAY } } }),
+          StarGantt.tracking({
+            cost: {
+              // Rate master seed: hourly standard/overtime rates per resource. Allocation above
+              // full time (units > 1) is costed at the overtime rate.
+              rates: [
+                { resourceId: "r-eng", standard: 110, overtime: 165 },
+                { resourceId: "r-des", standard: 90 },
+                { resourceId: "r-qa", standard: 75 },
+              ],
+              hoursPerDay: 8,
+              budget: 50000,
+              budgets: { "CC-100": 12000, "CC-200": 40000 },
+              alertThreshold: 1,
+              statusDate: T0,
+            },
+          }),
+        ],
+      });
+      gantt.service("stargantt.data").load(dataset());
+
+      const data = gantt.service("stargantt.data");
+      const cost = gantt.service("stargantt.cost");
+      const num = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+      const statusEl = document.getElementById("cost-status");
+      const readoutEl = document.getElementById("cost-readout");
+
+      function say(message) {
+        statusEl.textContent = message;
+      }
+
+      function fillSelects() {
+        const resourceSel = document.getElementById("rate-resource");
+        const taskSel = document.getElementById("item-task");
+        const keepResource = resourceSel.value;
+        const keepTask = taskSel.value;
+        resourceSel.textContent = "";
+        taskSel.textContent = "";
+        // `resources` is a store-ized property (data-store.md §"Naming resolution") — read its
+        // current value.
+        for (const resource of data.resources.get().values()) {
+          const option = document.createElement("option");
+          option.value = String(resource.id);
+          option.textContent = resource.name + " (" + resource.id + ")";
+          resourceSel.appendChild(option);
+        }
+        for (const id of data.taskIds()) {
+          const task = data.getTask(id);
+          const option = document.createElement("option");
+          option.value = String(id);
+          option.textContent = task ? task.name : String(id);
+          taskSel.appendChild(option);
+        }
+        if (keepResource) resourceSel.value = keepResource;
+        if (keepTask) taskSel.value = keepTask;
+      }
+
+      function refresh() {
+        const lines = [];
+        const breakdown = cost.breakdown();
+        const totalEstimated = cost.costs().reduce((sum, row) => sum + row.estimated, 0);
+        const totalActual = cost.costs().reduce((sum, row) => sum + row.actual, 0);
+        // Budget is read from the CostState store (tracking.md §1.3).
+        const budget = cost.state.get().budget;
+        lines.push(
+          "Planned " +
+            num.format(totalEstimated) +
+            "  |  Actual " +
+            num.format(totalActual) +
+            "  |  Variance " +
+            num.format(totalActual - totalEstimated) +
+            "  |  Budget " +
+            (budget === undefined ? "none" : num.format(budget)),
+        );
+        lines.push(
+          "Breakdown - labor " +
+            num.format(breakdown.labor) +
+            ", fixed " +
+            num.format(breakdown.fixed) +
+            ", variable " +
+            num.format(breakdown.variable) +
+            ", material " +
+            num.format(breakdown.material),
+        );
+        const codeLines = [];
+        for (const [code, totals] of cost.breakdownByCode()) {
+          const codeBudget = cost.budgetForCode(code);
+          codeLines.push(
+            (code || "(no code)") +
+              ": planned " +
+              num.format(totals.estimated) +
+              ", actual " +
+              num.format(totals.actual) +
+              (codeBudget === undefined ? "" : ", budget " + num.format(codeBudget)),
+          );
+        }
+        lines.push("By cost code - " + (codeLines.length ? codeLines.join("; ") : "none"));
+        const alerts = cost.alerts();
+        // Alerts are reported as text, never by color alone.
+        lines.push(
+          "Alerts (" +
+            alerts.length +
+            ") - " +
+            (alerts.length
+              ? alerts
+                  .map(
+                    (alert) =>
+                      alert.kind +
+                      (alert.subject ? " " + alert.subject : "") +
+                      ": " +
+                      num.format(alert.value) +
+                      " over limit " +
+                      num.format(alert.limit),
+                  )
+                  .join("; ")
+              : "none"),
+        );
+        // Cost baselines are read from the CostState store too.
+        const saved = cost.state.get().baselines;
+        lines.push(
+          "Cost baselines (" +
+            saved.length +
+            ") - " +
+            (saved.length ? saved.map((baseline) => baseline.name).join("; ") : "none saved yet"),
+        );
+        const curve = cost.costForecast();
+        const last = curve.length ? curve[curve.length - 1] : null;
+        lines.push(
+          "Curve points " +
+            curve.length +
+            (last
+              ? " - final planned " +
+                num.format(last.planned) +
+                ", actual " +
+                num.format(last.actual) +
+                (last.forecast === undefined ? "" : ", forecast " + num.format(last.forecast))
+              : ""),
+        );
+        readoutEl.textContent = lines.join("\n");
+      }
+
+      function panel(open, label) {
+        say(open(cost) ? label + " panel opened (Escape closes it)." : label + " panel unavailable.");
+      }
+
+      document.getElementById("cost-table").addEventListener("click", () => {
+        panel((c) => c.openCostTablePanel(), "Budget vs actual");
+      });
+      document.getElementById("cost-curve").addEventListener("click", () => {
+        panel((c) => c.openCostCurvePanel(), "Cost curve");
+      });
+      document.getElementById("cost-breakdown").addEventListener("click", () => {
+        panel((c) => c.openBreakdownPanel(), "Cost breakdown");
+      });
+      document.getElementById("cost-close").addEventListener("click", () => {
+        cost.closePanels();
+        say("Cost panels closed.");
+      });
+
+      document.getElementById("rate-apply").addEventListener("click", () => {
+        const resourceId = document.getElementById("rate-resource").value;
+        if (!resourceId) {
+          say("Pick a resource first.");
+          return;
+        }
+        const standard = Number(document.getElementById("rate-standard").value);
+        const overtimeRaw = document.getElementById("rate-overtime").value;
+        const rate = { standard: standard };
+        if (overtimeRaw !== "") rate.overtime = Number(overtimeRaw);
+        cost.setRate(resourceId, rate);
+        const stored = cost.rateOf(resourceId);
+        say(
+          stored
+            ? "Rate for " +
+                resourceId +
+                ": standard " +
+                num.format(stored.standard) +
+                ", overtime " +
+                num.format(stored.overtime === undefined ? stored.standard : stored.overtime)
+            : "Rate rejected - a finite standard rate of 0 or more is required.",
+        );
+      });
+
+      document.getElementById("item-add").addEventListener("click", () => {
+        const taskId = document.getElementById("item-task").value;
+        if (!taskId) {
+          say("Pick a task first.");
+          return;
+        }
+        const type = document.getElementById("item-type").value;
+        const amount = Number(document.getElementById("item-amount").value);
+        const id = cost.addCostItem(taskId, {
+          label: type + " item " + num.format(amount),
+          amount: amount,
+          type: type,
+        });
+        say(
+          id
+            ? "Added " +
+                type +
+                " item " +
+                num.format(amount) +
+                " to " +
+                taskId +
+                " (one undo step - click the chart, then Ctrl+Z reverts it)."
+            : "Cost item rejected - amount must be a finite number of 0 or more.",
+        );
+      });
+
+      document.getElementById("budget-apply").addEventListener("click", () => {
+        const raw = document.getElementById("budget-amount").value;
+        cost.setBudget(raw === "" ? undefined : Number(raw));
+        const current = cost.state.get().budget;
+        say(current === undefined ? "Project budget cleared." : "Project budget set to " + num.format(current) + ".");
+      });
+
+      document.getElementById("baseline-save").addEventListener("click", () => {
+        const baseline = cost.saveCostBaseline();
+        say(
+          'Saved "' +
+            baseline.name +
+            '" - planned ' +
+            num.format(baseline.totalEstimated) +
+            ", actual " +
+            num.format(baseline.totalActual) +
+            ". Change costs, then compare.",
+        );
+      });
+
+      document.getElementById("baseline-variance").addEventListener("click", () => {
+        const rows = cost.costVariance();
+        if (!rows.length) {
+          say("No cost baseline saved yet - save one first.");
+          return;
+        }
+        const changed = rows.filter((row) => row.variance !== 0);
+        say(
+          changed.length
+            ? "Variance vs latest baseline: " +
+                changed
+                  .map((row) => row.name + " " + (row.variance > 0 ? "+" : "") + num.format(row.variance))
+                  .join(", ")
+            : "Variance vs latest baseline: no task changed.",
+        );
+      });
+
+      // Store subscriptions observe task and cost changes directly.
+      data.tasks.subscribe(refresh);
+      cost.state.subscribe(refresh);
+
+      fillSelects();
+      refresh();
+
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

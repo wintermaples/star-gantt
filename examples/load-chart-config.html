@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Load chart configuration example</title>
+    <!--
+      This page's focus is the merged plugin's `loadChart` nest config surface itself
+      (docs/specs/plugins/resource.md §6.5) — the aggregate band's `bucket` ladder (including
+      `"auto"`, which follows the timeline's zoom density), the `resources` allowlist, and the
+      `load`/`capacity` override hooks.
+
+      - `loadChart` is a nest of `StarGantt.resource({ loadChart: loadChartConfig })`
+        (resource.md §6.5).
+      - The timeline origin/zoom preset is nested under `view.timeline` (view.md) —
+        `view: { timeline: { origin, initialZoom } }`.
+      - `bucket` / `resources` / `load` / `capacity` are read once at `setup()` (resource.md §6),
+        so every toolbar toggle rebuilds the chart (`gantt.dispose()` + a fresh
+        `StarGantt.create()` — the pattern `examples/basic-gantt.html` uses for its own setup-time
+        toggles) rather than mutating a live instance.
+      - Services: `stargantt.view` / `stargantt.timeline` (view.md); the viewport is the
+        `view.viewport` store (`.viewport.get()`).
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+      #toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+        align-items: center;
+        margin-bottom: 4px;
+      }
+      #toolbar span[role="group"] {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .group-label {
+        font-size: 11px;
+        color: #555;
+      }
+      #toolbar button {
+        min-height: 24px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .footnote {
+        font-size: 11px;
+        color: #555;
+        margin: 4px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — load chart configuration</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Every toggle below is a <code>loadChart</code> config field, read once at setup — changing
+      one rebuilds the chart from scratch (except timeline zoom, which is a live call).
+    </details>
+    <div id="toolbar">
+      <span role="group" aria-label="Bucket width">
+        <span class="group-label">bucket</span>
+        <button class="bucket-btn" data-bucket="minute15" aria-pressed="false">15 min</button>
+        <button class="bucket-btn" data-bucket="hour" aria-pressed="false">hour</button>
+        <button class="bucket-btn" data-bucket="day" aria-pressed="true">day</button>
+        <button class="bucket-btn" data-bucket="week" aria-pressed="false">week</button>
+        <button class="bucket-btn" data-bucket="month" aria-pressed="false">month</button>
+        <button class="bucket-btn" data-bucket="auto" aria-pressed="false">auto</button>
+      </span>
+      <span role="group" aria-label="Timeline zoom">
+        <span class="group-label">timeline zoom</span>
+        <button class="zoom-btn" data-zoom="hour" aria-pressed="false">hour</button>
+        <button class="zoom-btn" data-zoom="day" aria-pressed="true">day</button>
+        <button class="zoom-btn" data-zoom="week" aria-pressed="false">week</button>
+        <button class="zoom-btn" data-zoom="month" aria-pressed="false">month</button>
+      </span>
+      <label>
+        <input type="checkbox" id="allowlist-toggle" />
+        Only Alice &amp; Bob (drops Carol)
+      </label>
+      <label>
+        <input type="checkbox" id="custom-load-toggle" />
+        Custom weighted-hours load/capacity
+      </label>
+    </div>
+    <div id="chart"></div>
+    <p class="footnote">
+      Rebuilding on every toggle: <code>bucket</code>, <code>resources</code>, <code>load</code>
+      and <code>capacity</code> are all read once at <code>setup()</code>, so each change here
+      recreates the chart with a freshly configured <code>loadChart</code> nest.
+    </p>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      // Fixed anchor date (not "now"): keeps screenshots stable across runs.
+      // 2026-08-03 00:00 UTC, a Monday.
+      const DAY = 86400000;
+      const T0 = Date.UTC(2026, 7, 3);
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "plan", name: "Planning", start: T0, end: T0 + 5 * DAY, progress: 1 },
+            { id: "design", name: "Design", start: T0 + 3 * DAY, end: T0 + 14 * DAY, progress: 0.6 },
+            { id: "impl", name: "Implementation", start: T0 + 10 * DAY, end: T0 + 35 * DAY, progress: 0.2 },
+            { id: "test", name: "Test design", start: T0 + 14 * DAY, end: T0 + 30 * DAY, progress: 0.1 },
+            { id: "review", name: "Review", start: T0 + 20 * DAY, end: T0 + 32 * DAY, progress: 0 },
+            { id: "release", name: "Release", start: T0 + 36 * DAY, end: T0 + 38 * DAY, progress: 0 },
+          ],
+          resources: [
+            { id: "alice", name: "Alice", capacity: 1 },
+            { id: "bob", name: "Bob", capacity: 1 },
+            { id: "carol", name: "Carol", capacity: 0.5 },
+          ],
+          assignments: [
+            { taskId: "plan", resourceId: "alice", units: 1 },
+            { taskId: "design", resourceId: "alice", units: 1 },
+            { taskId: "design", resourceId: "bob", units: 0.5 },
+            { taskId: "impl", resourceId: "alice", units: 1 },
+            { taskId: "impl", resourceId: "bob", units: 1 },
+            { taskId: "test", resourceId: "carol", units: 0.5 },
+            { taskId: "review", resourceId: "bob", units: 1 },
+            { taskId: "release", resourceId: "alice", units: 1 },
+          ],
+          links: [
+            { id: "l1", sourceId: "plan", targetId: "design", type: "FS", lag: 0 },
+            { id: "l2", sourceId: "design", targetId: "impl", type: "FS", lag: 0 },
+            { id: "l3", sourceId: "impl", targetId: "release", type: "FS", lag: 0 },
+          ],
+        };
+      }
+
+      // Custom load: 8 weighted-hours per unit of assignment instead of raw Σunits.
+      function weightedHoursLoad(input) {
+        let total = 0;
+        for (const a of input.assignments) {
+          const active = input.tasks.some((t) => t.id === a.taskId);
+          if (active) total += a.units * 8;
+        }
+        return total;
+      }
+
+      // Matching custom capacity: 8 weighted-hours per unit of capacity.
+      function weightedHoursCapacity(input) {
+        let total = 0;
+        for (const r of input.resources) total += (r.capacity != null ? r.capacity : 1) * 8;
+        return total;
+      }
+
+      const bucketButtons = Array.from(document.querySelectorAll(".bucket-btn"));
+      const zoomButtons = Array.from(document.querySelectorAll(".zoom-btn"));
+      const allowlistToggle = document.getElementById("allowlist-toggle");
+      const customLoadToggle = document.getElementById("custom-load-toggle");
+
+      function pressedData(buttons, attr, fallback) {
+        const btn = buttons.find((b) => b.getAttribute("aria-pressed") === "true");
+        return btn ? btn.dataset[attr] : fallback;
+      }
+      function setPressed(buttons, target) {
+        for (const b of buttons) b.setAttribute("aria-pressed", String(b === target));
+      }
+
+      let gantt;
+
+      function rebuild() {
+        if (gantt) gantt.dispose();
+
+        const bucket = pressedData(bucketButtons, "bucket", "day");
+        // Timeline zoom level. "day" (the default) has enough px-per-day density that
+        // `bucket: "auto"` resolves to day buckets too, so the two controls look identical until
+        // this is zoomed out.
+        const zoom = pressedData(zoomButtons, "zoom", "day");
+        const allowlist = allowlistToggle.checked;
+        const customLoad = customLoadToggle.checked;
+
+        const loadChartConfig = {
+          bucket: bucket,
+          axisLabels: true,
+          valueLabels: true,
+          // The aggregate band is what this page configures, and both strips are off by default —
+          // composing the plugin costs no chart height until a host asks for one. This page asks.
+          total: true,
+        };
+        if (allowlist) loadChartConfig.resources = ["alice", "bob"];
+        if (customLoad) {
+          loadChartConfig.load = weightedHoursLoad;
+          loadChartConfig.capacity = weightedHoursCapacity;
+        }
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: [
+            ...StarGantt.presetStandard({
+              view: { timeline: { origin: T0, initialZoom: zoom } },
+            }),
+            StarGantt.resource({ loadChart: loadChartConfig }),
+          ],
+          locale: "en",
+        });
+
+        gantt.service("stargantt.data").load(dataset());
+        window.gantt = gantt;
+        window.loadChartConfigDemo = { gantt, config: loadChartConfig };
+      }
+
+      // Bucket / allowlist / custom-load changes flip the visible control state, then trigger a
+      // full rebuild.
+      for (const btn of bucketButtons) {
+        btn.addEventListener("click", () => {
+          if (btn.getAttribute("aria-pressed") === "true") return;
+          setPressed(bucketButtons, btn);
+          rebuild();
+        });
+      }
+
+      // Zoom is a live `setZoomLevel` call on the existing chart, not a rebuild — it changes the
+      // bucket width `"auto"` resolves to without touching the fixed day/week/month buttons.
+      for (const btn of zoomButtons) {
+        btn.addEventListener("click", () => {
+          if (btn.getAttribute("aria-pressed") === "true") return;
+          if (!gantt) return;
+          setPressed(zoomButtons, btn);
+          const view = gantt.service("stargantt.view");
+          const timeline = gantt.service("stargantt.timeline");
+          const vp = view.viewport.get();
+          const anchor = timeline.xToT(vp.scrollLeft + vp.width / 2);
+          timeline.setZoomLevel(btn.dataset.zoom, anchor);
+        });
+      }
+
+      allowlistToggle.addEventListener("change", rebuild);
+      customLoadToggle.addEventListener("change", rebuild);
+
+      rebuild();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StarGantt v2 — Task Bar Display Options example</title>
+  <!--
+    Every setup-time taskBars display option — host label placement, the custom renderBar hook
+    (dashed at-risk outline), barIcons, avatar, barRadius, milestoneShape, patternFill,
+    expandedHitArea, and collapsedSummary ("range" / "hidden" / "split") — is wired directly in a
+    plain self-contained page (see examples/basic.html): each toolbar control disposes the current
+    chart and calls create() again, since every taskBars option is resolved once at plugin
+    creation.
+
+    `taskBars` has 13 fields (docs/specs/plugins/task-bars.md), nested under
+    `presetStandard({ taskBars: {...} })`. `view/rowToggle` is a plain command dispatch, documented
+    as tree-grid's command. `stargantt.task-bars`'s `visibleBoxes()` geometry query is available
+    for inspection.
+  -->
+  <style>
+    body {
+      margin: 0;
+      padding: 16px 24px;
+      font-family: system-ui, sans-serif;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 4px;
+    }
+    #chart {
+      height: 480px;
+      border: 1px solid #ccc;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin: 10px 0;
+    }
+    .group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .group-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+    }
+    button {
+      font: inherit;
+      font-size: 13px;
+      padding: 4px 10px;
+      border: 1px solid #999;
+      border-radius: 4px;
+      background: #f5f5f5;
+      cursor: pointer;
+    }
+    button[aria-pressed="true"] {
+      background: #1f4e79;
+      color: #fff;
+      border-color: #1f4e79;
+    }
+    #status {
+      font-size: 12px;
+      color: #333;
+      max-width: 100ch;
+    }
+  </style>
+</head>
+<body>
+  <h1>StarGantt v2 — task bar display options</h1>
+
+  <div class="toolbar">
+    <div class="group" role="group" aria-label="Host label placement">
+      <span class="group-label">Host label</span>
+      <button id="tb-place-left" type="button" aria-pressed="false">Left</button>
+      <button id="tb-place-right" type="button" aria-pressed="true">Right</button>
+      <button id="tb-place-inside" type="button" aria-pressed="false">Inside</button>
+    </div>
+
+    <div class="group" role="group" aria-label="Bar decoration">
+      <button id="tb-renderbar" type="button" aria-pressed="true">Custom renderer</button>
+      <button id="tb-icons" type="button" aria-pressed="true">Bar icons</button>
+      <button id="tb-avatars" type="button" aria-pressed="true">Avatars</button>
+    </div>
+
+    <div class="group" role="group" aria-label="Collapsed summary">
+      <span class="group-label">Collapsed summary</span>
+      <button id="tb-cs-range" type="button" aria-pressed="false">Range</button>
+      <button id="tb-cs-hidden" type="button" aria-pressed="false">Hidden</button>
+      <button id="tb-cs-split" type="button" aria-pressed="true">Split</button>
+    </div>
+  </div>
+
+  <p id="tb-status" role="status" aria-live="polite">Loading&hellip;</p>
+
+  <div id="chart"></div>
+
+  <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+  <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+  <script>
+    const day = 86400000;
+    // Anchor the data at today 0:00 UTC — the default time-axis origin
+    // (docs/specs/plugins/view.md, `timeline.origin`) — so the chart opens on the data.
+    const t0 = Math.floor(Date.now() / day) * day;
+
+    function dataset() {
+      return {
+        tasks: [
+          { id: "root", parentId: null, name: "Release", type: "summary", start: t0 - 4 * day, end: t0 + 12 * day },
+          { id: "spec", parentId: "root", name: "Design review", start: t0 - 4 * day, end: t0 - 1 * day, progress: 1, meta: { owner: "Jo Park" } },
+          { id: "impl", parentId: "root", name: "Implementation", start: t0 - 1 * day, end: t0 + 6 * day, progress: 0.4, meta: { owner: "Ada Lin" } },
+          // `atRisk` drives both the renderBar outline and the "!" left-end icon.
+          { id: "qa", parentId: "root", name: "Integration tests", start: t0, end: t0 + 7 * day, meta: { owner: "Ravi Shah", atRisk: true } },
+          { id: "docs", parentId: "root", name: "Docs", start: t0 + 6 * day, end: t0 + 9 * day, progress: 0.1 },
+          // Finished and unassigned: its right-end "✓" icon has the bar end to itself, because an
+          // avatar would be drawn on the same spot.
+          { id: "beta", parentId: "root", name: "Beta soak", start: t0 + 2 * day, end: t0 + 5 * day, progress: 1 },
+          // Under "split" this collapsed row paints "vendor-ui" and "vendor-api" instead of its
+          // own glyph. No per-task opt-in: every collapsed summary follows the chart's mode.
+          { id: "vendor", parentId: "root", name: "Vendor deliverables", type: "summary", start: t0 + 2 * day, end: t0 + 9 * day },
+          { id: "vendor-ui", parentId: "vendor", name: "Vendor UI kit", start: t0 + 2 * day, end: t0 + 5 * day, progress: 0.5 },
+          { id: "vendor-api", parentId: "vendor", name: "Vendor API", start: t0 + 6 * day, end: t0 + 9 * day, progress: 0.2 },
+          // A second collapsed summary, so the mode is visibly chart-wide.
+          { id: "post", parentId: "root", name: "Post-release", type: "summary", start: t0 + 9 * day, end: t0 + 12 * day },
+          { id: "post-metrics", parentId: "post", name: "Adoption metrics", start: t0 + 9 * day, end: t0 + 11 * day },
+          { id: "post-retro", parentId: "post", name: "Retrospective", start: t0 + 11 * day, end: t0 + 12 * day },
+          { id: "ship", parentId: "root", name: "Ship", type: "milestone", start: t0 + 12 * day, end: t0 + 12 * day },
+        ],
+      };
+    }
+
+    const PLACEMENTS = ["left", "right", "inside"];
+
+    const OWNER_COLORS = {
+      "Jo Park": "#1f4e79",
+      "Ada Lin": "#6a3d9a",
+      "Ravi Shah": "#14625b",
+    };
+    const initialsOf = (name) =>
+      name
+        .split(" ")
+        .map((part) => part.charAt(0))
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+
+    // Replaces the bar body: `defaultPaint()` paints exactly what the plugin would have (body,
+    // progress fill, pattern), so the renderer only adds the at-risk outline on top. The dashed
+    // outline is decoration — the "!" end icon and the task name carry the meaning, never the
+    // color alone (WCAG 1.4.1).
+    function paintAtRisk(g, args) {
+      args.defaultPaint();
+      if (!args.task.meta || args.task.meta.atRisk !== true) return;
+      g.strokeStyle = "#5c0f0f";
+      g.lineWidth = 2;
+      g.setLineDash([4, 3]);
+      g.strokeRect(args.box.x + 1, args.box.y + 1, Math.max(0, args.box.width - 2), Math.max(0, args.box.height - 2));
+    }
+
+    // Short glyphs centred inside the bar's two ends; a bar narrower than twice its height draws
+    // none, and milestones never do.
+    function iconsOf(task) {
+      const icons = {};
+      if (task.meta && task.meta.atRisk === true) icons.left = "!";
+      if ((task.progress || 0) >= 1) icons.right = "✓";
+      return icons.left || icons.right ? icons : undefined;
+    }
+
+    // A filled circle on the bar's right end with the assignee's initials. The link to
+    // assignment data is the host's job — here it is `task.meta.owner`.
+    function avatarOf(task) {
+      const owner = task.meta && task.meta.owner;
+      if (!owner) return undefined;
+      return { initials: initialsOf(owner), color: OWNER_COLORS[owner] };
+    }
+
+    const els = {
+      placeLeft: document.getElementById("tb-place-left"),
+      placeRight: document.getElementById("tb-place-right"),
+      placeInside: document.getElementById("tb-place-inside"),
+      renderBar: document.getElementById("tb-renderbar"),
+      icons: document.getElementById("tb-icons"),
+      avatars: document.getElementById("tb-avatars"),
+      csRange: document.getElementById("tb-cs-range"),
+      csHidden: document.getElementById("tb-cs-hidden"),
+      csSplit: document.getElementById("tb-cs-split"),
+      status: document.getElementById("tb-status"),
+    };
+
+    // Boot-time options owned by the page toolbar: every taskBars option is resolved once when
+    // the plugin is created, so changing one re-runs `rebuild()`.
+    let options = { labelPlacement: "right", renderBar: true, barIcons: true, avatar: true, collapsedSummary: "split" };
+
+    let gantt;
+
+    function pressed(el, on) {
+      el.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+
+    function syncButtons() {
+      pressed(els.placeLeft, options.labelPlacement === "left");
+      pressed(els.placeRight, options.labelPlacement === "right");
+      pressed(els.placeInside, options.labelPlacement === "inside");
+      pressed(els.renderBar, options.renderBar !== false);
+      pressed(els.icons, options.barIcons !== false);
+      pressed(els.avatars, options.avatar !== false);
+      pressed(els.csRange, options.collapsedSummary === "range");
+      pressed(els.csHidden, options.collapsedSummary === "hidden");
+      pressed(els.csSplit, options.collapsedSummary === "split");
+    }
+
+    function rebuild() {
+      if (gantt) gantt.dispose();
+      syncButtons();
+
+      const hostPlacement = options.labelPlacement;
+      // Two labels sharing a placement would overdraw each other (the pipeline paints host
+      // label, then duration, then progress at the placement each resolves to), so the two
+      // built-in labels take the two placements the host label leaves free.
+      const free = PLACEMENTS.filter((p) => p !== hostPlacement);
+
+      gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          // "spec" starts at `t0 - 4 * day`, before the default today-anchored origin — without
+          // this, that content sits left of content x = 0 and no scroll gesture can reach it.
+          view: { timeline: { origin: t0 - 4 * day } },
+          taskBars: {
+            // The label pipeline: the host label carries the assignee, the two built-in labels
+            // take the remaining placements. Placement is chart-wide and lives in the option
+            // beside the provider, the same shape durationLabel and progressLabel use.
+            label: {
+              text: (task) => {
+                if (task.type === "milestone") return "Release gate";
+                const owner = task.meta && task.meta.owner;
+                return owner ? owner : undefined;
+              },
+              placement: hostPlacement,
+            },
+            durationLabel: { placement: free[0] },
+            progressLabel: { placement: free[1] },
+            barRadius: 3,
+            milestoneShape: "star",
+            patternFill: true,
+            expandedHitArea: true,
+            // The three optional hooks are spread in only when the toolbar leaves them on: these
+            // keys are optional in the `exactOptionalPropertyTypes` sense, so an off state must
+            // OMIT the key rather than pass `undefined`.
+            ...(options.renderBar === false ? {} : { renderBar: paintAtRisk }),
+            ...(options.barIcons === false ? {} : { barIcons: iconsOf }),
+            ...(options.avatar === false ? {} : { avatar: avatarOf }),
+            // What a collapsed summary shows. "split" is the dhtmlx look: while "Vendor
+            // deliverables" is collapsed its row paints its two children instead of its own
+            // summary glyph — undecorated (no labels, icons or avatars), but fully draggable.
+            // "hidden" makes a collapsed summary paint nothing; "range" is the default roll-up.
+            collapsedSummary: options.collapsedSummary || "split",
+          },
+        }),
+      });
+
+      const data = gantt.service("stargantt.data");
+      data.load(dataset());
+
+      // The mode only speaks about collapsed summaries, so both demo branches start folded.
+      ["vendor", "post"].forEach((id) => {
+        if (data.getTask(id) !== undefined) gantt.dispatch("view/rowToggle", { id: id, expanded: false });
+      });
+
+      window.gantt = gantt;
+      window.ganttDemo = { gantt };
+
+      queueBootRefresh();
+      // Also paint synchronously: without this, the "Loading…" placeholder sits on
+      // screen for the full two rAF frames `queueBootRefresh` waits out before its first refresh.
+      // A synchronous call here overwrites it immediately (with "none yet" if the composite is
+      // still empty), and the queued refresh above corrects it once real boxes exist.
+      refresh();
+    }
+
+    let refreshQueued = false;
+    let retries = 0;
+
+    function queueRefresh() {
+      if (refreshQueued) return;
+      refreshQueued = true;
+      // Two frames: the boxes the readout quotes come from the paint pass the rebuild just
+      // scheduled.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          refreshQueued = false;
+          refresh();
+        });
+      });
+    }
+
+    function queueBootRefresh() {
+      retries = 10;
+      queueRefresh();
+    }
+
+    function refresh() {
+      const place = options.labelPlacement;
+      const free = PLACEMENTS.filter((p) => p !== place);
+
+      const taskBars = gantt.getService("stargantt.task-bars");
+      if (!taskBars) {
+        els.status.textContent = "task-bars service not present in this composition.";
+        return;
+      }
+      const boxes = taskBars.visibleBoxes().map((box) => box.id);
+
+      els.status.textContent =
+        "Labels — assignee: " +
+        place +
+        ", duration: " +
+        free[0] +
+        ", progress: " +
+        free[1] +
+        ". Custom renderer " +
+        (options.renderBar === false ? "off" : "on (dashed outline + “!” icon on the at-risk task)") +
+        ", bar icons " +
+        (options.barIcons === false ? "off" : "on") +
+        ", avatars " +
+        (options.avatar === false ? "off" : "on") +
+        ", collapsed summary " +
+        options.collapsedSummary +
+        ". Bars painted: " +
+        (boxes.length ? boxes.join(", ") : "none yet") +
+        ".";
+
+      // The composite is empty until the first paint pass of a fresh instance has run; try again
+      // on a later frame rather than leaving "none yet" on screen.
+      if (boxes.length === 0 && retries > 0) {
+        retries -= 1;
+        queueRefresh();
+      }
+    }
+
+    function setOptions(patch) {
+      options = Object.assign({}, options, patch);
+      rebuild();
+    }
+
+    els.placeLeft.addEventListener("click", () => setOptions({ labelPlacement: "left" }));
+    els.placeRight.addEventListener("click", () => setOptions({ labelPlacement: "right" }));
+    els.placeInside.addEventListener("click", () => setOptions({ labelPlacement: "inside" }));
+    els.renderBar.addEventListener("click", () => setOptions({ renderBar: options.renderBar === false }));
+    els.icons.addEventListener("click", () => setOptions({ barIcons: options.barIcons === false }));
+    els.avatars.addEventListener("click", () => setOptions({ avatar: options.avatar === false }));
+    els.csRange.addEventListener("click", () => setOptions({ collapsedSummary: "range" }));
+    els.csHidden.addEventListener("click", () => setOptions({ collapsedSummary: "hidden" }));
+    els.csSplit.addEventListener("click", () => setOptions({ collapsedSummary: "split" }));
+
+    rebuild();
+  </script>
+</body>
+</html>

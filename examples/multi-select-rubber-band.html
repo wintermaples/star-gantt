@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Multi-select and rubber-band example</title>
+    <!--
+      One HTML file + one script tag. Demonstrates click / Ctrl-click / Shift-click selection,
+      rubber-band drag, the selectAll/clearOnEscape/deleteSelected keyboard shortcuts, and a
+      bulk-delete confirmation that can be either the plugin's built-in dialog or a host
+      `confirmDelete` policy hook — the two modes are switched by a toolbar toggle that re-creates
+      the chart, since `confirmDelete` is fixed at `create()` time. This page subscribes to
+      `SelectionService.state` and to `data/didApplyTransaction`
+      (docs/specs/plugins/interaction.md §2.4 and §7); `state.get().taskIds` reads the current
+      selection. This page is self-contained, so the `confirmDelete` hook and the contributed
+      handlers report back directly through a closure.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 6px;
+        font-size: 11px;
+        color: #333;
+      }
+      details > summary {
+        cursor: pointer;
+        color: #555;
+      }
+      details ul {
+        margin: 4px 0 0;
+        padding-left: 18px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 16px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      button {
+        font: inherit;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .label {
+        color: #555;
+        font-size: 11px;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — multi-select and rubber-band</h1>
+    <details open>
+      <summary>How to use</summary>
+      <ul>
+        <li>Click a bar to select only that bar.</li>
+        <li><strong>Ctrl</strong> (<strong>Cmd</strong> on macOS) + click a bar to toggle its membership in the selection.</li>
+        <li><strong>Shift</strong> + click a bar to select every visible row between the last non-Shift pick and that bar.</li>
+        <li>Press and drag on empty chart space (not on a bar) to rubber-band select every bar the rectangle touches; hold Ctrl/Cmd while dragging to add to the current selection instead of replacing it. <strong>Esc</strong> abandons a rubber-band in progress.</li>
+        <li>Hover a bar to see its tooltip (<code>trigger: "both"</code>); click still works too.</li>
+        <li><strong>Ctrl</strong>/<strong>Cmd</strong> + <strong>A</strong> selects every task in the data store (<code>shortcuts.selectAll</code>). It only fires while the keyboard focus is inside the chart — click a grid row first — so the shortcut never hijacks the surrounding page.</li>
+        <li><strong>Esc</strong> clears a non-empty selection (<code>shortcuts.clearOnEscape</code>). A rubber-band drag in flight wins: that first Esc abandons the drag, the next one clears.</li>
+        <li><strong>Delete</strong> (with the focus inside the chart) opens the bulk-delete confirmation for the current selection (<code>shortcuts.deleteSelected</code>) — the same flow the <em>Delete selected&hellip;</em> button starts through <code>SelectionService.deleteSelected()</code>. Confirming removes every selected task in one transaction, so a single <strong>Ctrl</strong>/<strong>Cmd</strong> + <strong>Z</strong> brings them all back. <em>Reset demo data</em> reloads the page's default data.</li>
+        <li><em>Confirm mode</em> switches between the plugin's built-in <code>alertdialog</code> (its wording comes from this page's <code>messages</code> overrides — <em>Remove</em> / <em>Keep</em>) and a host <code>confirmDelete</code> hook that replaces the dialog with a policy: it approves at most two rows at a time and refuses larger deletions. Either way the outcome is reported in the <em>Confirmation outcome</em> readout. Switching re-creates the chart, which also restores the data.</li>
+        <li>Keyboard: with a row focused (click a grid row, or Tab into the grid), <strong>Shift</strong> + <strong>&uarr;</strong>/<strong>&darr;</strong> extends the selection from the row where the Shift sequence began to the newly focused row, and <strong>Ctrl</strong> (<strong>Cmd</strong> on macOS) + <strong>Space</strong> toggles the focused row's membership — both only while selection runs in <code>mode: "multi"</code>, as configured here.</li>
+      </ul>
+    </details>
+
+    <div class="toolbar">
+      <button type="button" id="clearBtn">Clear selection</button>
+      <button type="button" id="selectAllBtn">Select all (via service)</button>
+      <span class="label">Current selection</span>
+      <span id="selectionReadout">(none)</span>
+    </div>
+    <div class="toolbar">
+      <span class="label">Bulk delete</span>
+      <button type="button" id="deleteBtn">Delete selected&hellip;</button>
+      <button type="button" id="confirmModeBtn" aria-pressed="false">Confirm mode: built-in dialog</button>
+      <button type="button" id="resetDataBtn">Reset demo data</button>
+      <span class="label">Confirmation outcome</span>
+      <span id="deleteReadout" role="status">(nothing deleted yet)</span>
+    </div>
+    <div id="chart"></div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      // Fixed anchor date (not "now"): keeps screenshots and task layout stable across runs.
+      // 2026-08-03 00:00 UTC, a Monday.
+      const DAY = 86400000;
+      const T0 = Date.UTC(2026, 7, 3);
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "row1", parentId: null, name: "Row A", start: T0, end: T0 + 4 * DAY, type: "task" },
+            { id: "row2", parentId: null, name: "Row B", start: T0 + 1 * DAY, end: T0 + 5 * DAY, type: "task" },
+            { id: "row3", parentId: null, name: "Row C", start: T0 + 2 * DAY, end: T0 + 6 * DAY, type: "task" },
+            { id: "row4", parentId: null, name: "Row D", start: T0 + 3 * DAY, end: T0 + 7 * DAY, type: "task" },
+            { id: "row5", parentId: null, name: "Row E", start: T0 + 4 * DAY, end: T0 + 8 * DAY, type: "task" },
+            { id: "row6", parentId: null, name: "Row F", start: T0 + 5 * DAY, end: T0 + 9 * DAY, type: "task" },
+            { id: "row7", parentId: null, name: "Row G", start: T0 + 6 * DAY, end: T0 + 10 * DAY, type: "task" },
+            { id: "row8", parentId: null, name: "Row H", start: T0 + 7 * DAY, end: T0 + 11 * DAY, type: "task" },
+          ],
+        };
+      }
+
+      // The hook's policy: at most this many tasks may be deleted in one go.
+      const POLICY_MAX = 2;
+      // Which confirmation the bulk delete uses; flipped by the toolbar toggle, read by runDemo().
+      let usePolicyHook = false;
+
+      const selectionReadout = document.getElementById("selectionReadout");
+      function renderSelection(ids) {
+        const arr = Array.from(ids);
+        selectionReadout.textContent = arr.length ? arr.join(", ") : "(none)";
+      }
+
+      const deleteReadout = document.getElementById("deleteReadout");
+      const confirmModeBtn = document.getElementById("confirmModeBtn");
+
+      let gantt;
+
+      /** (Re)creates the chart. `confirmDelete` is read once, at `interaction()` construction
+       *  time, so switching confirmation modes calls this again. */
+      function runDemo() {
+        if (gantt) gantt.dispose();
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: StarGantt.presetStandard({
+            interaction: {
+              selection: {
+                mode: "multi",
+                // All three shortcuts are opt-in and default to false. Ctrl/Cmd+A and Delete act
+                // only while the focus is inside the chart root; Escape is global (it first
+                // cancels a rubber-band drag, and clears the selection only when no drag is in
+                // flight).
+                shortcuts: { selectAll: true, clearOnEscape: true, deleteSelected: true },
+                // Host-owned confirmation: only an exact `true` confirms. This one answers
+                // synchronously from a policy instead of asking the user.
+                confirmDelete: usePolicyHook
+                  ? (request) => {
+                      const allowed = request.count <= POLICY_MAX;
+                      deleteReadout.textContent = allowed
+                        ? `Hook approved ${request.count} task(s)`
+                        : `Hook refused ${request.count} task(s) — policy allows at most ${POLICY_MAX}`;
+                      return allowed;
+                    }
+                  : undefined,
+              },
+              // Per-key overrides of the built-in dialog's strings; unused while a confirmDelete
+              // hook is configured, since the hook replaces the dialog. This is part of one
+              // top-level `interaction.messages` catalog covering the whole plugin
+              // (interaction.md §8).
+              messages: {
+                deleteConfirmTitle: (count) =>
+                  count === 1 ? "Remove 1 row from the demo?" : `Remove ${count} rows from the demo?`,
+                deleteConfirmButton: "Remove",
+                deleteCancelButton: "Keep",
+              },
+              tooltip: { trigger: "both" },
+            },
+            view: { timeline: { origin: T0 } },
+          }),
+          locale: "en",
+        });
+        window.gantt = gantt;
+
+        const dataService = gantt.service("stargantt.data");
+        dataService.load(dataset());
+
+        const selectionService = gantt.service("stargantt.selection");
+        selectionService.state.subscribe((state) => renderSelection(state.taskIds));
+        renderSelection(selectionService.state.get().taskIds);
+
+        // Report what a confirmed deletion (or an undo of one) actually did to the store, derived
+        // from the settled transaction's own patch list — `data/didApplyTransaction` fires
+        // exactly once per transaction with the final patch list already consolidated
+        // (docs/specs/plugins/undo-redo.md "Recording").
+        gantt.on("data/didApplyTransaction", (ev) => {
+          const removed = [];
+          const added = [];
+          for (const p of ev.transaction.patches) {
+            if (p.op === "task/remove") removed.push(p.task.id);
+            else if (p.op === "task/add") added.push(p.task.id);
+          }
+          if (removed.length) {
+            deleteReadout.textContent = `Deleted ${removed.length} task(s): ${removed.join(", ")}`;
+          } else if (added.length) {
+            deleteReadout.textContent = `Restored ${added.length} task(s): ${added.join(", ")}`;
+          }
+        });
+      }
+
+      document.getElementById("clearBtn").addEventListener("click", () => {
+        gantt.service("stargantt.selection").clear();
+      });
+
+      document.getElementById("selectAllBtn").addEventListener("click", () => {
+        const ids = gantt.service("stargantt.data").toJSON().tasks.map((t) => t.id);
+        gantt.service("stargantt.selection").select(ids);
+      });
+
+      document.getElementById("deleteBtn").addEventListener("click", () => {
+        gantt.service("stargantt.selection").deleteSelected();
+      });
+
+      confirmModeBtn.addEventListener("click", () => {
+        usePolicyHook = !usePolicyHook;
+        confirmModeBtn.setAttribute("aria-pressed", String(usePolicyHook));
+        confirmModeBtn.textContent = usePolicyHook
+          ? "Confirm mode: policy hook (max 2)"
+          : "Confirm mode: built-in dialog";
+        deleteReadout.textContent = "(nothing deleted yet)";
+        runDemo();
+      });
+
+      document.getElementById("resetDataBtn").addEventListener("click", () => {
+        deleteReadout.textContent = "(nothing deleted yet)";
+        runDemo();
+      });
+
+      runDemo();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,520 @@
+/* --------------------------------------------------------------------------
+   Docs-site design tokens. 8px spacing grid, 12px text floor, WCAG AA contrast.
+   Viewport assumption: >= 720x540 (tablet or wider). No phone breakpoints.
+   The chart's own colours are NOT set here — they come from the library's CSS
+   custom properties, which are its single source of truth.
+   -------------------------------------------------------------------------- */
+/* One declaration per colour, both schemes in it. `light-dark()` resolves against the computed
+   `color-scheme` of this element, so the three rules below — and nothing else — decide which half
+   of every pair is in effect. The library's own stylesheet is built the same way and keys off the
+   same property, which is why pinning a scheme here re-themes the charts too rather than leaving a
+   light chart on a dark page. */
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#fbfbfd, #0e1017);
+  --bg-sunken: light-dark(#f3f3f8, #0a0c12);
+  --bg-raised: light-dark(#ffffff, #161a27);
+  --bg-code: light-dark(#f7f7fb, #101420);
+  --fg: light-dark(#14162a, #e8eaf4);
+  --fg-muted: light-dark(#5b5e75, #9aa2ba);
+  --fg-faint: light-dark(#6b6f87, #7c86a0);
+  --line: light-dark(#e6e6f2, #242a3a);
+  --line-strong: light-dark(#cfd0e2, #39415a);
+  --accent: light-dark(#5b4bea, #9b8dff);
+  --accent-soft: light-dark(#eeecff, #1d1b3a);
+  /* Text drawn *on* a filled accent surface. White fails on the light violet the dark scheme
+     uses, so the pair flips rather than the fill being darkened for one scheme only. */
+  --on-accent: light-dark(#ffffff, #12101f);
+  /* The second accent. It carries string literals in code and the marks that must not be confused
+     with a link, and is the one hue the site shares with a default chart's bars. */
+  --accent-2: light-dark(#0d7d6f, #2dd4bf);
+  --warn-bg: light-dark(#fdf3e0, #2c2109);
+  --warn-fg: light-dark(#7a5200, #f0cf8a);
+  --ok-bg: light-dark(#e4f5ee, #0f2a20);
+  --ok-fg: light-dark(#186a45, #8fdcb4);
+  --err-bg: light-dark(#fdeceb, #331715);
+  --err-fg: light-dark(#93261a, #f0a79c);
+  --radius: 7px;
+  --radius-lg: 10px;
+  /* Two shadows, two jobs. `--shadow` lifts a transient overlay off the page; `--shadow-card`
+     is the resting elevation of the surfaces a reader looks *into* — a chart, a listing, a table. */
+  --shadow: light-dark(
+    0 1px 2px rgba(16, 24, 40, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.4)
+  ), light-dark(
+    0 4px 12px rgba(16, 24, 40, 0.08),
+    0 4px 14px rgba(0, 0, 0, 0.4)
+  );
+  --shadow-card: light-dark(
+    0 1px 2px rgba(40, 34, 90, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.45)
+  ), light-dark(
+    0 10px 26px rgba(50, 42, 120, 0.09),
+    0 12px 30px rgba(0, 0, 0, 0.45)
+  );
+  /* The page's texture, in two layers that never touch prose contrast: a wash that fades out
+     under the first screenful, and a dot field faint enough to read as paper grain. */
+  --tint: light-dark(
+    radial-gradient(120% 90% at 6% 0%, #efedff 0%, rgba(239, 237, 255, 0) 62%),
+    radial-gradient(120% 90% at 6% 0%, rgba(109, 94, 252, 0.26) 0%, rgba(109, 94, 252, 0) 64%)
+  );
+  --dot: light-dark(rgba(20, 22, 42, 0.10), rgba(232, 234, 244, 0.13));
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", "Noto Sans JP", sans-serif;
+  --nav-w: 232px;
+  --cm-keyword: light-dark(#7a3fd0, #c4a6ff);
+  --cm-string: light-dark(#0d7d6f, #2dd4bf);
+  --cm-number: light-dark(#a8560a, #e6a35c);
+  --cm-comment: light-dark(#6b6f87, #7c86a0);
+  --cm-prop: light-dark(#14162a, #e8eaf4);
+  --cm-type: light-dark(#5b4bea, #9b8dff);
+}
+/* Set by the topbar's theme button. Absent means "follow the OS", which is where a reader starts. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font: 14px/1.6 var(--sans);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { margin: 0; font-weight: 640; line-height: 1.2; letter-spacing: -0.015em; }
+p { margin: 0 0 10px; }
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: 0.92em; }
+/* Inline `code` in prose. Tinted and outlined so an identifier is distinguishable from an English
+   word at a glance; `pre` and the mono table cells set their own type and are left alone. */
+:where(p, li, dd, figcaption, .lede, .callout, .preview-caption, .cell-caption, .tsdoc) code {
+  background: var(--bg-code); border: 1px solid var(--line); border-radius: 4px;
+  padding: 0 4px; overflow-wrap: break-word;
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+/* ------------------------------- shell ---------------------------------- */
+.shell { display: flex; flex-direction: column; height: 100%; }
+/* Off-screen until focused, then pinned to the viewport's top-left. Deliberately not
+   `display: none` or `visibility: hidden`: either would take it out of the tab order, which is the
+   one thing it exists to be in. */
+.skip-link {
+  position: fixed; top: 0; left: -9999px; z-index: 100;
+  padding: 8px 14px; text-decoration: none;
+  background: var(--bg-raised); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 0 0 6px 0;
+}
+.skip-link:focus { left: 0; outline: 2px solid var(--accent); outline-offset: -2px; }
+.topbar {
+  flex: 0 0 48px; display: flex; align-items: center; gap: 16px; padding: 0 16px;
+  border-bottom: 1px solid var(--line); background: var(--bg-raised);
+}
+.brand {
+  display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px;
+  letter-spacing: -0.01em; color: var(--fg); text-decoration: none;
+}
+/* The mark carries both accents, which is the only place they meet: everything downstream uses
+   one or the other for a job, never the pair for decoration. */
+.brand .dot {
+  width: 11px; height: 11px; border-radius: 3px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.topbar nav { display: flex; gap: 4px; margin-left: 8px; }
+.topbar nav a {
+  font-size: 13px; color: var(--fg-muted); text-decoration: none;
+  padding: 6px 10px; border-radius: var(--radius); min-height: 28px; display: flex; align-items: center;
+}
+.topbar nav a:hover { background: var(--bg-sunken); color: var(--fg); }
+.topbar nav a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.topbar .spacer { flex: 1; }
+
+/* 28px is above the 24px pointer-target floor with the icon centred in it. The icon is stroked, not
+   filled, so it inherits the text colour and reads at 3:1 or better in both schemes. */
+.theme-btn {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; cursor: pointer;
+  background: none; border: 1px solid transparent; border-radius: var(--radius); color: var(--fg-muted);
+}
+.theme-btn:hover { background: var(--bg-sunken); color: var(--fg); border-color: var(--line); }
+.theme-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+
+.body { flex: 1; min-height: 0; display: flex; }
+.sidenav {
+  flex: 0 0 var(--nav-w); border-right: 1px solid var(--line); background: var(--bg-raised);
+  overflow: auto; padding: 12px 8px;
+}
+/* A category heading has to read as a divider, not as a dimmer link. It carries the sidebar's
+   strongest text colour and a rule above it: the group boundary is then visible as a line even
+   before the label is read, which greying the label out never achieved. */
+.nav-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+  color: var(--fg); padding: 14px 8px 6px; margin-top: 8px;
+  border-top: 1px solid var(--line-strong);
+}
+.sidenav nav > .nav-title:first-child { border-top: 0; margin-top: 0; padding-top: 4px; }
+.nav-link {
+  display: flex; align-items: center; gap: 6px; min-height: 26px; padding: 4px 8px;
+  font-size: 12.5px; border-radius: 5px; color: var(--fg-muted); text-decoration: none;
+}
+.nav-link:hover { background: var(--bg-sunken); color: var(--fg); }
+.nav-link[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav-link .tag {
+  margin-left: auto; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em;
+  background: var(--line); color: var(--fg-muted); border-radius: 3px; padding: 1px 5px;
+}
+.main { flex: 1; min-width: 0; overflow: auto; position: relative; isolation: isolate; }
+/* The dot field is a header band, not a page-wide texture. It covers the height a title and its
+   lede occupy and is masked out before the prose begins, so the reading column is never set on a
+   pattern. Absolutely positioned inside the scroller, so it scrolls away with the heading it
+   belongs to; `z-index: -1` (against the isolated parent) keeps it behind every glyph. */
+.main::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 300px; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 14px 14px;
+  -webkit-mask-image: linear-gradient(#000 0, #000 45%, transparent 100%);
+  mask-image: linear-gradient(#000 0, #000 45%, transparent 100%);
+}
+/* The wash belongs to the page, not to the viewport: it has to scroll away with the heading it
+   sits behind. Capped at 300px so it is gone before the first section rule. */
+.page {
+  padding: 26px 32px 56px;
+  background: var(--tint) no-repeat;
+  background-size: 100% 300px;
+}
+.page.narrow { max-width: 1020px; }
+.page h1 { font-size: 27px; }
+
+/* ------------------------------- bits ----------------------------------- */
+/* The eyebrow over a page title. Monospace and letterspaced so it reads as furniture — where you
+   are — rather than as the first line of the prose. */
+.crumb {
+  font: 700 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--accent); margin-bottom: 10px;
+}
+.lede { font-size: 15px; color: var(--fg-muted); }
+.badge-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 8px 0 14px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.02em; padding: 2px 8px; border-radius: 999px;
+}
+.pill.hand { background: var(--warn-bg); color: var(--warn-fg); }
+.pill.ok { background: var(--ok-bg); color: var(--ok-fg); }
+.pill.type { background: var(--bg-code); color: var(--fg-muted); font-family: var(--mono); font-weight: 500; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--accent-soft);
+  padding: 10px 12px; border-radius: 0 var(--radius) var(--radius) 0; font-size: 13px;
+  margin: 0 0 14px;
+}
+.callout.warn { border-left-color: var(--warn-fg); background: var(--warn-bg); color: var(--warn-fg); }
+.callout.err { border-left-color: var(--err-fg); background: var(--err-bg); color: var(--err-fg); }
+.card {
+  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-raised);
+  overflow: hidden; box-shadow: var(--shadow-card);
+}
+.card-head {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 12px; font-weight: 600;
+  border-bottom: 1px solid var(--line); background: var(--bg-sunken);
+}
+.card-head .spacer { flex: 1; }
+.btn {
+  appearance: none; font: inherit; font-size: 12px; cursor: pointer; min-height: 28px;
+  border: 1px solid var(--line-strong); background: var(--bg-raised); color: var(--fg);
+  border-radius: var(--radius); padding: 5px 10px;
+}
+.btn:hover { background: var(--bg-sunken); }
+.btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn.primary:hover { background: var(--accent); filter: brightness(1.08); }
+/* A disabled Run is the resting state of an unedited cell — it says "nothing to run", so it has to
+   read as inert rather than as a button that failed to work. */
+.btn:disabled { cursor: default; opacity: 0.45; }
+.btn.primary:disabled:hover { filter: none; }
+.card-head .hint { font-size: 11px; color: var(--fg-muted); font-weight: 500; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; }
+.seg .btn {
+  border: 0; border-right: 1px solid var(--line); border-radius: 0;
+  font-family: var(--mono); font-size: 11.5px; padding: 4px 10px; min-height: 28px;
+}
+.seg .btn:last-child { border-right: 0; }
+/* `separate` rather than `collapse`: a collapsed table drops the border radius, and the surface
+   has to match the listings and charts it sits between. */
+.api-table {
+  width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; max-width: 900px;
+  background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  overflow: hidden; box-shadow: var(--shadow-card);
+}
+.api-table th, .api-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.api-table tr:last-child td { border-bottom: 0; }
+/* A column header is a label, not decoration: at 10.5px it has to clear 4.5:1 against the sunken
+   fill behind it, which the faint token does not. */
+.api-table th {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-muted);
+  background: var(--bg-sunken); font-weight: 700;
+}
+.api-table td.mono { font-family: var(--mono); font-size: 11.5px; white-space: nowrap; }
+.api-table td.desc { color: var(--fg-muted); }
+.section-rule { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+.propname { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+
+/* ------------------------------ chart ----------------------------------- */
+.preview {
+  border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;
+  background: var(--bg-raised); position: relative; box-shadow: var(--shadow-card);
+}
+.preview-mount { width: 100%; }
+.preview-error {
+  position: absolute; inset: auto 8px 8px 8px; font-size: 12px; font-family: var(--mono);
+  background: var(--err-bg); color: var(--err-fg); border-radius: var(--radius); padding: 6px 8px;
+}
+/* Not a flex row: a caption is a sentence, and `RichText` emits one element per inline `code` span
+   inside it. As a flex container those spans become flex items, so the line breaks between them
+   rather than between words — a caption naming two options wrapped in three places and left an
+   8px gap mid-sentence. */
+.preview-caption {
+  font-size: 11.5px; line-height: 1.5; color: var(--fg-muted);
+  padding: 6px 10px; border-top: 1px solid var(--line); background: var(--bg-sunken);
+}
+
+/* ------------------------------ editor ---------------------------------- */
+.editor {
+  border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;
+  background: var(--bg-code); box-shadow: var(--shadow-card);
+}
+.editor .cm-editor { font-size: 12px; }
+.editor .cm-editor.cm-focused { outline: none; }
+.editor .cm-scroller { font-family: var(--mono); line-height: 1.55; }
+.editor .cm-gutters { background: transparent; border-right: 1px solid var(--line); color: var(--fg-faint); }
+.editor .cm-activeLine, .editor .cm-activeLineGutter { background: transparent; }
+pre.code {
+  margin: 0; background: var(--bg-code); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 9px 11px; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; overflow: auto;
+}
+/* A listing the reader copies: the same editor, read-only. Nothing to add beyond spacing — the
+   border, background and colours come from `.editor`, which is the point of using it. */
+.static-code { margin: 0 0 4px; }
+
+/* "the call this makes", under a runnable cell. Closed by default: the chart is what the prose
+   beside it is pointing at, and eight lines of boilerplate would push it off the screen. */
+.call-made { margin-top: 8px; }
+.call-made > summary {
+  display: flex; align-items: center; gap: 6px; min-height: 24px; width: fit-content;
+  padding: 2px 4px; margin-left: -4px; border-radius: 4px;
+  font: 11px/1 var(--mono); color: var(--fg-muted); cursor: pointer; user-select: none;
+}
+.call-made > summary:hover { color: var(--fg); background: var(--bg-sunken); }
+.call-made[open] > summary { margin-bottom: 6px; }
+/* `display: flex` on a summary drops the native marker, and open/closed would then be told only by
+   whether anything is underneath — which is nothing at all to go on before the first click. */
+.call-made > summary::marker, .call-made > summary::-webkit-details-marker { content: ""; }
+.call-made > summary::before {
+  content: "▸"; font-size: 9px; line-height: 1; transition: transform 120ms ease;
+}
+.call-made[open] > summary::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .call-made > summary::before { transition: none; }
+}
+
+/* ---------------------------- notebook (guides) -------------------------- */
+.cell { display: flex; gap: 12px; margin-bottom: 12px; }
+.cell-kind {
+  flex: 0 0 44px; text-align: right; font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.04em; color: var(--fg-faint); padding-top: 7px;
+}
+.cell-body { flex: 1; min-width: 0; }
+.cell-caption { font-size: 11.5px; color: var(--fg-muted); margin-top: 5px; }
+
+/* -------------------- sticky split (property detail) --------------------- */
+.split { display: flex; height: 100%; min-height: 0; }
+.split-prose { flex: 1 1 54%; overflow: auto; padding: 24px 28px 60vh; }
+.split-side {
+  flex: 0 0 46%; max-width: 620px; border-left: 1px solid var(--line);
+  background: var(--bg-sunken); padding: 16px; overflow: auto;
+}
+.split-sticky { position: sticky; top: 0; display: flex; flex-direction: column; gap: 10px; }
+.prop-section { padding: 18px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 8px; }
+.prop-section[data-active="true"] .propname { color: var(--accent); }
+
+/* Below ~1180px the reading column and a useful chart cannot share a row, so the pinned pane moves
+   to the top. Still a desktop-class arrangement: the site has no layout under 720px. */
+.split.stacked { flex-direction: column; }
+.split.stacked .split-side {
+  flex: 0 0 auto; max-width: none; order: -1; padding: 10px 16px;
+  border-left: 0; border-bottom: 1px solid var(--line-strong); overflow: visible;
+}
+.split.stacked .split-prose { padding: 16px 20px 60vh; }
+
+/* Give the reading column its width back before touching anything else. */
+@media (max-width: 1080px) {
+  :root { --nav-w: 178px; }
+  .page { padding: 20px 20px 48px; }
+  .hero { padding: 30px 20px 22px; }
+}
+
+/* ------------------------------- tabs ----------------------------------- */
+.tabstrip { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 14px 0 18px; flex-wrap: wrap; }
+.tabstrip .btn {
+  border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none;
+  color: var(--fg-muted); padding: 8px 12px; font-size: 12.5px;
+}
+.tabstrip .btn[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* Documentation debt is shown, never hidden: a plugin with no page still gets a row. */
+.nav-link.missing, .chip.missing { opacity: 0.5; cursor: default; }
+
+/* The generated TSDoc, folded away under the hand-written explanation — available for the reader
+   who wants the exact wording, never competing with the prose that says when to use the option. */
+.tsdoc { margin: 8px 0 12px; font-size: 12.5px; }
+.tsdoc > summary {
+  cursor: pointer; color: var(--fg-muted); font-size: 11.5px;
+  padding: 3px 0; list-style-position: outside;
+}
+.tsdoc > div {
+  border-left: 2px solid var(--line-strong); padding: 4px 0 4px 10px; margin-top: 4px;
+  color: var(--fg-muted);
+}
+.tsdoc p { margin: 0 0 6px; }
+
+.chip {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 3px 9px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg-raised);
+  font-family: var(--mono); font-size: 11.5px; color: var(--fg-muted); text-decoration: none;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ------------------------------- home ----------------------------------- */
+/* The landing page opens with a hero, and the hero owns both texture layers over its own full
+   height — so the dots stop exactly where its rule does instead of bleeding past it. The two rules
+   under it are what keep that from being a second copy: the scroll container's band is suppressed
+   on a page that has a hero, and the page below it drops its own wash rather than starting a
+   second one a few pixels under the first. */
+.main:has(.hero)::before { content: none; }
+.hero {
+  padding: 46px 32px 30px; border-bottom: 1px solid var(--line);
+  background:
+    var(--tint) no-repeat,
+    radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 100% 100%, 14px 14px;
+}
+.hero + .page { background-image: none; }
+.hero h1 { font-size: 34px; letter-spacing: -0.03em; }
+.hero p { font-size: 15.5px; color: var(--fg-muted); margin-top: 12px; }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.grid-cards a { text-decoration: none; color: inherit; display: block; }
+.grid-cards .card { height: 100%; }
+.grid-cards .card:hover { border-color: var(--accent); }
+
+/* ------------------------------ search ---------------------------------- */
+/* The box lives in the 48px topbar, so its own height is capped there; the popup is an overlay
+   anchored to it rather than a layout box, which keeps the topbar's height constant whether or not
+   anyone is searching. `position: relative` on the wrapper is what the popup anchors to. */
+.search { position: relative; flex: 0 1 260px; min-width: 150px; }
+.search-input {
+  width: 100%; min-height: 28px; padding: 5px 10px; font: inherit; font-size: 12.5px;
+  color: var(--fg); background: var(--bg-sunken);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.search-input::placeholder { color: var(--fg-faint); }
+.search-input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+  background: var(--bg-raised); border-color: var(--accent);
+}
+.search-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
+  width: min(460px, calc(100vw - 32px));
+  background: var(--bg-raised); border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden;
+}
+.search-list { list-style: none; margin: 0; padding: 4px; max-height: 60vh; overflow: auto; }
+/* 24px is the WCAG 2.5.8 floor for a pointer target; the padding does the rest. */
+.search-hit {
+  display: flex; gap: 8px; align-items: baseline; min-height: 24px;
+  padding: 7px 8px; border-radius: 5px; cursor: pointer;
+}
+.search-hit.active { background: var(--accent-soft); }
+.search-kind {
+  flex: 0 0 auto; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--fg-muted); background: var(--bg-sunken);
+  border-radius: 3px; padding: 2px 5px;
+}
+.search-hit.active .search-kind { background: var(--bg-raised); color: var(--accent); }
+.search-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.search-title { font-family: var(--mono); font-size: 12.5px; color: var(--fg); }
+.search-context { font-size: 11px; color: var(--fg-faint); }
+.search-text {
+  font-size: 12px; color: var(--fg-muted);
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.search-foot {
+  border-top: 1px solid var(--line); padding: 6px 10px;
+  font-size: 11px; color: var(--fg-faint); background: var(--bg-sunken);
+}
+
+/* The placeholder shown while CodeMirror's chunk is in flight. Same font, size and padding as the
+   editor it is replaced by, so the swap does not move anything on the page. */
+.cm-fallback {
+  margin: 0; padding: 8px 10px; font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+  color: var(--fg-muted); white-space: pre; overflow: auto;
+}
+
+/* ------------------------------ tokens ---------------------------------- */
+/* The CSS token reference. Its table is the site's densest — 150 rows a reader scans rather than
+   reads — so it drops the 900px cap the API tables carry and takes the width it needs. */
+.token-section h2 { scroll-margin-top: 12px; }
+.token-toolbar { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.token-filter { flex: 0 1 320px; }
+.token-filter input {
+  width: 100%; min-height: 28px; padding: 5px 10px; font: inherit; font-size: 12.5px;
+  color: var(--fg); background: var(--bg-sunken);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.token-filter input::placeholder { color: var(--fg-faint); }
+.token-filter input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+  background: var(--bg-raised); border-color: var(--accent);
+}
+.token-count { font-size: 12px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+/* The jump list is links, not tabs: each one is a real anchor so it is focusable and announced as
+   a link, and 24px of height keeps it above the pointer-target floor. */
+.token-jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 20px; }
+.token-jump a {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 3px 9px;
+  font-size: 11.5px; color: var(--fg-muted); text-decoration: none;
+  background: var(--bg-sunken); border: 1px solid var(--line); border-radius: 999px;
+}
+.token-jump a:hover { color: var(--fg); border-color: var(--line-strong); }
+.token-group { margin: 0 0 28px; scroll-margin-top: 12px; }
+.token-group h3 { font-size: 15px; margin: 0 0 4px; }
+.token-group > p { margin: 0 0 10px; }
+/* At the 720px minimum viewport the reading column is around 460px, and five columns of monospace
+   values do not fit in it at any font size worth reading. The table keeps its width and scrolls
+   inside this box; squeezing it instead produced rows five lines tall with one word per line. */
+.token-scroll { overflow-x: auto; max-width: 100%; }
+.token-table { max-width: none; min-width: 700px; }
+.token-table td { vertical-align: middle; }
+.token-table td.value { white-space: normal; min-width: 108px; }
+.token-table td.desc { min-width: 240px; }
+/* A row a search hit sent the reader to. The rule on the left survives a forced-colors palette,
+   which the tinted fill does not — the tint is the comfortable signal, the bar is the reliable one. */
+.token-table tr[aria-current="true"] > td { background: var(--accent-soft); }
+.token-table tr[aria-current="true"] > td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.token-value { display: inline-flex; align-items: center; gap: 6px; }
+/* The border is load-bearing: a swatch for #ffffff or #1a1917 would otherwise dissolve into the
+   row it sits in, in one scheme or the other. */
+.token-swatch {
+  flex: 0 0 auto; width: 14px; height: 14px; border-radius: 3px;
+  border: 1px solid var(--line-strong);
+}
+.token-where { white-space: nowrap; }
+.token-where .pill { margin-right: 4px; }
+.token-forced { font-family: var(--mono); font-size: 10.5px; color: var(--fg-faint); }
+.token-same { color: var(--fg-faint); }
+.token-empty { color: var(--fg-muted); }
+
+/* Present to a screen reader, absent from the page. Not `display: none`, which would take the
+   label out of the accessibility tree along with the layout. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}

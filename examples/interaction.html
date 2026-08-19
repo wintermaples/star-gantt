@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Interaction example</title>
+    <!--
+      One HTML file + one script tag, composed with `presetStandard()` and every interaction
+      feature turned on: selection (multi, shortcuts), drag editing (move / resize / progress / row
+      drag), snapping (align to tasks, push successors), the tooltip, the context menu, the zoom
+      toolbar, clipboard (Ctrl+C/V/D), filter/search, the double-click edit dialog, and the
+      right-hand side panel. Keyboard-only operation and screen-reader support come from `a11y`
+      (dependency read-out, shortcut help on `?`, keyboard zoom on `+`/`-`, the Ctrl+Alt+S summary
+      table). The chrome below is kept deliberately minimal — CLAUDE.md's documented viewport floor
+      is 720x540 (tablet and up, no mobile breakpoints), and the chart itself is the point.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+      #log {
+        margin-top: 4px;
+        font: 11px/1.3 ui-monospace, monospace;
+        max-height: 6em;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        padding: 3px 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — interaction</h1>
+    <details>
+      <summary>Activity log</summary>
+      <div id="log"></div>
+    </details>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2). Anchoring the data there puts the chart in the initial view with zero
+      // configuration.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function smallDataset() {
+        return {
+          tasks: [
+            { id: "root", parentId: null, name: "Release prep", type: "summary", start: T0, end: T0 + 20 * DAY },
+            { id: "spec", parentId: "root", name: "Design", start: T0, end: T0 + 5 * DAY, progress: 1 },
+            { id: "impl", parentId: "root", name: "Implementation", start: T0 + 5 * DAY, end: T0 + 15 * DAY, progress: 0.4 },
+            { id: "qa", parentId: "root", name: "Verification", start: T0 + 15 * DAY, end: T0 + 20 * DAY },
+            { id: "ship", parentId: "root", name: "Release", type: "milestone", start: T0 + 20 * DAY, end: T0 + 20 * DAY },
+          ],
+          links: [
+            { id: "l1", sourceId: "spec", targetId: "impl", type: "FS" },
+            { id: "l2", sourceId: "impl", targetId: "qa", type: "FS" },
+            { id: "l3", sourceId: "qa", targetId: "ship", type: "FS" },
+          ],
+          resources: [
+            { id: "alice", name: "Alice", capacity: 1 },
+            { id: "bob", name: "Bob", capacity: 1 },
+          ],
+          assignments: [
+            { taskId: "spec", resourceId: "alice", units: 1 },
+            { taskId: "impl", resourceId: "bob", units: 1 },
+            { taskId: "qa", resourceId: "alice", units: 0.5 },
+          ],
+        };
+      }
+
+      const dataset = smallDataset();
+
+      // Every peripheral feature (docs/specs/plugins/interaction.md §6.4–§6.10) is opted into, on
+      // top of the four preset-bundled groups (selection, dragEdit, snap, tooltip) tuned to exercise
+      // every one of their own opt-in options too, so a manual pass through this page — or an E2E
+      // spec driving it — can reach every documented interaction.
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          interaction: {
+            selection: {
+              mode: "multi",
+              shortcuts: { selectAll: true, clearOnEscape: true, deleteSelected: true },
+            },
+            dragEdit: {
+              dragTooltip: true,
+              rowDrag: true,
+              clickMove: false,
+              multiDrag: true,
+              autoScroll: true,
+              dependencyPreview: true,
+            },
+            snap: { alignToTasks: true, pushSuccessors: true },
+            tooltip: { trigger: "both" },
+            contextMenu: {},
+            zoomControls: {},
+            clipboard: {},
+            filterSearch: { searchBox: true, filterPanel: true },
+            editDialog: {},
+            sidePanel: {},
+          },
+          undoRedo: {},
+          a11y: {
+            describeDependencies: true,
+            shortcutHelp: true,
+            zoomKeys: true,
+            summaryTable: true,
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset);
+      window.gantt = gantt;
+
+      // A visible-but-unobtrusive readout of what just happened — handy for a manual pass through
+      // this page, and a stable hook (`#log`) an E2E spec can read instead of screen-scraping the
+      // canvas. Sourced from the same two commit points a screen reader hears: `stargantt.history`
+      // and `stargantt.focus`'s announcements are both spoken text already, so mirroring them here
+      // adds no behavior of its own — it only prints what already happened.
+      const log = document.getElementById("log");
+      function line(text) {
+        const p = document.createElement("div");
+        p.textContent = text;
+        log.appendChild(p);
+        log.scrollTop = log.scrollHeight;
+      }
+      const history = gantt.service("stargantt.history");
+      let lastDepth = history.state.get().depth;
+      history.state.subscribe((next) => {
+        if (next.depth !== lastDepth) line(`history: depth ${lastDepth} -> ${next.depth}`);
+        lastDepth = next.depth;
+      });
+    </script>
+  </body>
+</html>

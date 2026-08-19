@@ -1,0 +1,75 @@
+# Release — publishes every public workspace package to npm.
+#
+# Manual trigger only (workflow_dispatch). Requirements:
+#   - repository secret NPM_TOKEN: an npm automation token that may publish the
+#     `stargantt` package and the `@stargantt` scope.
+#   - the version fields in packages/*/package.json are already what you want to publish
+#     (this workflow never bumps versions).
+#
+# The full verification gate runs first; publishing is skipped if anything fails.
+# `pnpm -r publish` rewrites workspace:* dependencies to real version ranges and
+# skips private packages. npm provenance is enabled (requires the public repository).
+name: Release (npm publish)
+
+on:
+  workflow_dispatch:
+    inputs:
+      npm-tag:
+        description: "npm dist-tag to publish under (latest, alpha, next, ...)"
+        required: true
+        default: latest
+      dry-run:
+        description: "Dry run — build, test, and show what would be published"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from packageManager in package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Unit tests (lint:arch + vitest)
+        run: pnpm run test
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Typecheck E2E sources
+        run: pnpm exec tsc -p e2e --noEmit
+
+      - name: Install Playwright browser (chromium only)
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: E2E tests (Playwright)
+        run: pnpm run test:e2e
+
+      - name: Publish to npm
+        run: >
+          pnpm -r publish
+          --access public
+          --no-git-checks
+          --tag ${{ inputs.npm-tag }}
+          ${{ inputs.dry-run && '--dry-run' || '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"

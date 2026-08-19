@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Resource view example</title>
+    <!--
+      Resource facets are merged into one opt-in factory,
+      StarGantt.resource({ pool?, assign?, view?, utilization?, loadChart? })
+      (docs/specs/plugins/resource.md). This page's focus stays the resource-view strip (§3.4):
+      per-resource lane rows below the chart, grouped into teams, with an overallocated row
+      getting the `--over` modifier. Only the `view` nest is passed — `pool`/`assign`/`utilization`/
+      `loadChart` stay omitted, so those facets stay dormant (resource.md §6's presence rule); the
+      two services (`stargantt.resource-pool`, `stargantt.utilization`) are still provided
+      regardless, just unused here.
+
+      The strip's visibility rides the view plugin's own `view/setBottomPaneHeight { id, height }`
+      command (a positive height shows, 0 releases), and its state is observed through the
+      retained `resourceView/toggled { open, cause }` event rather than a service query (resource.md
+      §1.3). The toggle button below tracks `open` in a small local mirror.
+
+      `dragEdit.resourceDrag: true` (interaction nest) turns a vertical bar drag into a
+      reassignment through the resource plugin's `drag/lanes` contribution (resource.md §3.4/§4.2,
+      architecture ch. 4.1).
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 460px;
+        border: 1px solid #ccc;
+      }
+      #toolbar button {
+        min-height: 24px;
+        margin: 0 4px 4px 0;
+        font: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — resource view</h1>
+    <details>
+      <summary>What's on this page</summary>
+      The resource-view strip below the chart: one lane per resource, grouped into teams, with
+      Alice's row flagged where Design and Implementation overlap her over her capacity. Drag a bar
+      vertically onto another lane to reassign it. The toggle button shows and hides the strip.
+    </details>
+    <div id="toolbar">
+      <button id="view-toggle" type="button">Show / hide resource view</button>
+    </div>
+    <div id="chart"></div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "plan", name: "Planning", start: T0, end: T0 + 3 * DAY, progress: 1, meta: { project: "Atlas" } },
+            { id: "design", name: "Design", start: T0 + 2 * DAY, end: T0 + 6 * DAY, progress: 0.6, meta: { project: "Atlas" } },
+            { id: "impl", name: "Implementation", start: T0 + 2 * DAY, end: T0 + 12 * DAY, progress: 0.2, meta: { project: "Borealis" } },
+            { id: "review", name: "Review", start: T0 + 11 * DAY, end: T0 + 14 * DAY, meta: { project: "Borealis" } },
+          ],
+          resources: [
+            { id: "alice", name: "Alice", capacity: 1 },
+            { id: "bob", name: "Bob", capacity: 1 },
+            { id: "carol", name: "Carol", capacity: 0.5 },
+          ],
+          assignments: [
+            // Alice is deliberately over-allocated where Design and Implementation overlap
+            // (0.75 + 0.5 = 1.25 > her capacity 1).
+            { taskId: "plan", resourceId: "alice", units: 1 },
+            { taskId: "design", resourceId: "alice", units: 0.75 },
+            { taskId: "impl", resourceId: "alice", units: 0.5 },
+            { taskId: "impl", resourceId: "bob", units: 1 },
+            { taskId: "review", resourceId: "carol", units: 0.5 },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          ...StarGantt.presetStandard({
+            interaction: { dragEdit: { resourceDrag: true } },
+          }),
+          StarGantt.resource({
+            view: {
+              teams: [
+                { name: "Engineering", members: ["alice", "bob"] },
+                { name: "Design", members: ["carol"] },
+              ],
+            },
+          }),
+        ],
+      });
+      gantt.service("stargantt.data").load(dataset());
+
+      // The strip starts closed (`view.startOpen` defaults to false, left unset above); toggling
+      // dispatches the view plugin's generic command directly since the abolished resource-view
+      // service no longer offers open()/close() (see the header comment).
+      const STRIP_ID = "stargantt.resource-view:panel";
+      const STRIP_HEIGHT = 200; // the documented --sg-rv-height fallback (resource.md §3.4)
+      let stripOpen = false;
+      gantt.on("resourceView/toggled", (e) => {
+        stripOpen = e.open;
+      });
+      document.getElementById("view-toggle").addEventListener("click", () => {
+        gantt.dispatch("view/setBottomPaneHeight", {
+          id: STRIP_ID,
+          height: stripOpen ? 0 : STRIP_HEIGHT,
+        });
+      });
+
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

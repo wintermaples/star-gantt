@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Drag editing extensions example</title>
+    <!--
+      One HTML file + one script tag. Demonstrates the drag-edit plugin's two "pointer-loop"
+      flags — autoScroll and frameSync — using a scroll-position readout and a raw
+      pointermove-vs-frame counter. Drag-edit lives as nested config under the `interaction`
+      plugin's `dragEdit` group (docs/specs/plugins/interaction.md §6.2). The scroll service is
+      `stargantt.view` (its `viewport` is a store, and `scrollTo` clamps to the scrollable
+      range), and the timeline-scale config lives under `view: { timeline: { ... } }` — unused
+      here since this page keeps the default (today-anchored) origin. CLAUDE.md's viewport floor
+      is 720x540 (tablet+); no mobile breakpoint.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 16px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      button {
+        font: inherit;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .readout {
+        display: inline-flex;
+        gap: 6px;
+        align-items: baseline;
+      }
+      .readout .label {
+        color: #555;
+        font-size: 11px;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+      details {
+        margin: 6px 0 0;
+        font-size: 11px;
+        color: #333;
+      }
+      details > summary {
+        cursor: pointer;
+        color: #555;
+      }
+      details ul {
+        margin: 4px 0 0;
+        padding-left: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — drag editing extensions</h1>
+    <div class="toolbar">
+      <button type="button" id="scrollStartBtn">Scroll to start</button>
+      <button type="button" id="scrollEndBtn">Scroll to end</button>
+      <span class="readout">
+        <span class="label">Horizontal scroll (view/scrolled)</span>
+        <span id="scrollReadout">scrollLeft = 0 px</span>
+      </span>
+      <span class="readout">
+        <span class="label">Last drag: pointer moves vs frames</span>
+        <span id="frameSyncReadout">no drag yet</span>
+      </span>
+    </div>
+    <div id="chart"></div>
+    <details>
+      <summary>How to try the two pointer-loop flags</summary>
+      <ul>
+        <li>
+          <strong>Auto-scroll</strong> (<code>dragEdit: { autoScroll: true }</code>): press a bar
+          body and drag it until the pointer sits within 32&nbsp;px of the chart pane's right
+          edge, then hold still. The timeline keeps scrolling (ramping to at most 20&nbsp;px per
+          frame at the very edge) and the bar keeps following the pointer's on-screen position, so
+          you can move a task past the visible date range without letting go. The scroll readout
+          above counts along. Scrolling stops when the pointer leaves the edge zone, when the
+          range end is reached, and when you release. <strong>Esc</strong> still cancels the
+          whole drag.
+        </li>
+        <li>
+          <strong>Frame-sync</strong> (<code>dragEdit: { frameSync: true }</code>) has no look of
+          its own: it is a cost flag, not a visual one. The committed dates, the ghost and the
+          tooltip are identical with it on or off — what changes is that the drag arithmetic and
+          overlay invalidation run once per animation frame instead of once per pointer report.
+          The readout above illustrates the gap this closes: it counts the raw
+          <code>pointermove</code> events the browser delivered during your last drag against the
+          number of animation frames they spanned. On a high-rate mouse the first number runs well
+          ahead of the second; that surplus is the work frame-sync drops. (The counters are plain
+          page chrome watching the DOM — the plugin's own buffering is not observable from
+          outside.)
+        </li>
+      </ul>
+    </details>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2), so the chart opens on the data with zero extra configuration.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "root", parentId: null, name: "Release train", type: "summary", start: T0, end: T0 + 20 * DAY },
+            { id: "spec", parentId: "root", name: "Write spec", start: T0, end: T0 + 4 * DAY, progress: 0.9 },
+            { id: "build", parentId: "root", name: "Build feature", start: T0 + 3 * DAY, end: T0 + 9 * DAY, progress: 0.4 },
+            { id: "review", parentId: "root", name: "Code review", start: T0 + 9 * DAY, end: T0 + 11 * DAY },
+            { id: "qa", parentId: "root", name: "QA pass", start: T0 + 11 * DAY, end: T0 + 15 * DAY },
+            { id: "ship", parentId: "root", name: "Ship", type: "milestone", start: T0 + 16 * DAY, end: T0 + 16 * DAY },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          // This page is about dragging bars, so the chart pane gets the width.
+          treeGrid: { paneWidth: 360 },
+          interaction: {
+            dragEdit: {
+              dragTooltip: true,
+              clickMove: true,
+              minDuration: 2 * DAY,
+              rowDrag: true,
+              multiDrag: true,
+              // No resource-lane view (`stargantt.resource`) is composed here, so this flag
+              // resolves no `drag/lanes` provider and the vertical drag falls through to the row
+              // drag (docs/specs/plugins/interaction.md §6.2 `resourceDrag`).
+              resourceDrag: true,
+              // Holding a date drag within 32px of the chart pane's left/right edge scrolls the
+              // timeline, ramping to at most 20px per frame at the edge; the proposal keeps
+              // following the pointer's on-screen position (interaction.md §1.1 auto-scroll).
+              autoScroll: true,
+              // Coalesce pointer/barMove to one delivery per animation frame. The committed dates
+              // and the painted result are unchanged — only the per-move CPU work is.
+              frameSync: true,
+            },
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset());
+      window.gantt = gantt;
+
+      // ===== Auto-scroll readout =====
+      // The scroll service is `stargantt.view`; `scrollTo` clamps to the scrollable range and
+      // `viewport` is a store.
+      const view = gantt.service("stargantt.view");
+      const scrollReadout = document.getElementById("scrollReadout");
+
+      function renderScroll(scrollLeft) {
+        scrollReadout.textContent = "scrollLeft = " + Math.round(scrollLeft) + " px";
+      }
+
+      function scrollChartTo(scrollLeft) {
+        // scrollTo clamps to the scrollable range, so a huge value lands exactly on its end.
+        view.scrollTo({ scrollLeft });
+      }
+
+      document.getElementById("scrollStartBtn").addEventListener("click", () => scrollChartTo(0));
+      document.getElementById("scrollEndBtn").addEventListener("click", () => scrollChartTo(1e7));
+
+      gantt.on("view/scrolled", (evt) => renderScroll(evt.scrollLeft));
+      renderScroll(view.viewport.get().scrollLeft);
+
+      // ===== Frame-sync illustration =====
+      // Counts the raw pointermove events the browser delivers during a drag on the chart pane
+      // against the animation frames they span. This measures the DOM, not the plugin (its
+      // buffering is internal); the point is the size of the surplus frameSync drops. Pure page
+      // chrome — no StarGantt API involved.
+      const frameSyncReadout = document.getElementById("frameSyncReadout");
+      let dragMoves = 0;
+      let dragFrames = 0;
+      let dragging = false;
+      let frameHandle = 0;
+
+      function countFrame() {
+        if (!dragging) return;
+        dragFrames += 1;
+        frameHandle = requestAnimationFrame(countFrame);
+      }
+
+      document.addEventListener(
+        "pointerdown",
+        (event) => {
+          const target = event.target;
+          if (!(target instanceof Element) || !target.closest(".sg-pane--chart")) return;
+          dragging = true;
+          dragMoves = 0;
+          dragFrames = 0;
+          frameSyncReadout.textContent = "drag in progress…";
+          frameHandle = requestAnimationFrame(countFrame);
+        },
+        true,
+      );
+
+      document.addEventListener(
+        "pointermove",
+        () => {
+          if (dragging) dragMoves += 1;
+        },
+        true,
+      );
+
+      function endDragCount() {
+        if (!dragging) return;
+        dragging = false;
+        cancelAnimationFrame(frameHandle);
+        frameSyncReadout.textContent = dragMoves + " pointermove / " + dragFrames + " frames";
+      }
+
+      document.addEventListener("pointerup", endDragCount, true);
+      document.addEventListener("pointercancel", endDragCount, true);
+    </script>
+  </body>
+</html>

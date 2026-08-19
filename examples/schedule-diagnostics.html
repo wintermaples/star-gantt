@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Schedule diagnostics example</title>
+    <!--
+      The diagnostics panel is `scheduling.diagnostics.panel` — one nested group of the merged
+      `scheduling` plugin, one of the nine plugins `presetStandard()` composes (scheduling.md
+      §1.4: the panel is internalized into the scheduling plugin; its report/service types are not
+      public API).
+
+      KNOWN GAP: there is no service exposing the orphan/lead detection report; the *only* surface
+      for it is the opt-in corner panel UI itself. This page therefore reimplements the same two
+      detection rules, verbatim from scheduling.md §8 ("Orphans: a non-summary task with no
+      incoming and no outgoing link... Leads: a link whose lag is a finite number strictly below
+      0"), directly against the public `stargantt.data` service — the built-in corner panel
+      (bottom of the "What's on this page" note) shows the identical counts, computed by the
+      plugin's own internal (non-public) copy of the same rules. This is not an invented API: it
+      is the same public-service-only computation the panel's own spec describes, written out in
+      page script because no service exposes it.
+
+      Behavioral note: `scheduling.dependencies` is enabled with its defaults whenever `scheduling`
+      is composed and the nest is omitted (scheduling.md §11), and `scheduling` is always part of
+      `presetStandard()` — so this page's three FS links paint as connector ports and dependency
+      lines by default.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 0 0 6px;
+      }
+      button {
+        font: inherit;
+        font-size: 12px;
+      }
+      #chart {
+        height: 420px;
+        border: 1px solid #ccc;
+      }
+      #readout {
+        margin-top: 8px;
+        font-size: 12px;
+      }
+      #readout h2 {
+        font-size: 12px;
+        margin: 8px 0 2px;
+      }
+      #readout ul {
+        margin: 2px 0 4px;
+        padding-left: 18px;
+      }
+      #actionStatus {
+        color: #333;
+        min-height: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — schedule diagnostics</h1>
+    <details>
+      <summary>What's on this page</summary>
+      The opt-in schedule-diagnostics corner panel (`scheduling.diagnostics.panel`, top-left of the
+      chart) plus a page-level readout of the same two DCMA-style findings: unlinked ("orphan")
+      tasks and leads (links with negative lag).
+    </details>
+
+    <div class="toolbar">
+      <button id="orphanLinkBtn" type="button" aria-pressed="false">Link &ldquo;Design review&rdquo;</button>
+      <button id="leadBtn" type="button" aria-pressed="false">Lead on &ldquo;Build &rarr; Test&rdquo;</button>
+      <button id="selectOrphansBtn" type="button">Select unlinked tasks</button>
+    </div>
+    <div id="chart"></div>
+
+    <div id="readout">
+      <h2>Diagnostics readout (page-level, mirrors the corner panel — see the top comment)</h2>
+      <div id="reportBody" role="status" aria-live="polite">Loading&hellip;</div>
+      <div id="actionStatus" role="status" aria-live="polite"></div>
+    </div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2), so anchoring the data there opens the chart on the data with zero configuration.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "phase", parentId: null, name: "Release 2.1", type: "summary", start: T0, end: T0 + 13 * DAY },
+            { id: "spec", parentId: "phase", name: "Requirements", start: T0, end: T0 + 3 * DAY, progress: 1 },
+            { id: "review", parentId: "phase", name: "Design review", start: T0 + 2 * DAY, end: T0 + 5 * DAY, progress: 0.5 },
+            { id: "build", parentId: "phase", name: "Build", start: T0 + 3 * DAY, end: T0 + 9 * DAY, progress: 0.3 },
+            { id: "test", parentId: "phase", name: "Test", start: T0 + 7 * DAY, end: T0 + 13 * DAY },
+            { id: "launch", parentId: "phase", name: "Launch", type: "milestone", start: T0 + 13 * DAY, end: T0 + 13 * DAY },
+            { id: "audit", parentId: null, name: "Compliance audit", start: T0 + 10 * DAY, end: T0 + 14 * DAY },
+          ],
+          links: [
+            { id: "l-spec-build", sourceId: "spec", targetId: "build", type: "FS", lag: 0 },
+            // A lead: the negative lag lets Test start two days before Build finishes.
+            { id: "l-build-test", sourceId: "build", targetId: "test", type: "FS", lag: -2 * DAY },
+            { id: "l-test-launch", sourceId: "test", targetId: "launch", type: "FS", lag: 0 },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          // "multi" selection so "Select unlinked tasks" can highlight both orphans at once.
+          interaction: { selection: { mode: "multi" } },
+          scheduling: {
+            diagnostics: { panel: true },
+            // Every UI string is overridable per key; keys left out keep their English defaults.
+            // The single top-level `messages` key (scheduling.md §12) is shared by every
+            // scheduling sub-feature.
+            messages: {
+              button: (issueCount) => (issueCount === 0 ? "Diagnostics: clean" : `Diagnostics (${issueCount})`),
+              noIssues: "No schedule issues found",
+            },
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset());
+      window.gantt = gantt;
+
+      const data = gantt.service("stargantt.data");
+
+      // --- Page-level diagnostics (scheduling.md §8, reimplemented — see top comment) ----------
+      function findings() {
+        const incoming = new Set();
+        const outgoing = new Set();
+        const links = [...data.links.get().values()];
+        for (const link of links) {
+          outgoing.add(link.sourceId);
+          incoming.add(link.targetId);
+        }
+        const orphans = [];
+        for (const id of data.taskIds()) {
+          const task = data.getTask(id);
+          if (!task || task.type === "summary") continue; // summaries are excluded (§8)
+          if (!incoming.has(id) && !outgoing.has(id)) orphans.push(id);
+        }
+        const leads = links.filter((link) => Number.isFinite(link.lag) && link.lag < 0);
+        return { orphans, leads };
+      }
+
+      function escapeHtml(text) {
+        return String(text).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      }
+
+      function taskName(id) {
+        const task = data.getTask(id);
+        return task ? task.name : String(id);
+      }
+
+      const body = document.getElementById("reportBody");
+
+      function renderReport() {
+        const { orphans, leads } = findings();
+        const lines = [];
+
+        lines.push(`<p>orphans (${orphans.length}):</p>`);
+        if (orphans.length === 0) {
+          lines.push("<ul><li>none — every detail task is linked</li></ul>");
+        } else {
+          lines.push(
+            "<ul>" + orphans.map((id) => `<li>${escapeHtml(taskName(id))}</li>`).join("") + "</ul>",
+          );
+        }
+
+        lines.push(`<p>leads (${leads.length}):</p>`);
+        if (leads.length === 0) {
+          lines.push("<ul><li>none — no link has a negative lag</li></ul>");
+        } else {
+          lines.push(
+            "<ul>" +
+              leads
+                .map((link) => {
+                  const days = Math.round((link.lag / DAY) * 100) / 100;
+                  return `<li>${escapeHtml(taskName(link.sourceId))} &rarr; ${escapeHtml(taskName(link.targetId))} (lag ${days}d)</li>`;
+                })
+                .join("") +
+              "</ul>",
+          );
+        }
+
+        body.innerHTML = lines.join("");
+      }
+
+      // --- Toolbar --------------------------------------------------------------------------
+      const orphanBtn = document.getElementById("orphanLinkBtn");
+      const leadBtn = document.getElementById("leadBtn");
+      const selectBtn = document.getElementById("selectOrphansBtn");
+      const actionStatus = document.getElementById("actionStatus");
+
+      function actionSay(message) {
+        actionStatus.textContent = message;
+      }
+
+      function findLink(sourceId, targetId) {
+        for (const link of data.links.get().values()) {
+          if (link.sourceId === sourceId && link.targetId === targetId) return link;
+        }
+        return null;
+      }
+
+      function syncToolbar() {
+        const hasReviewPair = Boolean(data.getTask("spec")) && Boolean(data.getTask("review"));
+        const leadLink = findLink("build", "test");
+
+        orphanBtn.disabled = !hasReviewPair;
+        const linked = Boolean(findLink("spec", "review"));
+        orphanBtn.setAttribute("aria-pressed", String(linked));
+        orphanBtn.textContent = linked ? '✓ Link "Design review" (linked)' : 'Link "Design review"';
+
+        leadBtn.disabled = leadLink === null;
+        const isLead = leadLink !== null && leadLink.lag < 0;
+        leadBtn.setAttribute("aria-pressed", String(isLead));
+        leadBtn.textContent = isLead ? '✓ Lead on "Build → Test" (-2d)' : 'Lead on "Build → Test"';
+      }
+
+      function refresh() {
+        renderReport();
+        syncToolbar();
+      }
+
+      // Both `tasks` and `links` stores are observed, since either can change the orphan/lead
+      // findings independently.
+      data.tasks.subscribe(refresh);
+      data.links.subscribe(refresh);
+      refresh();
+
+      orphanBtn.addEventListener("click", () => {
+        const existing = findLink("spec", "review");
+        if (existing === null) {
+          gantt.dispatch("link/add", { sourceId: "spec", targetId: "review", type: "FS", lag: 0 });
+          actionSay("Linked Requirements → Design review: the task is no longer an orphan.");
+        } else {
+          gantt.dispatch("link/remove", { ids: [existing.id] });
+          actionSay("Removed the link: Design review is an unlinked task again.");
+        }
+      });
+
+      leadBtn.addEventListener("click", () => {
+        const link = findLink("build", "test");
+        if (link === null) return;
+        const lead = link.lag < 0;
+        gantt.dispatch("link/update", { id: link.id, lag: lead ? 0 : -2 * DAY });
+        actionSay(
+          lead
+            ? "Build → Test now has lag 0: the lead finding is gone."
+            : "Build → Test now has lag -2d: a lead finding is reported.",
+        );
+      });
+
+      selectBtn.addEventListener("click", () => {
+        const { orphans } = findings();
+        gantt.service("stargantt.selection").select(orphans);
+        if (orphans.length === 0) {
+          actionSay("No unlinked tasks to select.");
+          return;
+        }
+        const names = orphans.map((id) => taskName(id));
+        actionSay(`Selected ${orphans.length} unlinked task(s): ${names.join(", ")}.`);
+      });
+    </script>
+  </body>
+</html>

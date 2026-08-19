@@ -1,0 +1,26 @@
+{
+  "_comment": "See ../png-fixture.test.ts for what this fixture is and why it exists in place of a byte-identical PNG.",
+  "scenario": {
+    "viewport": { "width": 300, "height": 150 },
+    "layer": { "width": 300, "height": 150 },
+    "image": { "background": "#112233", "pixelRatio": 2, "format": "jpeg", "quality": 0.42 },
+    "auxiliarySurfaces": [
+      { "side": "top", "height": 20 },
+      { "side": "bottom", "height": 30 }
+    ]
+  },
+  "createdCanvases": [
+    { "role": "layer composite (captureLayers' own offscreen canvas)", "width": 600, "height": 300 },
+    { "role": "tile canvas (one tile: the whole viewport-only plan)", "width": 600, "height": 300 },
+    { "role": "top-level output canvas (raster()'s own offscreen canvas)", "width": 600, "height": 400 },
+    { "role": "top auxiliary band canvas", "width": 600, "height": 40 },
+    { "role": "bottom auxiliary band canvas", "width": 600, "height": 60 }
+  ],
+  "outputCanvasOps": [
+    { "op": "fillRect", "args": [0, 0, 600, 400], "fill": "#112233" },
+    { "op": "drawImage", "dx": 0, "dy": 40, "dw": 600, "dh": 300, "src": "layer composite" },
+    { "op": "drawImage", "dx": 0, "dy": 0, "dw": 600, "dh": 40, "src": "top auxiliary band canvas" },
+    { "op": "drawImage", "dx": 0, "dy": 340, "dw": 600, "dh": 60, "src": "bottom auxiliary band canvas" }
+  ],
+  "encoder": { "type": "image/jpeg", "quality": 0.42 }
+}

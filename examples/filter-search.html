@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StarGantt v2 — Filter and search example</title>
+  <!--
+    Demonstrates the incremental search box and the filter panel (checkbox value-list per
+    filterable field).
+
+    Filter-search is a nested config group under `interaction` (`interaction.filterSearch`),
+    NOT under `treeGrid` — verified against docs/specs/plugins/interaction.md §6.8 ("disabled
+    when omitted"; the tree-grid spec has no such nest). `searchBox`/`filterPanel` are the
+    relevant fields.
+  -->
+  <style>
+    body {
+      margin: 0;
+      padding: 6px 12px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+    #chart {
+      height: 480px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>StarGantt v2 — filter and search</h1>
+  <div id="chart"></div>
+
+  <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+  <script>
+    const DAY = 86400000;
+    // Anchor the data at today 0:00 UTC — the default time-axis origin — so the chart opens on
+    // the data.
+    const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+    function dataset() {
+      return {
+        tasks: [
+          { id: "root", parentId: null, name: "Website relaunch", type: "summary", start: T0, end: T0 + 20 * DAY },
+          { id: "design", parentId: "root", name: "Design system", start: T0, end: T0 + 5 * DAY, progress: 0.8 },
+          { id: "backend", parentId: "root", name: "Backend API", start: T0 + 2 * DAY, end: T0 + 10 * DAY, progress: 0.3 },
+          { id: "frontend", parentId: "root", name: "Frontend pages", start: T0 + 5 * DAY, end: T0 + 14 * DAY },
+          { id: "search", parentId: "frontend", name: "Search page", start: T0 + 5 * DAY, end: T0 + 9 * DAY },
+          { id: "checkout", parentId: "frontend", name: "Checkout page", start: T0 + 9 * DAY, end: T0 + 14 * DAY },
+          { id: "qa", parentId: "root", name: "QA pass", start: T0 + 14 * DAY, end: T0 + 19 * DAY },
+          { id: "launch", parentId: "root", name: "Launch", type: "milestone", start: T0 + 20 * DAY, end: T0 + 20 * DAY },
+        ],
+      };
+    }
+
+    const gantt = StarGantt.create({
+      element: document.getElementById("chart"),
+      plugins: StarGantt.presetStandard({
+        interaction: {
+          filterSearch: { searchBox: true, filterPanel: true },
+        },
+      }),
+    });
+
+    gantt.service("stargantt.data").load(dataset());
+    window.gantt = gantt;
+  </script>
+</body>
+</html>

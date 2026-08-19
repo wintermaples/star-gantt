@@ -1,0 +1,188 @@
+{
+  "guides": [
+    {
+      "slug": "your-first-chart",
+      "title": "Your first chart",
+      "module": "./guides/01-your-first-chart.ts"
+    },
+    {
+      "slug": "loading-your-data",
+      "title": "Loading your data",
+      "module": "./guides/02-loading-your-data.ts"
+    },
+    {
+      "slug": "reading-the-timeline",
+      "title": "Reading the timeline",
+      "module": "./guides/03-reading-the-timeline.ts"
+    },
+    {
+      "slug": "sizing-task-bars",
+      "title": "Sizing task bars",
+      "module": "./guides/04-sizing-task-bars.ts"
+    },
+    {
+      "slug": "editing-by-drag",
+      "title": "Editing by drag",
+      "module": "./guides/05-editing-by-drag.ts"
+    },
+    {
+      "slug": "dependencies-and-scheduling",
+      "title": "Dependencies and automatic scheduling",
+      "module": "./guides/06-dependencies-and-scheduling.ts"
+    },
+    {
+      "slug": "finding-tasks",
+      "title": "Finding tasks in a large plan",
+      "module": "./guides/07-finding-tasks.ts"
+    },
+    {
+      "slug": "keyboard-and-screen-readers",
+      "title": "Keyboard and screen-reader access",
+      "module": "./guides/08-keyboard-and-screen-readers.ts"
+    },
+    {
+      "slug": "theming",
+      "title": "Theming and dark mode",
+      "module": "./guides/09-theming.ts"
+    },
+    {
+      "slug": "resources-and-workload",
+      "title": "Resources and workload",
+      "module": "./guides/10-resources-and-workload.ts"
+    },
+    {
+      "slug": "baselines-and-progress",
+      "title": "Baselines and tracking progress",
+      "module": "./guides/11-baselines-and-progress.ts"
+    },
+    {
+      "slug": "exporting-and-printing",
+      "title": "Exporting and printing",
+      "module": "./guides/12-exporting-and-printing.ts"
+    },
+    {
+      "slug": "data-from-a-server",
+      "title": "Loading data from a server",
+      "module": "./guides/13-data-from-a-server.ts"
+    },
+    {
+      "slug": "listening-to-events",
+      "title": "Listening to events",
+      "module": "./guides/14-listening-to-events.ts"
+    },
+    {
+      "slug": "writing-a-plugin",
+      "title": "Writing your own plugin",
+      "module": "./guides/15-writing-a-plugin.ts"
+    },
+    {
+      "slug": "ten-thousand-tasks",
+      "title": "Ten thousand tasks",
+      "module": "./guides/16-ten-thousand-tasks.ts"
+    },
+    {
+      "slug": "what-the-standard-preset-loads",
+      "title": "What the standard preset loads",
+      "module": "./guides/17-what-the-standard-preset-loads.ts"
+    },
+    {
+      "slug": "earned-value-management",
+      "title": "Earned value management",
+      "module": "./guides/18-earned-value-management.ts"
+    }
+  ],
+  "core": [
+    {
+      "slug": "plugin-host",
+      "title": "The plugin host",
+      "module": "./core/01-plugin-host.ts"
+    },
+    {
+      "slug": "service-registry",
+      "title": "The service registry",
+      "module": "./core/02-service-registry.ts"
+    },
+    {
+      "slug": "extension-points",
+      "title": "Extension points",
+      "module": "./core/03-extension-points.ts"
+    },
+    {
+      "slug": "event-bus",
+      "title": "The event bus",
+      "module": "./core/04-event-bus.ts"
+    },
+    {
+      "slug": "command-bus",
+      "title": "The command bus",
+      "module": "./core/05-command-bus.ts"
+    },
+    {
+      "slug": "lifecycle-and-ownership",
+      "title": "Lifecycle and ctx.own()",
+      "module": "./core/06-lifecycle-and-ownership.ts"
+    }
+  ],
+  "plugins": [
+    {
+      "id": "stargantt.a11y",
+      "module": "./plugins/interaction/a11y.ts"
+    },
+    {
+      "id": "stargantt.data-store",
+      "module": "./plugins/basic/data-store.ts"
+    },
+    {
+      "id": "stargantt.data-sync",
+      "module": "./plugins/data/data-sync.ts"
+    },
+    {
+      "id": "stargantt.export",
+      "module": "./plugins/export/export.ts"
+    },
+    {
+      "id": "stargantt.i18n",
+      "module": "./plugins/dev/i18n.ts"
+    },
+    {
+      "id": "stargantt.interaction",
+      "module": "./plugins/interaction/interaction.ts"
+    },
+    {
+      "id": "stargantt.perf-tools",
+      "module": "./plugins/dev/perf-tools.ts"
+    },
+    {
+      "id": "stargantt.portfolio",
+      "module": "./plugins/portfolio/portfolio.ts"
+    },
+    {
+      "id": "stargantt.resource",
+      "module": "./plugins/resource/resource.ts"
+    },
+    {
+      "id": "stargantt.scheduling",
+      "module": "./plugins/scheduling/scheduling.ts"
+    },
+    {
+      "id": "stargantt.task-bars",
+      "module": "./plugins/basic/task-bars.ts"
+    },
+    {
+      "id": "stargantt.tracking",
+      "module": "./plugins/scheduling/tracking.ts"
+    },
+    {
+      "id": "stargantt.tree-grid",
+      "module": "./plugins/basic/tree-grid.ts"
+    },
+    {
+      "id": "stargantt.undo-redo",
+      "module": "./plugins/interaction/undo-redo.ts"
+    },
+    {
+      "id": "stargantt.view",
+      "module": "./plugins/basic/view.ts"
+    }
+  ]
+}

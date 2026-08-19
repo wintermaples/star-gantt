@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Progress tracking example</title>
+    <!--
+      One HTML file + one script tag, composed with `presetStandard()` plus the OPT-IN tracking
+      plugin (tracking ships in the bundle but is not preset-composed), configured with only its
+      `progress` nest (docs/specs/plugins/tracking.md §5.2). The service id is `stargantt.progress`
+      (tracking.md §1 naming note — the other three service ids are unchanged, only this one and
+      `cost` were shortened). `taskFields` is enabled at its defaults on the `treeGrid` nest, so the
+      "done" status check the status report can read exists (tracking.md §2.6). The preset's
+      `view: { timeline: { origin } }` key pulls the visible range back to cover the plan's start.
+
+      RAG status (design=green, impl=amber, test=red) is set once through the public service —
+      each call is one undoable store edit. Two seed trend snapshots give the trend panel a line to
+      draw on first open. The status-date progress line is on at boot (this plan's size reads well
+      with it); the toolbar button below toggles it off via
+      `progress.setProgressLineVisible(!progress.state.get().progressLineVisible)`.
+
+      The dataset is small and deterministic (no Math.random(), fixed relative offsets from
+      "today") so a manual pass through this page and any e2e coverage see the same shapes.
+      CLAUDE.md's documented viewport floor is 720x540 (tablet and up, no mobile breakpoints) — the
+      chrome below is kept minimal.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+      #toolbar button {
+        min-height: 24px;
+        margin: 0 4px 4px 0;
+        font: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — progress tracking</h1>
+    <details>
+      <summary>What's on this page</summary>
+      RAG badges (design=green, impl=amber, test=red), the status-date zigzag progress line
+      (toggleable), the bulk-update panel (edit progress % / remaining work for every task in one
+      undo step) and the progress-trend panel (a small polyline over the seeded snapshots plus one
+      you can record live). The toolbar below opens the on-demand panels through the real
+      `stargantt.progress` service — nothing here is a shortcut around the public API.
+    </details>
+    <div id="toolbar">
+      <button id="btn-progress-line">Toggle progress line</button>
+      <button id="btn-bulk">Update progress…</button>
+      <button id="btn-trend">Progress trend…</button>
+      <button id="btn-snapshot">Record trend snapshot</button>
+    </div>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2). "plan" starts at `T0 - 6 * DAY`, before that default origin, so the preset's
+      // `view.timeline.origin` is pulled back to cover it — without it that content sits left of
+      // content x = 0 and no scroll gesture can reach it. The default status date (today) then
+      // falls inside the currently running tasks.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "plan", parentId: null, name: "Planning", start: T0 - 6 * DAY, end: T0 - 2 * DAY, progress: 1 },
+            { id: "design", parentId: null, name: "Design", start: T0 - 4 * DAY, end: T0 + 1 * DAY, progress: 0.7 },
+            { id: "impl", parentId: null, name: "Implementation", start: T0 - 2 * DAY, end: T0 + 6 * DAY, progress: 0.2 },
+            { id: "test", parentId: null, name: "Test pass", start: T0 + 2 * DAY, end: T0 + 8 * DAY },
+            { id: "release", parentId: null, name: "Release", start: T0 + 9 * DAY, end: T0 + 10 * DAY },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          ...StarGantt.presetStandard({
+            view: { timeline: { origin: T0 - 6 * DAY } },
+            treeGrid: { taskFields: {} },
+          }),
+          StarGantt.tracking({
+            progress: {
+              // On by default here — a plan of this size is exactly where the line reads well;
+              // `setProgressLineVisible()` toggles it at runtime.
+              progressLine: true,
+              // Two seed snapshots so the trend panel has a line to draw on first open.
+              snapshots: [
+                { date: T0 - 7 * DAY, percentComplete: 18, completedCount: 0, lateCount: 0, taskCount: 5 },
+                { date: T0 - 3 * DAY, percentComplete: 34, completedCount: 1, lateCount: 1, taskCount: 5 },
+              ],
+            },
+          }),
+        ],
+      });
+      gantt.service("stargantt.data").load(dataset());
+
+      const progress = gantt.service("stargantt.progress");
+
+      // RAG statuses through the public service — each set is one undoable store edit. The badge
+      // letter (R/A/G) keeps the meaning readable without relying on color alone.
+      progress.setRag("design", "green");
+      progress.setRag("impl", "amber");
+      progress.setRag("test", "red");
+
+      document.getElementById("btn-progress-line").addEventListener("click", () => {
+        progress.setProgressLineVisible(!progress.state.get().progressLineVisible);
+      });
+      document.getElementById("btn-bulk").addEventListener("click", () => {
+        progress.openBulkUpdatePanel();
+      });
+      document.getElementById("btn-trend").addEventListener("click", () => {
+        progress.openTrendPanel();
+      });
+      document.getElementById("btn-snapshot").addEventListener("click", () => {
+        progress.recordSnapshot();
+      });
+
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

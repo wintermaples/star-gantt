@@ -1,0 +1,68 @@
+{
+  "name": "stargantt",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "StarGantt: a plugin-based Gantt chart library with zero runtime dependencies. Single-file bundle of the core plus all fifteen official plugins (ESM + IIFE, CSS embedded).",
+  "keywords": [
+    "gantt",
+    "gantt-chart",
+    "project-management",
+    "timeline",
+    "scheduling",
+    "typescript",
+    "plugin-architecture",
+    "zero-dependencies"
+  ],
+  "author": "wintermaples",
+  "homepage": "https://wintermaples.github.io/star-gantt/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wintermaples/star-gantt.git",
+    "directory": "packages/stargantt"
+  },
+  "bugs": "https://github.com/wintermaples/star-gantt/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/stargantt.js",
+  "module": "./dist/stargantt.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/stargantt.js",
+      "default": "./dist/stargantt.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json && tsc -p tsconfig.typecheck-dist.json",
+    "prepublishOnly": "pnpm run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stargantt/core": "workspace:*",
+    "@stargantt/preset-standard": "workspace:*",
+    "@stargantt/plugin-data-store": "workspace:*",
+    "@stargantt/plugin-view": "workspace:*",
+    "@stargantt/plugin-tree-grid": "workspace:*",
+    "@stargantt/plugin-task-bars": "workspace:*",
+    "@stargantt/plugin-interaction": "workspace:*",
+    "@stargantt/plugin-undo-redo": "workspace:*",
+    "@stargantt/plugin-a11y": "workspace:*",
+    "@stargantt/plugin-scheduling": "workspace:*",
+    "@stargantt/plugin-export": "workspace:*",
+    "@stargantt/plugin-tracking": "workspace:*",
+    "@stargantt/plugin-resource": "workspace:*",
+    "@stargantt/plugin-data-sync": "workspace:*",
+    "@stargantt/plugin-portfolio": "workspace:*",
+    "@stargantt/plugin-i18n": "workspace:*",
+    "@stargantt/plugin-perf-tools": "workspace:*",
+    "@stargantt/sdk": "workspace:*"
+  }
+}

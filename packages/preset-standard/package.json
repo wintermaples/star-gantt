@@ -1,0 +1,61 @@
+{
+  "name": "@stargantt/preset-standard",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "The standard nine-plugin StarGantt composition, ready to pass to create().",
+  "keywords": [
+    "gantt",
+    "gantt-chart",
+    "project-management",
+    "timeline",
+    "scheduling",
+    "typescript",
+    "plugin-architecture",
+    "zero-dependencies"
+  ],
+  "author": "wintermaples",
+  "homepage": "https://wintermaples.github.io/star-gantt/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wintermaples/star-gantt.git",
+    "directory": "packages/preset-standard"
+  },
+  "bugs": "https://github.com/wintermaples/star-gantt/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@stargantt/core": "workspace:*",
+    "@stargantt/plugin-data-store": "workspace:*",
+    "@stargantt/plugin-view": "workspace:*",
+    "@stargantt/plugin-tree-grid": "workspace:*",
+    "@stargantt/plugin-task-bars": "workspace:*",
+    "@stargantt/plugin-interaction": "workspace:*",
+    "@stargantt/plugin-undo-redo": "workspace:*",
+    "@stargantt/plugin-a11y": "workspace:*",
+    "@stargantt/plugin-scheduling": "workspace:*",
+    "@stargantt/plugin-export": "workspace:*"
+  },
+  "main": "./dist/preset-standard.umd.js",
+  "module": "./dist/preset-standard.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/preset-standard.js",
+      "default": "./dist/preset-standard.umd.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@stargantt/sdk": "workspace:*"
+  }
+}

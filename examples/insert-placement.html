@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StarGantt v2 — Insert placement example</title>
+  <!--
+    Demonstrates where the context-menu "Insert task" command places the new row: child of the
+    pressed task, at the pressed date, one grid cell long at the current zoom level — including
+    the "split row" behavior of a collapsed summary (`taskBars.collapsedSummary: "split"`).
+
+    This page is self-contained: the toolbar markup lives directly in the body, and the boot
+    script runs once at load (see examples/interaction.html for the same convention).
+
+    - The context menu is a nested config group under `interaction` (`interaction.contextMenu`),
+      not a standalone factory — verified against docs/specs/plugins/interaction.md §6.5.
+    - Row/timeline services: `gantt.service("stargantt.rows")`,
+      `gantt.service("stargantt.timeline")`; `.zoomLevel` is a store, read via `.zoomLevel.get()`.
+    - Data/row changes are observed through store subscriptions:
+      `gantt.service("stargantt.data").tasks.subscribe(refresh)` and
+      `gantt.service("stargantt.rows").rows.subscribe(refresh)`.
+    - Undo/redo is called directly through the service
+      (`gantt.service("stargantt.history").undo()`/`.redo()`), consistent with the service
+      already in use for `canUndo()`/`canRedo()` (docs/specs/plugins/undo-redo.md).
+  -->
+  <style>
+    body {
+      margin: 0;
+      padding: 6px 12px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 16px;
+      margin: 0 0 4px;
+    }
+    .group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11px;
+    }
+    .group-label {
+      font-weight: 600;
+      color: #555;
+    }
+    #chart {
+      height: 360px;
+      border: 1px solid #ccc;
+    }
+    .readouts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 16px;
+      margin: 6px 0;
+      font-size: 11px;
+    }
+    .readouts span.value {
+      font: 11px/1.3 ui-monospace, monospace;
+      color: #333;
+    }
+    .note ul {
+      margin: 4px 0 0;
+      padding-left: 18px;
+    }
+    .note li {
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>StarGantt v2 — insert placement</h1>
+
+  <div class="toolbar">
+    <div class="group">
+      <label class="group-label" for="zoomSelect">Zoom level (sets the cell an insert fills)</label>
+      <select id="zoomSelect">
+        <option value="day">Day</option>
+        <option value="week">Week</option>
+        <option value="month">Month</option>
+        <option value="quarter">Quarter</option>
+      </select>
+    </div>
+    <div class="group">
+      <span class="group-label" id="gridInsertLabel">Grid command</span>
+      <div role="group" aria-labelledby="gridInsertLabel">
+        <button type="button" id="insertChildBtn">Insert row under "Design system"</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="group-label" id="splitLabel">Split row</span>
+      <div role="group" aria-labelledby="splitLabel">
+        <button type="button" id="splitToggleBtn">Collapse "Content migration"</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="group-label" id="historyLabel">History</span>
+      <div role="group" aria-labelledby="historyLabel">
+        <button type="button" id="undoBtn">Undo</button>
+        <button type="button" id="redoBtn">Redo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="readouts">
+    <span>Status: <span class="value" id="statusReadout" role="status">Ready.</span></span>
+    <span>Tasks in store: <span class="value" id="taskCountReadout">0</span></span>
+    <span>Last task added: <span class="value" id="addedReadout">(none)</span></span>
+    <span>"Content migration" row paints: <span class="value" id="splitReadout">(none)</span></span>
+  </div>
+
+  <div id="chart"></div>
+
+  <div class="note">
+    <h2>How to use</h2>
+    <ul>
+      <li><strong>Right-press a bar or a grid row</strong> and pick <em>Insert task</em>: the new
+        task is a <strong>child</strong> of the task you pressed, starts where it starts, and is
+        one grid cell long. Change the zoom level first and insert again to see the duration
+        follow the cell — a day, a week, a month, a quarter.</li>
+      <li><strong>Right-press empty chart space inside a task's row</strong> — beside the bar, in
+        the same lane — and the same entry creates a child of that row's task at the pressed
+        cell. The press names a date as well as a row, so the new bar lands under the pointer
+        rather than at the task's own start.</li>
+      <li><strong>Right-press an in-row bar of the collapsed "Content migration" row</strong>:
+        that row is a <em>split row</em> — it paints its two children's bars instead of its own
+        summary glyph — and the press names whichever child is under the pointer, so the insert
+        goes under <em>that child</em>. The split row is unchanged afterwards: it shows the
+        project's <strong>direct</strong> children only, and the new task is a level deeper.</li>
+      <li><strong>Right-press the gap between those two bars</strong> — inside the project's row
+        but over no child — and the row's own task is the parent, so the insert becomes a third
+        direct child. It would have landed out of sight under a folded parent, so the entry
+        expands the row right after adding it; press <em>Collapse "Content migration"</em> to
+        fold it back and watch all three children share the project's row again.</li>
+      <li><strong>Right-press below the last row</strong> for a top-level task at the pressed
+        date.</li>
+      <li><em>Insert row under "Design system"</em> dispatches
+        <code>view/rowInsert&nbsp;{&nbsp;id&nbsp;}</code> with no <code>position</code>: the grid
+        command defaults to <code>"child"</code> too, and gives the row the same one-cell span.</li>
+      <li>Every insert is exactly one history entry: <strong>Undo</strong>
+        reverses it in one step.</li>
+    </ul>
+  </div>
+
+  <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+  <script>
+    // The time-axis origin defaults to today 0:00 UTC, so the default data is laid out as fixed
+    // offsets from a day-floored "today" anchor: deterministic, and always in the initial view.
+    const DAY = 86400000;
+    const T0 = Math.floor(Date.now() / DAY) * DAY;
+    const d = (days) => T0 + days * DAY;
+
+    function dataset() {
+      return {
+        tasks: [
+          { id: "relaunch", parentId: null, name: "Website relaunch", type: "summary", start: d(0), end: d(24) },
+          { id: "design", parentId: "relaunch", name: "Design system", type: "task", start: d(0), end: d(6) },
+          { id: "templates", parentId: "relaunch", name: "Page templates", type: "task", start: d(6), end: d(12), progress: 0.4 },
+          { id: "cms", parentId: "relaunch", name: "CMS integration", type: "task", start: d(12), end: d(22) },
+          // A project of its own, so the page has a split row to insert into: while it is
+          // collapsed its row paints "Audit" and "Move" instead of its own summary glyph.
+          { id: "migration", parentId: "relaunch", name: "Content migration", type: "summary", start: d(6), end: d(16) },
+          { id: "mig-audit", parentId: "migration", name: "Audit", type: "task", start: d(6), end: d(10) },
+          { id: "mig-move", parentId: "migration", name: "Move", type: "task", start: d(12), end: d(16) },
+          { id: "launch", parentId: "relaunch", name: "Launch", type: "milestone", start: d(24), end: d(24) },
+        ],
+      };
+    }
+
+    // `collapsedSummary: "split"` is the dhtmlx-style row compression: a collapsed summary paints
+    // its direct children's bars in its own row. The children stay draggable there; hovering one
+    // names it, because in-row bars carry no labels.
+    const gantt = StarGantt.create({
+      element: document.getElementById("chart"),
+      plugins: StarGantt.presetStandard({
+        taskBars: { collapsedSummary: "split" },
+        // insertMode defaults to "child"; "sibling" makes every insert a sibling instead.
+        interaction: { contextMenu: { insertMode: "child" } },
+      }),
+    });
+    window.gantt = gantt;
+
+    gantt.service("stargantt.data").load(dataset());
+
+    // A split row only paints its children while it is collapsed, so the demo starts folded.
+    if (gantt.service("stargantt.data").getTask("migration") !== undefined) {
+      gantt.dispatch("view/rowToggle", { id: "migration", expanded: false });
+    }
+
+    // ===== Page chrome: zoom selector, grid-insert button, readouts =====
+
+    const statusReadout = document.getElementById("statusReadout");
+    const taskCountReadout = document.getElementById("taskCountReadout");
+    const addedReadout = document.getElementById("addedReadout");
+    const splitReadout = document.getElementById("splitReadout");
+    const zoomSelect = document.getElementById("zoomSelect");
+    const insertChildBtn = document.getElementById("insertChildBtn");
+    const splitToggleBtn = document.getElementById("splitToggleBtn");
+    const undoBtn = document.getElementById("undoBtn");
+    const redoBtn = document.getElementById("redoBtn");
+
+    /** Ids present at boot; anything else in the store was inserted by a gesture on this page. */
+    const SEEDED = [
+      "relaunch", "design", "templates", "cms",
+      "migration", "mig-audit", "mig-move",
+      "launch",
+    ];
+
+    function setStatus(text) {
+      statusReadout.textContent = text;
+    }
+
+    function formatDays(ms) {
+      const days = ms / 86400000;
+      return (Math.round(days * 10) / 10) + (days === 1 ? " day" : " days");
+    }
+
+    /** Whether "Content migration" is folded, i.e. whether its row is painting its children. */
+    function migrationCollapsed() {
+      return gantt.service("stargantt.rows").isExpanded("migration") === false;
+    }
+
+    /** What the "Content migration" row currently shows: its children in-row, or its own bar. */
+    function describeSplitRow() {
+      const data = gantt.service("stargantt.data");
+      if (data.getTask("migration") === undefined) return "(not in this dataset)";
+      if (!migrationCollapsed()) return "its own summary bar (expanded)";
+      const kids = data.query().children.get("migration") || [];
+      if (kids.length === 0) return "nothing (no children)";
+      return kids.map((id) => data.getTask(id).name).join(", ");
+    }
+
+    function refresh() {
+      const data = gantt.service("stargantt.data");
+      // `taskIds()` is an iterable, not an array — in store order, so the last unseeded id is the
+      // most recently inserted one.
+      const ids = Array.from(data.taskIds());
+      taskCountReadout.textContent = String(ids.length);
+
+      const addedIds = ids.filter((id) => SEEDED.indexOf(id) === -1);
+      if (addedIds.length === 0) {
+        addedReadout.textContent = "(none)";
+      } else {
+        const last = data.getTask(addedIds[addedIds.length - 1]);
+        const parent = last.parentId === null ? "root" : last.parentId;
+        addedReadout.textContent = last.name + " — under " + parent + ", " + formatDays(last.end - last.start);
+      }
+
+      splitReadout.textContent = describeSplitRow();
+      const hasMigration = data.getTask("migration") !== undefined;
+      splitToggleBtn.disabled = !hasMigration;
+      splitToggleBtn.textContent = hasMigration && migrationCollapsed()
+        ? 'Expand "Content migration"'
+        : 'Collapse "Content migration"';
+
+      const history = gantt.service("stargantt.history");
+      const state = history.state.get();
+      undoBtn.disabled = !state.canUndo;
+      redoBtn.disabled = !state.canRedo;
+    }
+
+    zoomSelect.addEventListener("change", () => {
+      gantt.service("stargantt.timeline").setZoomLevel(zoomSelect.value);
+      setStatus('Zoom level "' + zoomSelect.value + '" — an insert now fills one ' + zoomSelect.value + ' cell.');
+    });
+
+    insertChildBtn.addEventListener("click", () => {
+      gantt.dispatch("view/rowInsert", { id: "design" });
+      setStatus('view/rowInsert { id: "design" } — inserted as a child, one grid cell long.');
+      refresh();
+    });
+
+    splitToggleBtn.addEventListener("click", () => {
+      const collapsed = migrationCollapsed();
+      // Expansion is display state (no transaction, no history entry), so folding the row back
+      // after an insert does not touch Undo.
+      gantt.dispatch("view/rowToggle", { id: "migration", expanded: collapsed });
+      setStatus(collapsed
+        ? '"Content migration" expanded — each child has its own row again.'
+        : '"Content migration" collapsed — its row now paints its children’s bars.');
+      refresh();
+    });
+
+    // Chart-gesture inserts (background / bar press) never pass through this page's buttons, so
+    // the undo/redo state must follow the history store itself, not just the button handlers.
+    gantt.service("stargantt.history").state.subscribe(() => {
+      refresh();
+    });
+
+    undoBtn.addEventListener("click", () => {
+      gantt.service("stargantt.history").undo();
+      setStatus("Undone.");
+      refresh();
+    });
+
+    redoBtn.addEventListener("click", () => {
+      gantt.service("stargantt.history").redo();
+      setStatus("Redone.");
+      refresh();
+    });
+
+    zoomSelect.value = gantt.service("stargantt.timeline").zoomLevel.get().id;
+    gantt.service("stargantt.data").tasks.subscribe(refresh);
+    // Expanding or collapsing from the grid's own caret is display state, so it arrives on the
+    // rows store rather than a transaction — the split-row readout follows both.
+    gantt.service("stargantt.rows").rows.subscribe(refresh);
+    setStatus("Ready. Right-press a bar, a grid row, or the space beside a bar.");
+    refresh();
+  </script>
+</body>
+</html>

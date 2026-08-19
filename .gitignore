@@ -1,0 +1,70 @@
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Dependencies (pnpm) ---
+node_modules/
+.pnpm-store/
+.pnpm-state.json
+# pnpm-lock.yaml is committed (not ignored)
+
+# --- Build output (vite / TypeScript) ---
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+vite.config.js.timestamp-*
+
+# --- Env ---
+.env
+.env.*
+!.env.example
+
+# --- Test / coverage (vitest / playwright) ---
+coverage/
+.nyc_output/
+.vitest/
+.vitest-reports/
+.vitest-attachments/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+playwright/.auth/
+
+# --- Cache ---
+.eslintcache
+.stylelintcache
+.cache/
+
+# --- Git worktrees ---
+.worktrees/
+worktrees/
+
+# --- Editor / OS ---
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Claude Code (local-only; settings.json / CLAUDE.md are committed) ---
+.claude/settings.local.json
+CLAUDE.local.md
+
+# --- OA sweep output (e2e/oa) ---
+oa-results/
+
+star-gantt-old/

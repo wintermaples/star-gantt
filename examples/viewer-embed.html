@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Viewer &amp; embed example</title>
+    <!--
+      Read-only/embed/snapshot are one facet of the single `stargantt.export` facade
+      presetStandard() always includes, config nested at `export.viewerEmbed`.
+
+      - `stargantt.export`'s viewer-embed methods (docs/specs/plugins/export.md §1): `snapshot()`
+        returns a bare token; `snapshot({ url: true })` attaches the token to the current
+        `location.href`; `applySnapshot(source?)` takes an optional source argument;
+        `isReadOnly()`/`setReadOnly()` toggle read-only mode.
+      - This page's origin picker demonstrates the built-in read-only-exempt rule
+        (docs/specs/plugins/export.md §2.1): every read-only veto lets a transaction through
+        unconditionally when its origin string starts with the prefix `"stargantt.data-sync/"`
+        (tracking the data-sync plugin's own origin vocabulary) — no other
+        built-in strings are exempt. The picker offers `"stargantt.data-sync/import"` as the
+        built-in-exempt example, and `"demo-feed"` as the config-exempt example (added via
+        `readOnlyExemptOrigins`).
+      - This page is self-contained, like `examples/scheduling.html`. Embed mode is still a
+        composition-time flag (`export.viewerEmbed.embed`), so toggling it rebuilds the whole
+        chart; this page implements that rebuild directly with `gantt.dispose()` +
+        `StarGantt.create()`.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 6px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 420px;
+        border: 1px solid #ccc;
+      }
+      .panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin: 0 0 6px;
+        font-size: 12px;
+        align-items: center;
+      }
+      .group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      button {
+        font: inherit;
+        padding: 4px 8px;
+      }
+      .state {
+        font-size: 12px;
+        color: #444;
+      }
+      #snapshotUrl {
+        width: 320px;
+        font: inherit;
+      }
+      #viewerStatus {
+        font-size: 12px;
+        margin: 4px 0;
+      }
+      #eventLog {
+        list-style: none;
+        margin: 0 0 6px;
+        padding: 4px 6px;
+        max-height: 90px;
+        overflow-y: auto;
+        font-size: 11px;
+        border: 1px solid #ddd;
+        background: #fafafa;
+      }
+      .note {
+        font-size: 11px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — viewer &amp; embed</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Read-only mode vetoes transactions at the store's cancelable pre-event, except origins
+      matching the built-in exempt prefix or the configured <code>readOnlyExemptOrigins</code>.
+      Embed mode dresses the root for iframe hosting and flips the read-only default on. Snapshot
+      links encode the whole project into the URL fragment.
+    </details>
+    <div class="panel">
+      <span>Modes:</span>
+      <button id="readOnlyBtn" type="button" aria-pressed="false">Read-only: off</button>
+      <button id="embedBtn" type="button" aria-pressed="false">Embed mode: off</button>
+      <span class="state" id="viewerState">Editable · no viewer classes on the root</span>
+    </div>
+    <div class="panel">
+      <span>Try an edit:</span>
+      <label for="originSelect">Transaction origin</label>
+      <select id="originSelect">
+        <option value="user">user — a normal edit</option>
+        <option value="schedule">schedule — auto-scheduling</option>
+        <option value="stargantt.data-sync/import">stargantt.data-sync/import — built-in exempt</option>
+        <option value="demo-feed">demo-feed — exempt via config</option>
+      </select>
+      <button id="editBtn" type="button">Advance "Implementation" progress by 10%</button>
+    </div>
+    <div class="panel">
+      <span>Share link:</span>
+      <button id="snapshotBtn" type="button">Create snapshot link</button>
+      <button id="copyBtn" type="button">Copy</button>
+      <button id="restoreBtn" type="button">Restore from link</button>
+      <button id="replaceBtn" type="button">Replace data</button>
+    </div>
+    <div class="panel">
+      <label for="snapshotUrl">Snapshot URL</label>
+      <input id="snapshotUrl" type="text" spellcheck="false" placeholder="Press “Create snapshot link” — the whole project is encoded into the URL fragment" />
+    </div>
+    <p id="viewerStatus" role="status"></p>
+    <h2 style="font-size: 12px; margin: 0 0 2px">Plugin events</h2>
+    <ul id="eventLog"><li>Waiting for <code>viewerembed/*</code> events…</li></ul>
+    <p class="note">
+      Reload this page with the generated link in the address bar and the chart rebuilds itself
+      from the fragment alone — no server, no storage, no id registry. Tokens are uncompressed, so
+      the spec recommends staying under ~64KB of token text for URL delivery.
+    </p>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+
+      function dataset() {
+        const t0 = Math.floor(Date.now() / DAY) * DAY;
+        return {
+          tasks: [
+            { id: "root", parentId: null, name: "Customer portal", type: "summary", start: t0 - 7 * DAY, end: t0 + 21 * DAY },
+            { id: "spec", parentId: "root", name: "Specification", start: t0 - 7 * DAY, end: t0 - 2 * DAY, progress: 1 },
+            { id: "impl", parentId: "root", name: "Implementation", start: t0 - 2 * DAY, end: t0 + 8 * DAY, progress: 0.4 },
+            { id: "review", parentId: "root", name: "Design review", start: t0 + 3 * DAY, end: t0 + 6 * DAY, progress: 0 },
+            { id: "qa", parentId: "root", name: "QA pass", start: t0 + 8 * DAY, end: t0 + 14 * DAY, progress: 0 },
+            { id: "docs", parentId: "root", name: "User guide", start: t0 + 8 * DAY, end: t0 + 13 * DAY, progress: 0 },
+            { id: "launch", parentId: "root", name: "Launch", type: "milestone", start: t0 + 21 * DAY, end: t0 + 21 * DAY },
+          ],
+          links: [
+            { sourceId: "spec", targetId: "impl", type: "FS" },
+            { sourceId: "impl", targetId: "qa", type: "FS" },
+            { sourceId: "impl", targetId: "docs", type: "FS" },
+            { sourceId: "qa", targetId: "launch", type: "FS" },
+          ],
+          // Snapshot tokens carry resources and assignments too, not just tasks and links.
+          resources: [
+            { id: "r1", name: "Ada", capacity: 1 },
+            { id: "r2", name: "Grace", capacity: 1 },
+          ],
+          assignments: [
+            { taskId: "impl", resourceId: "r1", units: 1 },
+            { taskId: "qa", resourceId: "r2", units: 0.5 },
+            { taskId: "docs", resourceId: "r2", units: 0.5 },
+          ],
+        };
+      }
+
+      const chartEl = document.getElementById("chart");
+      let gantt = null;
+      let embedMode = false;
+
+      function buildChart() {
+        if (gantt) {
+          gantt.dispose();
+          chartEl.innerHTML = "";
+        }
+        gantt = StarGantt.create({
+          element: chartEl,
+          plugins: StarGantt.presetStandard({
+            // The default fixture starts before today, and this page's whole point is data of
+            // unknown-at-composition-time extent — a URL snapshot restored on load, or one pasted
+            // and restored later — so the origin follows the data instead of a fixed instant.
+            view: { timeline: { autoExtendOrigin: true } },
+            export: {
+              viewerEmbed: {
+                // Both modes start off; embed: true also flips read-only's default to true.
+                embed: embedMode,
+                snapshotParam: "sg-snapshot",
+                // The built-in exempt prefix ("stargantt.data-sync/...") can never be narrowed;
+                // this only adds one more origin string, so the demo's "feed" also survives
+                // read-only.
+                readOnlyExemptOrigins: ["demo-feed"],
+              },
+            },
+          }),
+        });
+        gantt.service("stargantt.data").load(dataset());
+
+        // Share links: a token in this page's own URL fragment replaces the data just loaded.
+        // (`autoRestore: true` would do this inside setup(), before the load above, which would
+        // then overwrite it — so this page calls applySnapshot() by hand afterward instead.)
+        gantt.service("stargantt.export").applySnapshot();
+
+        bind(gantt);
+        window.gantt = gantt;
+        syncModes();
+      }
+
+      const readOnlyBtn = document.getElementById("readOnlyBtn");
+      const embedBtn = document.getElementById("embedBtn");
+      const originSelect = document.getElementById("originSelect");
+      const editBtn = document.getElementById("editBtn");
+      const snapshotBtn = document.getElementById("snapshotBtn");
+      const copyBtn = document.getElementById("copyBtn");
+      const restoreBtn = document.getElementById("restoreBtn");
+      const replaceBtn = document.getElementById("replaceBtn");
+      const urlField = document.getElementById("snapshotUrl");
+      const statusEl = document.getElementById("viewerStatus");
+      const logEl = document.getElementById("eventLog");
+      let logCleared = false;
+
+      function say(text) {
+        statusEl.textContent = text;
+      }
+
+      function log(text) {
+        if (!logCleared) {
+          logEl.textContent = "";
+          logCleared = true;
+        }
+        const li = document.createElement("li");
+        li.textContent = text;
+        logEl.appendChild(li);
+        while (logEl.childElementCount > 20) logEl.removeChild(logEl.firstElementChild);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      /** Modes are stated in text, never by color alone. */
+      function syncModes() {
+        const svc = gantt.getService("stargantt.export");
+        const readOnly = svc ? svc.isReadOnly() : false;
+        readOnlyBtn.setAttribute("aria-pressed", String(readOnly));
+        readOnlyBtn.textContent = "Read-only: " + (readOnly ? "on" : "off");
+        embedBtn.setAttribute("aria-pressed", String(embedMode));
+        embedBtn.textContent = "Embed mode: " + (embedMode ? "on" : "off");
+
+        const classes = [];
+        if (readOnly) classes.push("sg-readonly");
+        if (embedMode) classes.push("sg-viewer-embed");
+        document.getElementById("viewerState").textContent =
+          (readOnly ? "Edits vetoed" : "Editable") + " · " + (classes.length ? "root classes: " + classes.join(" ") : "no viewer classes on the root");
+      }
+
+      function bind(instance) {
+        instance.on("viewerembed/readOnlyChanged", (e) => {
+          log("readOnlyChanged  readOnly=" + e.readOnly + "  cause=" + e.cause);
+          syncModes();
+        });
+        instance.on("viewerembed/snapshotApplied", (e) => {
+          log("snapshotApplied  source=" + e.source);
+        });
+      }
+
+      buildChart();
+
+      // Opened through a share link: buildChart() already restored it from the fragment.
+      if (location.hash.indexOf("sg-snapshot=") !== -1) {
+        urlField.value = location.href;
+        say("This page was opened from a snapshot link — the chart above came from the URL fragment, not from the page's default data.");
+      }
+
+      readOnlyBtn.addEventListener("click", () => {
+        const svc = gantt.getService("stargantt.export");
+        const next = !svc.isReadOnly();
+        svc.setReadOnly(next);
+        syncModes();
+        say(
+          next
+            ? "Read-only on: every transaction is vetoed at data/willApplyTransaction, except the exempt origins."
+            : "Read-only off: transactions apply normally again.",
+        );
+      });
+
+      embedBtn.addEventListener("click", () => {
+        embedMode = !embedMode;
+        // Embed mode is a composition-time flag, so the chart is re-created.
+        buildChart();
+        say(
+          embedMode
+            ? "Re-created with embed: true — the root fills its container, text selection is off, and read-only defaults to on. Data reset to the page default."
+            : "Re-created with embed: false. Data reset to the page default.",
+        );
+      });
+
+      editBtn.addEventListener("click", () => {
+        const data = gantt.getService("stargantt.data");
+        const before = data.getTask("impl");
+        if (!before) {
+          say("Task “Implementation” is not in the current data — restore the snapshot or reset the dataset.");
+          return;
+        }
+        const origin = originSelect.value;
+        const current = before.progress || 0;
+        // Wraps back to 0 at 100% so the target always differs from the stored value — that is
+        // what makes "applied" vs "vetoed" observable from the store alone.
+        const target = current >= 1 ? 0 : Math.round((current + 0.1) * 100) / 100;
+        gantt.dispatch("task/update", { id: "impl", after: { progress: target }, origin });
+        const after = data.getTask("impl");
+        const applied = after !== undefined && (after.progress || 0) === target;
+        say(
+          applied
+            ? "Applied: origin “" + origin + "” → progress " + Math.round(target * 100) + "%."
+            : "Vetoed: origin “" + origin + "” is not exempt while read-only, so the transaction never reached the store (and left no undo step).",
+        );
+      });
+
+      snapshotBtn.addEventListener("click", () => {
+        const svc = gantt.getService("stargantt.export");
+        const token = svc.snapshot();
+        urlField.value = svc.snapshot({ url: true });
+        say(
+          "Snapshot token: " +
+            token.length +
+            " base64url characters (tasks, links, calendars, resources and assignments). Recommended ceiling for URL delivery: ~64KB.",
+        );
+      });
+
+      copyBtn.addEventListener("click", () => {
+        if (!urlField.value) {
+          say("Create a snapshot link first.");
+          return;
+        }
+        urlField.focus();
+        urlField.select();
+        const clipboard = navigator.clipboard;
+        if (!clipboard || typeof clipboard.writeText !== "function") {
+          say("Clipboard access is unavailable here — the link is selected, copy it with Ctrl+C.");
+          return;
+        }
+        clipboard.writeText(urlField.value).then(
+          () => say("Link copied to the clipboard."),
+          () => say("The browser blocked clipboard access — the link is selected, copy it with Ctrl+C."),
+        );
+      });
+
+      restoreBtn.addEventListener("click", () => {
+        const svc = gantt.getService("stargantt.export");
+        if (!urlField.value.trim()) {
+          say("Create a snapshot link first, or paste one into the field.");
+          return;
+        }
+        const ok = svc.applySnapshot(urlField.value.trim());
+        say(
+          ok
+            ? "Restored from the link: one DataService.load() replaced the whole project. It bypasses transactions, so it works while read-only and is not undoable."
+            : "Rejected: no readable sg-snapshot token in that URL. Nothing was loaded.",
+        );
+      });
+
+      replaceBtn.addEventListener("click", () => {
+        const data = gantt.getService("stargantt.data");
+        const t0 = Math.floor(Date.now() / DAY) * DAY;
+        data.load({
+          tasks: [{ id: "stale", parentId: null, name: "Stale placeholder data", start: t0, end: t0 + 4 * DAY, progress: 0 }],
+        });
+        say("Project replaced through DataService.load() — now press “Restore from link” to bring the snapshot back.");
+      });
+    </script>
+  </body>
+</html>

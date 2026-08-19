@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Offline &amp; realtime example</title>
+    <!--
+      Demonstrates the merged, OPT-IN `StarGantt.dataSync()` plugin: `dataSync({ offline,
+      realtime })` composed as one call, driven through one
+      `gantt.service("stargantt.data-sync")` facade (`sync.offline.*`, `sync.realtime.*`). The
+      `sync.realtime.status` store reports connection status; `sync/realtimeApplied`,
+      `sync/offlineSaved`, `sync/offlineRestored`, and `sync/offlineCleared` events report the
+      corresponding actions. The "Request resync" button's log text explains that
+      `resyncViaDataSource`'s delegation finds no active source — this page has no
+      `sources`/`active` configured — and stays a no-op.
+
+      No server is contacted: the "peer" is an in-page loopback socket handed to
+      `StarGantt.webSocketTransport({ webSocket: … })`, and the latency / drop / offline switches
+      simulate the network entirely inside this page. Persistence uses the browser's real
+      IndexedDB under the document key `offline-realtime-example`. Try it: let the peer edit a few
+      tasks, reload the page, then press "Restore snapshot".
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 340px;
+        border: 1px solid #ccc;
+      }
+      .panels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 6px 0;
+      }
+      fieldset.panel {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 6px 8px;
+        min-width: 230px;
+        flex: 1 1 230px;
+      }
+      .panel legend {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .panel button {
+        min-height: 24px;
+        margin: 0 4px 4px 0;
+        font: inherit;
+        cursor: pointer;
+      }
+      .readout {
+        font-size: 11px;
+        color: #333;
+        margin: 2px 0;
+      }
+      #event-log {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 4px 8px;
+        height: 90px;
+        overflow-y: auto;
+        font-size: 11px;
+        margin: 6px 0;
+      }
+      #event-log p {
+        margin: 1px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — offline storage &amp; realtime sync</h1>
+    <details>
+      <summary>What's on this page</summary>
+      One <code>dataSync({ offline, realtime })</code> composition: a real IndexedDB snapshot plus
+      an in-page loopback WebSocket transport standing in for a second client.
+    </details>
+
+    <div class="panels">
+      <fieldset class="panel">
+        <legend>Connection</legend>
+        <button id="rt-connect">Connect</button>
+        <button id="rt-disconnect">Disconnect</button>
+        <button id="rt-drop">Simulate drop</button>
+        <button id="rt-offline" aria-pressed="false">Peer server: online</button>
+        <br />
+        <label>Latency <input id="rt-latency" type="range" min="0" max="1500" step="50" value="150" /></label>
+        <output id="rt-latency-out">150 ms</output>
+        <p class="readout" id="rt-status" role="status">Booting…</p>
+      </fieldset>
+
+      <fieldset class="panel">
+        <legend>Peer (second client)</legend>
+        <button id="peer-rename">Rename a task</button>
+        <button id="peer-shift">Shift by +1 day</button>
+        <button id="peer-add">Add a task</button>
+        <button id="peer-remove">Delete a task</button>
+        <br />
+        <button id="peer-echo">Echo unchanged row</button>
+        <button id="peer-resync">Request resync</button>
+        <button id="peer-direct">applyMessage() direct</button>
+        <p class="readout" id="rt-applied" role="status">No remote message applied yet.</p>
+      </fieldset>
+
+      <fieldset class="panel">
+        <legend>Offline storage</legend>
+        <button id="off-save">Save snapshot</button>
+        <button id="off-restore">Restore snapshot</button>
+        <button id="off-clear">Clear snapshot</button>
+        <button id="off-refresh">Refresh state</button>
+        <p class="readout" id="off-status" role="status">Checking IndexedDB…</p>
+      </fieldset>
+    </div>
+
+    <div id="chart"></div>
+    <div id="event-log" role="log" aria-live="polite" aria-label="Sync and storage events"></div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const t0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "release", parentId: null, name: "Release 4.2", type: "summary", start: t0 - 6 * DAY, end: t0 + 9 * DAY },
+            { id: "spec", parentId: "release", name: "Specification", type: "task", start: t0 - 6 * DAY, end: t0 - 3 * DAY, progress: 1 },
+            { id: "design", parentId: "release", name: "Design", type: "task", start: t0 - 3 * DAY, end: t0 + 1 * DAY, progress: 0.6 },
+            { id: "build", parentId: "release", name: "Implementation", type: "task", start: t0, end: t0 + 5 * DAY, progress: 0.2 },
+            { id: "qa", parentId: "release", name: "QA", type: "task", start: t0 + 4 * DAY, end: t0 + 8 * DAY, progress: 0 },
+            { id: "launch", parentId: null, name: "Launch", type: "milestone", start: t0 + 9 * DAY, end: t0 + 9 * DAY },
+          ],
+          links: [
+            { sourceId: "spec", targetId: "design", type: "FS" },
+            { sourceId: "design", targetId: "build", type: "FS" },
+            { sourceId: "build", targetId: "qa", type: "FS" },
+            { sourceId: "qa", targetId: "launch", type: "FS" },
+          ],
+          resources: [
+            { id: "alice", name: "Alice", capacity: 1 },
+            { id: "bob", name: "Bob", capacity: 1 },
+          ],
+          assignments: [
+            { taskId: "design", resourceId: "alice", units: 1 },
+            { taskId: "build", resourceId: "bob", units: 1 },
+          ],
+        };
+      }
+
+      // ----------------------------------------------------------------- page readouts
+      const logEl = document.getElementById("event-log");
+      const rtStatusEl = document.getElementById("rt-status");
+      const rtAppliedEl = document.getElementById("rt-applied");
+      const offStatusEl = document.getElementById("off-status");
+
+      let logLines = 0;
+      /** Appends one line to the on-page log; failures never go to the console. */
+      function log(text) {
+        const line = document.createElement("p");
+        line.textContent = text;
+        logEl.appendChild(line);
+        logLines += 1;
+        while (logLines > 40) { logEl.removeChild(logEl.firstChild); logLines -= 1; }
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      // ------------------------------------------------- in-page loopback "server"
+      // A minimal `WebSocketLike`: the transport only needs onopen/onmessage/onclose/onerror and
+      // close(). Nothing leaves the page. Ordinary host code, ported mechanically.
+      function createLoopbackHub() {
+        let latencyMs = 150;
+        let serverOffline = false;
+        let live = null;
+
+        function afterLatency(fn) {
+          let waited = 0;
+          const wait = (slice) => setTimeout(() => {
+            waited += slice;
+            const remaining = latencyMs - waited;
+            if (remaining <= 0) { fn(); return; }
+            wait(remaining);
+          }, slice);
+          wait(latencyMs);
+        }
+
+        class LoopbackSocket {
+          constructor(url) {
+            this.url = url;
+            this.onopen = null;
+            this.onmessage = null;
+            this.onclose = null;
+            this.onerror = null;
+            this.dead = false;
+            afterLatency(() => {
+              if (this.dead) return;
+              if (serverOffline) {
+                this.dead = true;
+                log('Peer server refused the connection ("offline" switch is on).');
+                if (this.onclose) this.onclose({ reason: "server offline" });
+                return;
+              }
+              live = this;
+              if (this.onopen) this.onopen();
+            });
+          }
+          close() {
+            this.dead = true;
+            if (live === this) live = null;
+          }
+        }
+
+        return {
+          Socket: LoopbackSocket,
+          setLatency(ms) { latencyMs = Math.max(0, Math.min(1500, Number(ms) || 0)); },
+          setOffline(value) { serverOffline = value === true; },
+          push(message) {
+            const socket = live;
+            if (socket === null) { log("Peer message dropped: no client is connected."); return false; }
+            const frame = JSON.stringify(message);
+            afterLatency(() => {
+              if (socket.dead || socket.onmessage === null) return;
+              socket.onmessage({ data: frame });
+            });
+            return true;
+          },
+          /** Simulates the server dropping the socket: the plugin's retry policy takes over. */
+          drop() {
+            const socket = live;
+            if (socket === null) { log("Nothing to drop: no client is connected."); return false; }
+            live = null;
+            socket.dead = true;
+            if (socket.onclose) socket.onclose({ reason: "server closed the connection" });
+            return true;
+          },
+        };
+      }
+
+      const hub = createLoopbackHub();
+
+      // ----------------------------------------------------------------- composition
+      // Offline persistence and realtime sync are composed with one `dataSync({ offline,
+      // realtime })` call. The default fixture starts before the
+      // today-anchored default origin, and a restored snapshot or a peer edit can extend the data
+      // in either direction, so the origin follows the data instead of a fixed instant.
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          ...StarGantt.presetStandard({ view: { timeline: { autoExtendOrigin: true } } }),
+          StarGantt.dataSync({
+            // Auto-save keeps the IndexedDB snapshot in step with every edit, local or remote.
+            // Auto-restore stays off so the first paint is always the dataset below.
+            offline: {
+              documentKey: "offline-realtime-example",
+              autoSave: true,
+              autoSaveDebounceMs: 400,
+            },
+            // The transport is a stock WebSocket helper; only its socket constructor is swapped
+            // for the loopback above.
+            realtime: {
+              transports: {
+                loopback: StarGantt.webSocketTransport({
+                  url: "wss://peer.example.invalid/stargantt",
+                  webSocket: hub.Socket,
+                }),
+              },
+              connect: "loopback",
+              reconnectDelayMs: 700,
+              maxReconnectAttempts: 3,
+            },
+          }),
+        ],
+      });
+
+      const data = gantt.service("stargantt.data");
+      const sync = gantt.service("stargantt.data-sync");
+
+      data.load(dataset());
+
+      // ----------------------------------------------------------------- event wiring
+      // The abolished `realtime/statusChanged` event is now the `realtime.status` store: one
+      // notification per transition, carrying the cause and the transport name.
+      sync.realtime.status.subscribe((e) => {
+        const where = e.transport === undefined ? "" : ' via "' + e.transport + '"';
+        const label = e.status.charAt(0).toUpperCase() + e.status.slice(1);
+        rtStatusEl.textContent = label + where + (e.cause ? " (cause: " + e.cause + ")" : "");
+        log("Status: " + e.status + where + (e.cause ? " — cause " + e.cause + "." : "."));
+      });
+
+      // Counts cover only the operations actually dispatched, so a pure echo reports all zeros.
+      gantt.on("sync/realtimeApplied", (e) => {
+        const c = e.applied;
+        rtAppliedEl.textContent =
+          "Last remote message: " + c.added + " added, " + c.updated + " updated, " + c.removed + " removed" +
+          (c.added + c.updated + c.removed === 0 ? " (nothing to do — echo suppressed)" : "") + ".";
+        log("Applied: " + c.added + " added / " + c.updated + " updated / " + c.removed + " removed.");
+      });
+
+      gantt.on("sync/offlineSaved", (e) => log("Snapshot saved: " + e.tasks + " tasks."));
+      gantt.on("sync/offlineRestored", (e) => log("Snapshot restored: " + e.tasks + " tasks."));
+      gantt.on("sync/offlineCleared", () => log("Snapshot cleared."));
+
+      // Plugin faults are reported as events, not thrown — surface them in the page.
+      gantt.on("core/pluginError", (e) => log("Plugin error from " + e.pluginId + ": " + String(e.error)));
+
+      // ----------------------------------------------------------------- offline helpers
+      function offlineState(extra) {
+        const available = sync.offline.available();
+        sync.offline.persisted().then((present) => {
+          offStatusEl.textContent =
+            "IndexedDB: " + (available ? "available" : "unavailable") +
+            " · snapshot: " + (present ? "present" : "none") +
+            " · auto-save: on (400 ms debounce)" +
+            (extra ? " · " + extra : "");
+        });
+      }
+
+      function report(action, result) {
+        if (result.ok) {
+          offlineState(action + " ok" + (result.tasks === undefined ? "" : " (" + result.tasks + " tasks)"));
+        } else {
+          offlineState(action + " failed");
+          log(action + " failed: " + (result.error === undefined ? "no snapshot" : String(result.error)));
+        }
+      }
+
+      // ----------------------------------------------------------------- the simulated peer
+      // Every peer edit is a `changes` message carrying full task rows — the realtime area's wire
+      // shape (an alias of the source area's `DeltaChange`).
+      let peerEdits = 0;
+      let lastAdded = null;
+
+      function anyTaskId() {
+        for (const id of data.taskIds()) {
+          const task = data.getTask(id);
+          if (task && task.type !== "summary") return id;
+        }
+        return undefined;
+      }
+
+      /** The task the peer edits: the demo's "Design" row, or any leaf when a preset is loaded. */
+      function subject() {
+        const preferred = data.getTask("design");
+        if (preferred !== undefined) return preferred;
+        const id = anyTaskId();
+        return id === undefined ? undefined : data.getTask(id);
+      }
+
+      function send(changes) {
+        return hub.push({ type: "changes", changes });
+      }
+
+      const peer = {
+        rename() {
+          const task = subject();
+          if (task === undefined) { log("Peer has nothing to rename."); return; }
+          peerEdits += 1;
+          send([{ type: "upsert", task: Object.assign({}, task, { name: task.name.replace(/ \(peer \d+\)$/, "") + " (peer " + peerEdits + ")" }) }]);
+          log('Peer renamed "' + task.id + '".');
+        },
+        shift() {
+          const task = subject();
+          if (task === undefined) { log("Peer has nothing to move."); return; }
+          send([{ type: "upsert", task: Object.assign({}, task, { start: task.start + DAY, end: task.end + DAY }) }]);
+          log('Peer moved "' + task.id + '" one day later.');
+        },
+        add() {
+          peerEdits += 1;
+          const id = "peer-" + peerEdits;
+          const parent = data.getTask("release") === undefined ? null : "release";
+          send([{ type: "upsert", task: { id, parentId: parent, name: "Peer hotfix " + peerEdits, type: "task", start: t0 + 2 * DAY, end: t0 + 4 * DAY, progress: 0 } }]);
+          lastAdded = id;
+          log('Peer added "' + id + '".');
+        },
+        remove() {
+          let id = lastAdded !== null && data.getTask(lastAdded) !== undefined ? lastAdded : undefined;
+          if (id === undefined) id = data.getTask("qa") !== undefined ? "qa" : anyTaskId();
+          if (id === undefined) { log("Peer has nothing to delete."); return; }
+          if (id === lastAdded) lastAdded = null;
+          send([{ type: "remove", id }]);
+          log('Peer deleted "' + id + '".');
+        },
+        echo() {
+          const task = subject();
+          if (task === undefined) { log("Peer has nothing to echo."); return; }
+          send([{ type: "upsert", task: Object.assign({}, task) }]);
+          log('Peer echoed "' + task.id + '" unchanged — echo suppression drops it (no command, no undo entry).');
+        },
+        resync() {
+          hub.push({ type: "resync" });
+          // The `offline` nest above auto-registers a read-only "offline" source into the
+          // registry at setup (data-sync.md §4.4 "The offline source adapter" — gated on
+          // `offline.registerSource`, true by default), but registration alone activates
+          // nothing: this page never
+          // calls `sync.sources.activate(...)` and passes no `active` in the dataSync() config,
+          // so no source is the ACTIVE one, and that's what the source-area resync delegation
+          // needs.
+          log('Peer asked for a resync — recognized, but a no-op here: no data-sync source is active (the auto-registered "offline" source is registered, not activated), so the source-area delegation finds nothing to resync through.');
+        },
+        // `applyMessage` is the seam for hosts that own their own delivery channel.
+        direct() {
+          const task = subject();
+          if (task === undefined) { log("Nothing to apply."); return; }
+          peerEdits += 1;
+          const result = sync.realtime.applyMessage({
+            type: "changes",
+            changes: [{ type: "upsert", task: Object.assign({}, task, { progress: Math.min(1, (task.progress || 0) + 0.1) }) }],
+          });
+          log("applyMessage() returned resync=" + result.resync + ", updated=" + result.applied.updated + " (bypassing the socket entirely).");
+        },
+      };
+
+      offlineState("");
+      log("Composed offline + realtime areas of dataSync(); connecting to the in-page peer…");
+
+      // ----------------------------------------------------------------- page chrome
+      const latency = document.getElementById("rt-latency");
+      const latencyOut = document.getElementById("rt-latency-out");
+      const offlineToggle = document.getElementById("rt-offline");
+
+      function syncControls() {
+        hub.setLatency(latency.value);
+        hub.setOffline(offlineToggle.getAttribute("aria-pressed") === "true");
+      }
+
+      latency.addEventListener("input", () => {
+        latencyOut.textContent = latency.value + " ms";
+        syncControls();
+      });
+
+      offlineToggle.addEventListener("click", () => {
+        const next = offlineToggle.getAttribute("aria-pressed") !== "true";
+        offlineToggle.setAttribute("aria-pressed", String(next));
+        // The pressed state is spelled out in the label too, never signalled by color alone.
+        offlineToggle.textContent = next ? "Peer server: offline" : "Peer server: online";
+        syncControls();
+      });
+
+      document.getElementById("rt-connect").addEventListener("click", () => sync.realtime.connect("loopback"));
+      document.getElementById("rt-disconnect").addEventListener("click", () => sync.realtime.disconnect());
+      document.getElementById("rt-drop").addEventListener("click", () => hub.drop());
+
+      document.getElementById("peer-rename").addEventListener("click", () => peer.rename());
+      document.getElementById("peer-shift").addEventListener("click", () => peer.shift());
+      document.getElementById("peer-add").addEventListener("click", () => peer.add());
+      document.getElementById("peer-remove").addEventListener("click", () => peer.remove());
+      document.getElementById("peer-echo").addEventListener("click", () => peer.echo());
+      document.getElementById("peer-resync").addEventListener("click", () => peer.resync());
+      document.getElementById("peer-direct").addEventListener("click", () => peer.direct());
+
+      document.getElementById("off-save").addEventListener("click", () => sync.offline.save().then((r) => report("save", r)));
+      document.getElementById("off-restore").addEventListener("click", () => sync.offline.restore().then((r) => report("restore", r)));
+      document.getElementById("off-clear").addEventListener("click", () => sync.offline.clear().then((r) => report("clear", r)));
+      document.getElementById("off-refresh").addEventListener("click", () => offlineState(""));
+
+      syncControls();
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

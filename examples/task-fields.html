@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StarGantt v2 — Task fields and custom fields example</title>
+  <!--
+    Demonstrates the standard task-field columns (status/priority/tags/deadline/duration), their
+    bar decorations (status glyph, overdue warning, assignee avatars), the side-panel detail
+    section, and typed custom fields including two formula columns.
+
+    Design notes (read this before trusting the control panel code below):
+    - There is no `stargantt.task-fields` service (docs/specs/plugins/tree-grid.md "Internalized
+      services"): field values are edited through the grid/panel UI or written by the host via the
+      public `task/update` / `assignment/*` commands. This page's entire "Selected task" control
+      panel reads `task.meta.taskFields` directly off `stargantt.data` and writes through
+      `task/update` / `assignment/set` / `assignment/remove` — the same storage
+      (`task.meta.taskFields`, claimed by tree-grid) and the same commands the internalized field
+      logic uses. `autoRecordCompletion` (status "done" auto-stamping `actualEnd`) works with
+      this: it is a `data/willApplyTransaction` hook the tree-grid plugin registers
+      unconditionally from its config, independent of which caller dispatched `task/update`.
+    - GAP (report-only, no fake API invented): there is no `templates` API surface in this
+      codebase yet, so no Templates panel is shown. Per tree-grid.md's config table: "the
+      application path (template-driven insert) arrives with the context-menu insert flows in
+      Phase 3 — until then the machinery is resolved but has no public caller." The `templates`
+      config below is kept (it is valid, documented config shape), but no UI is wired to it, since
+      there is no call to wire it to.
+    - GAP (report-only): `taskFields.displayId(id)` (the automatic sequence-ID formatter driven by
+      `idNumbering`) has no public getter. The "Display ID" readout below shows the raw stored
+      `taskFields.customId` (falling back to the task id) instead of the formatted sequence id.
+    - `taskFields` is a nested config group under `treeGrid` (`treeGrid.taskFields`) — see
+      tree-grid.md.
+    - `customFields` nests under `dataStore` (`dataStore.customFields`) — see data-store.md. The
+      service is `stargantt.fields`, with `definitions()`/`valueOf()`/`setValue()`/`displayValue()`
+      members used below.
+    - `sidePanel` nests under `interaction` (`interaction.sidePanel`).
+    - Selection changes are observed via
+      `gantt.service("stargantt.selection").state.subscribe(render)`.
+    - Task changes are observed via `gantt.service("stargantt.data").tasks.subscribe(render)`.
+    - This page is self-contained (see examples/interaction.html for the pattern).
+  -->
+  <style>
+    body {
+      margin: 0;
+      padding: 6px 12px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+    h2 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 8px 0 4px;
+    }
+    #chart {
+      height: 420px;
+      border: 1px solid #ccc;
+    }
+    .panel {
+      margin-top: 8px;
+    }
+    dl.detail {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 2px 8px;
+      margin: 4px 0 8px;
+      font-size: 12px;
+      max-width: 640px;
+    }
+    dl.detail dt {
+      font-weight: 600;
+      color: #444;
+    }
+    dl.detail dd {
+      margin: 0;
+    }
+    .ctl-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+    }
+    fieldset {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 6px 8px;
+      min-width: 180px;
+    }
+    legend {
+      font-size: 11px;
+      font-weight: 600;
+      color: #555;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .btn-group button[aria-pressed="true"] {
+      background: #0f766e;
+      color: #fff;
+      border-color: #0f766e;
+    }
+    .hint {
+      display: block;
+      font-size: 10px;
+      color: #666;
+      margin-top: 4px;
+    }
+    ul.ctl-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 90px;
+      overflow-y: auto;
+    }
+    ul.ctl-list li {
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <h1>StarGantt v2 — task fields and custom fields</h1>
+  <div id="chart"></div>
+
+  <section class="panel" aria-labelledby="panelHeading">
+    <h2 id="panelHeading">Selected task</h2>
+    <p id="selStatus" role="status" aria-live="polite">Select a task row to edit its fields.</p>
+
+    <dl class="detail" id="selDetail"></dl>
+
+    <div class="ctl-grid">
+      <fieldset>
+        <legend>Status</legend>
+        <div class="btn-group" id="statusRow">
+          <button type="button" data-status="not-started" aria-pressed="false" disabled><span aria-hidden="true">○</span> Not started</button>
+          <button type="button" data-status="in-progress" aria-pressed="false" disabled><span aria-hidden="true">▶</span> In progress</button>
+          <button type="button" data-status="done" aria-pressed="false" disabled><span aria-hidden="true">✓</span> Done</button>
+          <button type="button" data-status="on-hold" aria-pressed="false" disabled><span aria-hidden="true">‖</span> On hold</button>
+        </div>
+        <span class="hint">Pressing the active status again clears the field. Setting <em>Done</em> also stamps the actual end date inside the same undo step.</span>
+      </fieldset>
+
+      <fieldset>
+        <legend>Priority</legend>
+        <label for="prioritySelect">Priority</label>
+        <select id="prioritySelect" disabled>
+          <option value="">—</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <span class="hint">Writes through <code>task/update</code> — one undo step.</span>
+      </fieldset>
+
+      <fieldset>
+        <legend>Duration</legend>
+        <label for="durationInput">Days</label>
+        <input type="number" id="durationInput" min="0.25" step="0.25" disabled />
+        <button type="button" id="durationApply" disabled>Set duration</button>
+        <span class="hint">Moves the end date only, via <code>task/update</code>.</span>
+      </fieldset>
+
+      <fieldset>
+        <legend>Assignees</legend>
+        <ul class="ctl-list" id="assigneeList"></ul>
+        <span class="hint">Writes through <code>assignment/set</code> / <code>assignment/remove</code>; up to three initials are drawn after the bar, then <code>+n</code>.</span>
+      </fieldset>
+
+      <fieldset>
+        <legend>Custom field: Budget</legend>
+        <button type="button" id="budgetUp" disabled>Budget +5</button>
+        <button type="button" id="budgetClear" disabled>Clear budget</button>
+        <span class="hint"><code>stargantt.fields.setValue()</code>; the Remaining and Flag formula columns recompute on read.</span>
+      </fieldset>
+    </div>
+  </section>
+
+  <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+  <script>
+    const DAY = 86400000;
+    // Day-floored "today" — the default time-axis origin — so the data opens in view.
+    const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+    function dataset() {
+      return {
+        tasks: [
+          {
+            id: "epic", parentId: null, name: "Payments revamp", type: "summary",
+            start: T0 - 5 * DAY, end: T0 + 16 * DAY,
+          },
+          {
+            id: "discovery", parentId: "epic", name: "Discovery", type: "task",
+            start: T0 - 5 * DAY, end: T0 - 2 * DAY, progress: 1,
+            meta: {
+              taskFields: {
+                status: "done", priority: "medium", tags: ["research"],
+                customId: "PR-001",
+                actualStart: T0 - 5 * DAY, actualEnd: T0 - 2 * DAY,
+                notes: "Signed off by the payments council.",
+              },
+              customFields: {
+                vendor: "Northwind", budget: 18, costCenter: "Platform",
+                signOff: T0 - 2 * DAY, internalRef: "REF-0912",
+              },
+            },
+          },
+          {
+            id: "api", parentId: "epic", name: "API design", type: "task",
+            start: T0 - 4 * DAY, end: T0 + 1 * DAY, progress: 0.9,
+            meta: {
+              // Deadline in the past on a task that is not done: the Deadline cell gets a " !"
+              // suffix and the bar gets a warning triangle.
+              taskFields: {
+                status: "in-progress", priority: "high", tags: ["api", "design"],
+                deadline: T0 - 1 * DAY, actualStart: T0 - 4 * DAY,
+              },
+              customFields: {
+                vendor: "Acme", budget: 42, costCenter: "Platform", internalRef: "REF-1043",
+              },
+            },
+          },
+          {
+            id: "checkout", parentId: "epic", name: "Checkout UI", type: "task",
+            start: T0 - 1 * DAY, end: T0 + 6 * DAY, progress: 0.4,
+            meta: {
+              taskFields: {
+                status: "in-progress", priority: "medium", tags: ["ui"],
+                deadline: T0 + 5 * DAY, actualStart: T0 - 1 * DAY,
+              },
+              customFields: {
+                vendor: "Bright", budget: 60, costCenter: "Design", internalRef: "REF-1101",
+              },
+            },
+          },
+          {
+            id: "fraud", parentId: "epic", name: "Fraud rules", type: "task",
+            start: T0 + 2 * DAY, end: T0 + 8 * DAY, progress: 0,
+            meta: {
+              taskFields: { status: "on-hold", priority: "high", deadline: T0 + 7 * DAY },
+              customFields: {
+                vendor: "Sentinel", budget: 26, costCenter: "QA", internalRef: "REF-1150",
+              },
+            },
+          },
+          {
+            id: "tests", parentId: "epic", name: "Integration tests", type: "task",
+            start: T0 + 6 * DAY, end: T0 + 12 * DAY, progress: 0,
+            meta: {
+              taskFields: { status: "not-started", priority: "low", deadline: T0 + 13 * DAY },
+              customFields: { vendor: "Sentinel", budget: 12, costCenter: "QA" },
+            },
+          },
+          {
+            id: "launch", parentId: "epic", name: "Launch review", type: "milestone",
+            start: T0 + 14 * DAY, end: T0 + 14 * DAY,
+            meta: { taskFields: { status: "not-started", priority: "high", deadline: T0 + 14 * DAY } },
+          },
+          {
+            id: "enablement", parentId: null, name: "Enablement", type: "task",
+            start: T0 + 9 * DAY, end: T0 + 16 * DAY, progress: 0,
+            meta: {
+              taskFields: { status: "not-started", priority: "medium" },
+              customFields: { vendor: "In-house", budget: 8, costCenter: "Design" },
+            },
+          },
+        ],
+        links: [
+          { sourceId: "discovery", targetId: "api", type: "FS" },
+          { sourceId: "api", targetId: "checkout", type: "FS" },
+          { sourceId: "api", targetId: "fraud", type: "FS" },
+          { sourceId: "checkout", targetId: "tests", type: "FS" },
+          { sourceId: "tests", targetId: "launch", type: "FS" },
+        ],
+        resources: [
+          { id: "r1", name: "Ada Chen" },
+          { id: "r2", name: "Grace Ito" },
+          { id: "r3", name: "Rui Costa" },
+          { id: "r4", name: "Nils Berg" },
+          { id: "r5", name: "Mira Patel" },
+        ],
+        assignments: [
+          { taskId: "discovery", resourceId: "r1", units: 1 },
+          { taskId: "api", resourceId: "r1", units: 0.5 },
+          { taskId: "api", resourceId: "r2", units: 1 },
+          // Four assignees: three initials plus a "+1" badge after the bar.
+          { taskId: "checkout", resourceId: "r2", units: 0.5 },
+          { taskId: "checkout", resourceId: "r3", units: 1 },
+          { taskId: "checkout", resourceId: "r4", units: 1 },
+          { taskId: "checkout", resourceId: "r5", units: 0.5 },
+          { taskId: "fraud", resourceId: "r3", units: 1 },
+          { taskId: "tests", resourceId: "r4", units: 1 },
+        ],
+      };
+    }
+
+    // `grid/columns` is a collect point that preserves plugin start-up order, and this page-local
+    // plugin depends only on the data store (starting before tree-grid, whose own built-ins would
+    // otherwise land to the left of it) — so its "Name" column stays leftmost even though the
+    // built-in Name/Start/End/Progress are dropped with `treeGrid.columns: []` below.
+    const nameColumn = StarGantt.definePlugin({
+      meta: { id: "demo.name-column", dependsOn: ["stargantt.data-store"] },
+      setup(ctx) {
+        ctx.contribute("grid/columns", {
+          id: "name",
+          header: "Name",
+          width: 200,
+          render(el, task) {
+            el.textContent = task.name;
+          },
+          getValue: (task) => task.name,
+          setValue: (task, value) => {
+            task.name = String(value);
+          },
+          compare: (a, b) => String(a.name).localeCompare(String(b.name)),
+        });
+      },
+    });
+
+    const gantt = StarGantt.create({
+      element: document.getElementById("chart"),
+      plugins: [
+        // Registered first so it also contributes first (see the comment above).
+        nameColumn,
+        ...StarGantt.presetStandard({
+          view: { timeline: { origin: T0 - 6 * DAY } },
+          treeGrid: {
+            paneWidth: 460,
+            columns: [],
+            taskFields: {
+              columns: ["id", "status", "priority", "deadline", "duration"],
+              idNumbering: { prefix: "T-", start: 1, minDigits: 3 },
+              durationUnit: "days",
+              showStatusOnBars: true,
+              showDeadlineWarnings: true,
+              showAssigneeAvatars: true,
+              detailFields: true,
+              autoRecordCompletion: true,
+              // See the file header GAP note: this config is resolved but currently has no
+              // public caller (context-menu template insert lands in a later phase), so the
+              // page shows no Templates UI for it.
+              templates: {
+                "Design review": {
+                  name: "Design review",
+                  durationMs: 2 * DAY,
+                  fields: { status: "not-started", priority: "high", tags: ["review", "design"] },
+                },
+                "Bug triage": {
+                  name: "Bug triage",
+                  durationMs: 1 * DAY,
+                  fields: { status: "in-progress", priority: "medium", tags: ["bug"] },
+                },
+                "Release gate": {
+                  name: "Release gate",
+                  durationMs: 3 * DAY,
+                  fields: { status: "on-hold", priority: "high", tags: ["release", "gate"] },
+                },
+              },
+            },
+          },
+          dataStore: {
+            customFields: {
+              fields: [
+                { key: "vendor", type: "text", label: "Vendor", width: 100 },
+                { key: "budget", type: "number", label: "Budget k$", width: 90 },
+                { key: "signOff", type: "date", label: "Sign-off", width: 100 },
+                {
+                  key: "costCenter",
+                  type: "select",
+                  label: "Cost center",
+                  width: 105,
+                  options: ["Platform", "Design", "QA"],
+                },
+                {
+                  key: "remaining",
+                  type: "formula",
+                  label: "Remaining k$",
+                  width: 100,
+                  formula: "ROUND(budget * (1 - progress), 2)",
+                },
+                {
+                  key: "flag",
+                  type: "formula",
+                  label: "Flag",
+                  width: 115,
+                  formula: 'IF(remaining > 20, "! " & costCenter & " at risk", "ok")',
+                },
+                { key: "internalRef", type: "text", label: "Internal ref", column: false },
+              ],
+            },
+          },
+          interaction: {
+            // The right-hand detail pane, so the task-fields side-panel section (tags, notes,
+            // deadline, actual start/end) has somewhere to mount.
+            sidePanel: {},
+          },
+        }),
+      ],
+    });
+    window.gantt = gantt;
+
+    const dataService = gantt.service("stargantt.data");
+    const fieldsService = gantt.service("stargantt.fields");
+    const selectionService = gantt.service("stargantt.selection");
+
+    dataService.load(dataset());
+
+    // Open on a task that shows the overdue mark, the status glyph and two avatars at once.
+    if (dataService.getTask("api") !== undefined) {
+      selectionService.select(["api"]);
+    }
+
+    /* --- reading/writing task.meta.taskFields directly (see file header) -------------------- */
+
+    function taskFieldsOf(task) {
+      return (task && task.meta && task.meta.taskFields) || {};
+    }
+
+    function updateTaskFields(id, patch) {
+      const task = dataService.getTask(id);
+      if (!task) return;
+      const nextFields = Object.assign({}, taskFieldsOf(task), patch);
+      Object.keys(nextFields).forEach((key) => {
+        if (nextFields[key] === undefined) delete nextFields[key];
+      });
+      const meta = Object.assign({}, task.meta, { taskFields: nextFields });
+      gantt.dispatch("task/update", { id, after: { meta } });
+    }
+
+    function isOverdue(f) {
+      return typeof f.deadline === "number" && Number.isFinite(f.deadline)
+        && f.deadline < Date.now() && f.status !== "done";
+    }
+
+    function durationOf(task) {
+      if (typeof task.start !== "number" || typeof task.end !== "number") return undefined;
+      return (task.end - task.start) / DAY;
+    }
+
+    function assigneesOf(id) {
+      const byTask = dataService.assignments.get();
+      const rows = byTask.get(id) || [];
+      const resources = dataService.resources.get();
+      return rows.map((a) => resources.get(a.resourceId)).filter((r) => r !== undefined);
+    }
+
+    /* --- controls ---------------------------------------------------------------------------- */
+
+    const STATUS_LABELS = {
+      "not-started": "Not started",
+      "in-progress": "In progress",
+      done: "Done",
+      "on-hold": "On hold",
+    };
+    const PRIORITY_LABELS = { high: "High", medium: "Medium", low: "Low" };
+
+    const statusRow = document.getElementById("statusRow");
+    const statusButtons = Array.from(statusRow.querySelectorAll("button"));
+    const prioritySelect = document.getElementById("prioritySelect");
+    const durationInput = document.getElementById("durationInput");
+    const durationApply = document.getElementById("durationApply");
+    const assigneeList = document.getElementById("assigneeList");
+    const budgetUp = document.getElementById("budgetUp");
+    const budgetClear = document.getElementById("budgetClear");
+    const selStatus = document.getElementById("selStatus");
+    const selDetail = document.getElementById("selDetail");
+
+    function currentId() {
+      const it = selectionService.state.get().taskIds.values().next();
+      return it.done ? undefined : it.value;
+    }
+
+    function isoDay(ms) {
+      return typeof ms === "number" && isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : "—";
+    }
+
+    function addDetail(term, value) {
+      const dt = document.createElement("dt");
+      dt.textContent = term;
+      const dd = document.createElement("dd");
+      dd.textContent = value;
+      selDetail.appendChild(dt);
+      selDetail.appendChild(dd);
+    }
+
+    function setEnabled(enabled) {
+      statusButtons.forEach((b) => { b.disabled = !enabled; });
+      prioritySelect.disabled = !enabled;
+      durationInput.disabled = !enabled;
+      durationApply.disabled = !enabled;
+      budgetUp.disabled = !enabled;
+      budgetClear.disabled = !enabled;
+      assigneeList.querySelectorAll("input").forEach((i) => { i.disabled = !enabled; });
+    }
+
+    function renderAssignees(id) {
+      const resources = Array.from(dataService.resources.get().values());
+      const assigned = id === undefined ? [] : assigneesOf(id).map((r) => String(r.id));
+      const boxes = Array.from(assigneeList.querySelectorAll("input"));
+      const sameSet = boxes.length === resources.length
+        && boxes.every((box, i) => box.value === String(resources[i].id));
+      if (sameSet) {
+        boxes.forEach((box) => {
+          box.checked = assigned.indexOf(box.value) !== -1;
+          box.disabled = id === undefined;
+        });
+        return;
+      }
+      assigneeList.textContent = "";
+      resources.forEach((resource) => {
+        const li = document.createElement("li");
+        const label = document.createElement("label");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.value = String(resource.id);
+        box.checked = assigned.indexOf(String(resource.id)) !== -1;
+        box.disabled = id === undefined;
+        box.addEventListener("change", () => {
+          const target = currentId();
+          if (target === undefined) return;
+          if (box.checked) {
+            gantt.dispatch("assignment/set", { taskId: target, resourceId: resource.id, units: 1 });
+          } else {
+            gantt.dispatch("assignment/remove", { taskId: target, resourceId: resource.id });
+          }
+          announce("Assignees updated.");
+        });
+        const text = document.createElement("span");
+        text.textContent = resource.name;
+        label.appendChild(box);
+        label.appendChild(text);
+        li.appendChild(label);
+        assigneeList.appendChild(li);
+      });
+    }
+
+    function announce(text) {
+      selStatus.textContent = text;
+    }
+
+    function render() {
+      selDetail.textContent = "";
+      const id = currentId();
+      setEnabled(id !== undefined);
+      renderAssignees(id);
+
+      if (id === undefined) {
+        statusButtons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+        prioritySelect.value = "";
+        durationInput.value = "";
+        announce("Select a task row to edit its fields.");
+        return;
+      }
+
+      const task = dataService.getTask(id);
+      const f = taskFieldsOf(task);
+      statusButtons.forEach((b) => {
+        b.setAttribute("aria-pressed", f.status === b.dataset.status ? "true" : "false");
+      });
+      prioritySelect.value = f.priority || "";
+      const duration = durationOf(task);
+      durationInput.value = duration === undefined ? "" : String(Math.round(duration * 100) / 100);
+
+      // See the file header GAP note: no public `displayId()` getter exists in v2, so this shows
+      // the raw stored `customId` (falling back to the task id) instead of the formatted
+      // idNumbering sequence.
+      addDetail("Display ID (raw)", f.customId || String(id));
+      addDetail("Name", task ? task.name : String(id));
+      addDetail("Status", f.status ? STATUS_LABELS[f.status] : "—");
+      addDetail("Priority", f.priority ? PRIORITY_LABELS[f.priority] : "—");
+      addDetail("Tags", f.tags && f.tags.length ? f.tags.join(", ") : "—");
+      addDetail("Deadline", isoDay(f.deadline) + (isOverdue(f) ? "  (overdue!)" : ""));
+      addDetail("Actual start", isoDay(f.actualStart));
+      addDetail("Actual end", isoDay(f.actualEnd));
+      addDetail("Duration", duration === undefined ? "—" : Math.round(duration * 100) / 100 + " d");
+      addDetail("Assignees", assigneesOf(id).map((r) => r.name).join(", ") || "—");
+      addDetail("Notes", f.notes ? f.notes : "—");
+      fieldsService.definitions().forEach((def) => {
+        const shown = fieldsService.displayValue(id, def.key);
+        addDetail(
+          def.label + (def.type === "formula" ? " (formula)" : def.column ? "" : " (no column)"),
+          shown === "" ? "—" : shown,
+        );
+      });
+      announce("Editing " + (task ? task.name : String(id)) + ".");
+    }
+
+    statusButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = currentId();
+        if (id === undefined) return;
+        const wanted = button.dataset.status;
+        const next = taskFieldsOf(dataService.getTask(id)).status === wanted ? undefined : wanted;
+        updateTaskFields(id, { status: next });
+        announce(next === undefined ? "Status cleared." : "Status set to " + STATUS_LABELS[next] + ".");
+      });
+    });
+
+    prioritySelect.addEventListener("change", () => {
+      const id = currentId();
+      if (id === undefined) return;
+      const value = prioritySelect.value;
+      updateTaskFields(id, { priority: value === "" ? undefined : value });
+      announce(value === "" ? "Priority cleared." : "Priority set to " + PRIORITY_LABELS[value] + ".");
+    });
+
+    durationApply.addEventListener("click", () => {
+      const id = currentId();
+      if (id === undefined) return;
+      const value = Number(durationInput.value);
+      if (!isFinite(value) || value <= 0) {
+        announce("Enter a duration greater than zero.");
+        return;
+      }
+      const task = dataService.getTask(id);
+      gantt.dispatch("task/update", { id, after: { end: task.start + value * DAY } });
+      announce("Duration set to " + value + " days.");
+    });
+
+    budgetUp.addEventListener("click", () => {
+      const id = currentId();
+      if (id === undefined) return;
+      const current = fieldsService.valueOf(id, "budget");
+      const next = (typeof current === "number" ? current : 0) + 5;
+      fieldsService.setValue(id, "budget", next);
+      announce("Budget set to " + next + " k$.");
+    });
+
+    budgetClear.addEventListener("click", () => {
+      const id = currentId();
+      if (id === undefined) return;
+      fieldsService.setValue(id, "budget", undefined);
+      announce("Budget cleared — the formula columns now evaluate to nothing.");
+    });
+
+    selectionService.state.subscribe(render);
+    dataService.tasks.subscribe(render);
+    render();
+  </script>
+</body>
+</html>

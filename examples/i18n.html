@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — I18n example</title>
+    <!--
+      Demonstrates the OPT-IN `StarGantt.i18n()` plugin plus the `StarGantt.createDictionary()`
+      hostless helper. The `I18nService` exposes a `state` store (`svc.state.get().locale` /
+      `.fallbacks` / `.resolutionOrder` / `.locales`), and `svc.state.subscribe(...)` notifies on
+      change. `t()`, `has()`, `catalog()`, `setLocale()`, `setFallbacks()`, `add()`, `remove()`
+      round out the service.
+
+      Multi-plugin catalog sharing is demonstrated through the single `interaction` plugin (part
+      of `presetStandard()`): its side-panel, edit-dialog, context-menu, and zoom-controls
+      surfaces are nested groups of that one plugin, and per interaction.md §8 they share one
+      `InteractionMessages` catalog under interaction's top-level `messages` field — 58 keys, with
+      8 colliding key names (between the dialog and panel surfaces) disambiguated by a `dialog*` /
+      `panel*` prefix (`dialogNameLabel` / `panelNameLabel`, etc.); the non-colliding keys
+      (context-menu, zoom-controls, and the panel's non-colliding members) stay unprefixed. This
+      page's dictionary keys, `DEFAULTS`/`BUILDERS` tables, and the "catalog(prefix, defaults)"
+      panel's prefix list use one `"interaction.*"` translation namespace and one
+      `dict.catalog("interaction", INTERACTION_DEFAULTS)` call. `treeGrid`, `taskBars`, and
+      `undoRedo` keep their own separate `messages` fields and catalogs.
+
+      This page follows the convention already established by the example corpus (see
+      `examples/column-editing-sort.html`): a local `boot()` function that disposes the previous
+      `GanttInstance` (`gantt.dispose()`) and creates a fresh one on a language change, since every
+      official plugin resolves its `messages` catalog once at `setup()` and never re-reads it —
+      exactly the point this page demonstrates.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      #chart {
+        height: 320px;
+        border: 1px solid #ccc;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 6px 0;
+      }
+      .group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .group-label {
+        font-size: 11px;
+        color: #555;
+      }
+      .toolbar button {
+        min-height: 24px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .panels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 6px 0;
+      }
+      .panel {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 6px 8px;
+        min-width: 250px;
+        flex: 1 1 250px;
+      }
+      .panel h2 {
+        font-size: 12px;
+        margin: 0 0 4px;
+      }
+      .panel input,
+      .panel select,
+      .panel button {
+        font: inherit;
+        min-height: 24px;
+      }
+      output,
+      .readout {
+        display: block;
+        font-size: 11px;
+        white-space: pre-wrap;
+        color: #333;
+        margin: 4px 0;
+      }
+      #event-log {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-size: 11px;
+        max-height: 80px;
+        overflow-y: auto;
+      }
+      .note {
+        margin: 8px 0 0;
+        padding: 6px 10px;
+        border-left: 3px solid #888;
+        background: #f6f6f6;
+        font-size: 12px;
+      }
+      .note h2 {
+        font-size: 12px;
+        margin: 0 0 4px;
+      }
+      .note ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .note li {
+        margin: 0 0 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — internationalization (i18n)</h1>
+    <details>
+      <summary>What's on this page</summary>
+      One dictionary (<code>createDictionary()</code>), shared by <code>treeGrid</code>,
+      <code>taskBars</code>, <code>undoRedo</code> and the merged <code>interaction</code> plugin's
+      side panel / edit dialog / context menu / zoom toolbar, plus the runtime
+      <code>stargantt.i18n</code> service for live lookups. The chart itself does not re-translate
+      live: every plugin resolves its catalog once at setup, so a language change re-creates the
+      chart (the buttons below do this).
+    </details>
+
+    <div class="toolbar">
+      <div class="group">
+        <span class="group-label" id="lang-label">Chart language (re-creates the chart)</span>
+        <div role="group" aria-labelledby="lang-label" id="lang-buttons">
+          <button type="button" data-locale="en" aria-pressed="false">English</button>
+          <button type="button" data-locale="ja" aria-pressed="true" lang="ja">日本語</button>
+          <button type="button" data-locale="ja-JP" aria-pressed="false" lang="ja">日本語 (ja-JP)</button>
+          <button type="button" data-locale="fr" aria-pressed="false" lang="fr">Français (partial)</button>
+        </div>
+      </div>
+      <div class="group">
+        <span class="group-label"><label for="fallback-input">Fallback chain</label></span>
+        <div>
+          <input type="text" id="fallback-input" value="en" size="14" aria-describedby="fallback-hint" />
+          <button type="button" id="apply-fallback">Apply &amp; re-create</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="chart"></div>
+
+    <div class="panels">
+      <section class="panel">
+        <h2>Live dictionary service</h2>
+        <p class="readout" id="fallback-hint">
+          These controls talk to <code>gantt.service("stargantt.i18n")</code> at runtime. The chart
+          above deliberately does not re-translate.
+        </p>
+        <label for="svc-locale">Service locale</label>
+        <select id="svc-locale">
+          <option value="en">en</option>
+          <option value="ja">ja</option>
+          <option value="ja-JP">ja-JP</option>
+          <option value="ja-JP-u-ca-japanese">ja-JP-u-ca-japanese</option>
+          <option value="fr">fr</option>
+          <option value="de">de (unregistered)</option>
+        </select>
+        <button type="button" id="ja-table-toggle" aria-pressed="true">ja table registered</button>
+        <output id="chain-readout" for="svc-locale"></output>
+      </section>
+
+      <section class="panel">
+        <h2>Key lookup</h2>
+        <p class="readout">A miss returns <code>undefined</code> — the plugin then keeps its own English default.</p>
+        <label for="lookup-key">Key</label>
+        <input type="text" id="lookup-key" value="treeGrid.nameColumn" list="key-list" spellcheck="false" />
+        <datalist id="key-list"></datalist>
+        <button type="button" id="lookup-btn">Look up</button>
+        <output id="lookup-readout" for="lookup-key"></output>
+      </section>
+
+      <section class="panel">
+        <h2>catalog(prefix, defaults)</h2>
+        <p class="readout">The exact object handed to a sibling plugin's <code>messages</code> field.</p>
+        <label for="catalog-prefix">Prefix</label>
+        <select id="catalog-prefix">
+          <option value="treeGrid">treeGrid</option>
+          <option value="interaction">interaction</option>
+          <option value="taskBars">taskBars</option>
+          <option value="undoRedo">undoRedo</option>
+        </select>
+        <output id="catalog-readout" for="catalog-prefix"></output>
+      </section>
+
+      <section class="panel">
+        <h2>i18n dictionary state changes</h2>
+        <p class="readout">Emitted (via the <code>state</code> store) for every observable dictionary change.</p>
+        <ul id="event-log" aria-live="polite" aria-relevant="additions"></ul>
+      </section>
+    </div>
+
+    <div class="note">
+      <h2>What to look for</h2>
+      <ul>
+        <li><strong>One dictionary, many plugins</strong>: the grid headers, the detail pane on the
+          right, the zoom toolbar in the chart's corner and the right-click menu all read their
+          text from the same inline translation table via <code>catalog()</code>.</li>
+        <li><strong>Regional overrides</strong>: <code>ja-JP</code> only defines three keys;
+          everything else resolves through the shortened prefix <code>ja</code>, then through
+          <code>en</code>.</li>
+        <li><strong>Partial dictionaries degrade cleanly</strong>: <code>fr</code> translates three
+          grid headers and nothing else, so the rest of the chart stays on its built-in English
+          defaults.</li>
+        <li><strong>Wording vs. formatting</strong>: the dictionary only carries wording. The
+          language buttons also set <code>GanttOptions.locale</code>, which the timeline header
+          uses for its <code>Intl</code> month and day labels; the grid's built-in date columns
+          stay locale-neutral ISO by contract, so this page passes its own
+          <code>Intl.DateTimeFormat</code> through <code>formatDate</code> to localize them.</li>
+        <li><strong>Builders are host code</strong>: a dictionary can only carry strings, so the
+          pane's composed lines — the "← task (FS)" dependencies, the "name × units" assignments,
+          the "n tasks selected" summary — come from functions supplied next to the catalog, where
+          word order and pluralization belong.</li>
+        <li><strong>Announcements too</strong>: undo/redo speaks its outcome through the focus
+          service using the translated <code>undoRedo</code> catalog.</li>
+        <li><strong>Task names are your data</strong>: the dictionary translates chart chrome, not
+          the rows — localizing task text is the host's job.</li>
+      </ul>
+    </div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: 1, parentId: null, name: "Localized product launch", type: "summary", start: T0, end: T0 + 24 * DAY },
+            { id: 2, parentId: 1, name: "Discovery", type: "task", start: T0, end: T0 + 4 * DAY, progress: 1 },
+            { id: 3, parentId: 1, name: "Localization audit", type: "task", start: T0 + 3 * DAY, end: T0 + 8 * DAY, progress: 0.7 },
+            { id: 4, parentId: 1, name: "Implementation", type: "summary", start: T0 + 6 * DAY, end: T0 + 20 * DAY },
+            { id: 5, parentId: 4, name: "UI string extraction", type: "task", start: T0 + 6 * DAY, end: T0 + 12 * DAY, progress: 0.5 },
+            { id: 6, parentId: 4, name: "Date and number formats", type: "task", start: T0 + 10 * DAY, end: T0 + 16 * DAY, progress: 0.25 },
+            { id: 7, parentId: 4, name: "Locale QA", type: "task", start: T0 + 15 * DAY, end: T0 + 20 * DAY, progress: 0 },
+            { id: 8, parentId: 1, name: "Release", type: "milestone", start: T0 + 22 * DAY, end: T0 + 22 * DAY },
+          ],
+          links: [
+            { id: "l1", sourceId: 2, targetId: 3, type: "FS" },
+            { id: "l2", sourceId: 3, targetId: 5, type: "FS" },
+            { id: "l3", sourceId: 5, targetId: 6, type: "FS" },
+            { id: "l4", sourceId: 6, targetId: 7, type: "FS" },
+            { id: "l5", sourceId: 7, targetId: 8, type: "FS" },
+          ],
+          resources: [
+            { id: "r1", name: "Ayaka", capacity: 1 },
+            { id: "r2", name: "Ben", capacity: 1 },
+            { id: "r3", name: "Chloé", capacity: 0.5 },
+          ],
+          assignments: [
+            { taskId: 2, resourceId: "r1", units: 1 },
+            { taskId: 3, resourceId: "r2", units: 1 },
+            { taskId: 5, resourceId: "r1", units: 1 },
+            { taskId: 6, resourceId: "r3", units: 0.5 },
+            { taskId: 7, resourceId: "r2", units: 1 },
+          ],
+        };
+      }
+
+      // ---- The dictionary -------------------------------------------------
+      // Flat "<pluginCamelName>.<messageKey>" keys, which is the shape catalog() assumes. "en"
+      // needs no table: a lookup miss returns undefined and each plugin keeps its own built-in
+      // English default. `treeGrid` / `taskBars` / `undoRedo` each keep their own namespace; the
+      // side-panel, edit-dialog, context-menu, and zoom-controls surfaces share one
+      // `interaction.*` namespace (interaction.md §8's `InteractionMessages` catalog), with the 8
+      // colliding names disambiguated by `dialog*` / `panel*` prefixes.
+      const TRANSLATIONS = {
+        ja: {
+          "treeGrid.nameColumn": "名前",
+          "treeGrid.startColumn": "開始",
+          "treeGrid.endColumn": "終了",
+          "treeGrid.progressColumn": "進捗",
+          "treeGrid.wbsColumn": "WBS",
+          "treeGrid.newTaskName": "新しいタスク",
+          "taskBars.empty": "タスクがありません",
+          "undoRedo.undone": "元に戻しました",
+          "undoRedo.redone": "やり直しました",
+          "interaction.panelNameLabel": "名前",
+          "interaction.panelStartLabel": "開始",
+          "interaction.panelEndLabel": "終了",
+          "interaction.panelProgressLabel": "進捗",
+          "interaction.dependenciesLabel": "依存関係",
+          "interaction.resourcesLabel": "リソース",
+          "interaction.noSelection": "タスクが選択されていません",
+          "interaction.noDependencies": "なし",
+          "interaction.dialogTitle": "タスクを編集",
+          "interaction.dialogSave": "保存",
+          "interaction.dialogCancel": "キャンセル",
+          "interaction.dialogNameLabel": "名前",
+          "interaction.dialogStartLabel": "開始",
+          "interaction.dialogEndLabel": "終了",
+          "interaction.dialogProgressLabel": "進捗",
+          "interaction.dialogErrorInvalidDate": "日付を YYYY-MM-DD 形式で入力してください",
+          "interaction.dialogErrorDateOrder": "終了日は開始日より後にしてください",
+          "interaction.dialogErrorProgressRange": "進捗は 0 から 1 の数値で入力してください",
+          "interaction.panelErrorInvalidDate": "日付を YYYY-MM-DD 形式で入力してください",
+          "interaction.panelErrorDateOrder": "終了日は開始日より後にしてください",
+          "interaction.panelErrorProgressRange": "進捗は 0 から 1 の数値で入力してください",
+          "interaction.menuLabel": "コンテキストメニュー",
+          "interaction.insertTask": "タスクを挿入",
+          "interaction.duplicateTask": "タスクを複製",
+          "interaction.deleteTask": "タスクを削除",
+          "interaction.linkFrom": "ここから依存関係を作成",
+          "interaction.linkTo": "ここへ依存関係を接続",
+          "interaction.cancelLink": "依存関係の作成を中止",
+          "interaction.newTaskName": "新しいタスク",
+          "interaction.toolbar": "ズーム操作",
+          "interaction.zoomIn": "拡大",
+          "interaction.zoomOut": "縮小",
+          "interaction.zoomSlider": "ズームレベル",
+          "interaction.fit": "全体表示",
+          "interaction.today": "今日",
+          "interaction.selection": "選択中のタスク",
+        },
+        // A regional table holding only what differs: everything else resolves through the
+        // shortened prefix "ja", then through the terminal "en".
+        "ja-JP": {
+          "treeGrid.startColumn": "開始日",
+          "treeGrid.endColumn": "終了日",
+          "interaction.dialogSave": "保存する",
+        },
+        // Deliberately partial: three headers translated, the rest left to the English defaults.
+        fr: {
+          "treeGrid.nameColumn": "Nom",
+          "treeGrid.startColumn": "Début",
+          "treeGrid.endColumn": "Fin",
+        },
+      };
+
+      // ---- Defaults the catalogs are built from ---------------------------
+      // catalog() returns a copy of these with every key the dictionary resolves replaced, so the
+      // English text here is what a miss falls back to. `treeGrid` / `taskBars` / `undoRedo`
+      // each have their own table; `interaction` uses the merged 58-key `InteractionMessages`
+      // shape covering side-panel/edit-dialog/context-menu/zoom-controls (subset used by this
+      // page).
+      const DEFAULTS = {
+        treeGrid: {
+          nameColumn: "Name", startColumn: "Start", endColumn: "End",
+          progressColumn: "Progress", wbsColumn: "WBS", newTaskName: "New task",
+        },
+        taskBars: { empty: "No tasks" },
+        undoRedo: { undone: "Undone", redone: "Redone" },
+        interaction: {
+          // side-panel
+          panelNameLabel: "Name", panelStartLabel: "Start", panelEndLabel: "End", panelProgressLabel: "Progress",
+          dependenciesLabel: "Dependencies", resourcesLabel: "Resources",
+          noSelection: "No task selected", noDependencies: "None",
+          panelErrorInvalidDate: "Enter a valid date (YYYY-MM-DD)",
+          panelErrorDateOrder: "End date must be after the start date",
+          panelErrorProgressRange: "Progress must be a number between 0 and 1",
+          // edit-dialog
+          dialogTitle: "Edit task", dialogSave: "Save", dialogCancel: "Cancel",
+          dialogNameLabel: "Name", dialogStartLabel: "Start", dialogEndLabel: "End", dialogProgressLabel: "Progress",
+          dialogErrorInvalidDate: "Enter a valid date (YYYY-MM-DD)",
+          dialogErrorDateOrder: "End date must be after the start date",
+          dialogErrorProgressRange: "Progress must be a number between 0 and 1",
+          // context-menu
+          menuLabel: "Context menu", insertTask: "Insert task", duplicateTask: "Duplicate task",
+          deleteTask: "Delete task", linkFrom: "Start link from here",
+          linkTo: "Link here from source", cancelLink: "Cancel link", newTaskName: "New task",
+          // zoom-controls
+          toolbar: "Zoom controls", zoomIn: "Zoom in", zoomOut: "Zoom out",
+          zoomSlider: "Zoom level", fit: "Fit", today: "Today", selection: "Selected task",
+        },
+      };
+
+      // A dictionary can only carry strings, so the side panel's line builders (multiSelection,
+      // incomingLink, outgoingLink, assignment — all merged into the `interaction` catalog, none
+      // renamed) are ordinary host code picked by base language and merged over the catalog.
+      const BUILDERS = {
+        ja: {
+          multiSelection: (count) => `${count} 件のタスクを選択中`,
+          incomingLink: (parts) => `← ${parts.name}（${parts.type}）`,
+          outgoingLink: (parts) => `→ ${parts.name}（${parts.type}）`,
+          assignment: (parts) => `${parts.name} × ${parts.units}`,
+        },
+        fr: {
+          multiSelection: (count) => (count > 1 ? `${count} tâches sélectionnées` : "1 tâche sélectionnée"),
+        },
+      };
+
+      // ---- page state -------------------------------------------------
+      // The language buttons store their choice here and call boot() again.
+      let settings = { locale: "ja", fallbacks: ["en"] };
+      let gantt;
+      let statusUnsubscribe = null;
+
+      const chainReadout = document.getElementById("chain-readout");
+      const lookupKeyEl = document.getElementById("lookup-key");
+      const lookupReadout = document.getElementById("lookup-readout");
+      const catalogPrefixEl = document.getElementById("catalog-prefix");
+      const catalogReadout = document.getElementById("catalog-readout");
+      const keyList = document.getElementById("key-list");
+      const eventLog = document.getElementById("event-log");
+      const svcLocaleEl = document.getElementById("svc-locale");
+      const jaTableToggle = document.getElementById("ja-table-toggle");
+      const langButtons = document.getElementById("lang-buttons");
+      const fallbackInput = document.getElementById("fallback-input");
+
+      function logEvent(text) {
+        const item = document.createElement("li");
+        item.textContent = text;
+        eventLog.appendChild(item);
+        while (eventLog.children.length > 6) eventLog.removeChild(eventLog.firstChild);
+      }
+
+      function markLanguage(locale) {
+        for (const button of langButtons.querySelectorAll("button[data-locale]")) {
+          button.setAttribute("aria-pressed", String(button.dataset.locale === locale));
+        }
+      }
+
+      function refreshChain() {
+        const svc = gantt.service("stargantt.i18n");
+        // locale/fallbacks/resolutionOrder/locales are read from the `state` store —
+        // `.get()` reads the current snapshot.
+        const s = svc.state.get();
+        chainReadout.textContent = [
+          "locale:          " + s.locale,
+          "fallbacks:       [" + s.fallbacks.join(", ") + "]",
+          "resolutionOrder: " + s.resolutionOrder.join(" -> "),
+          "locales:         [" + s.locales.join(", ") + "]",
+        ].join("\n");
+      }
+
+      function refreshLookup() {
+        const svc = gantt.service("stargantt.i18n");
+        const key = lookupKeyEl.value.trim();
+        const value = svc.t(key);
+        const lines = [
+          't("' + key + '") -> ' + (value === undefined ? "undefined (miss: the plugin keeps its default)" : JSON.stringify(value)),
+          "has(key) in the chain: " + svc.has(key),
+        ];
+        for (const locale of svc.state.get().locales) {
+          lines.push('has(key, "' + locale + '"): ' + svc.has(key, locale));
+        }
+        lookupReadout.textContent = lines.join("\n");
+      }
+
+      function refreshCatalog() {
+        const svc = gantt.service("stargantt.i18n");
+        const prefix = catalogPrefixEl.value;
+        const built = svc.catalog(prefix, DEFAULTS[prefix]);
+        catalogReadout.textContent = JSON.stringify(built, null, 2);
+      }
+
+      function refresh() {
+        refreshChain();
+        refreshLookup();
+        refreshCatalog();
+      }
+
+      /**
+       * `treeGrid` / `taskBars` / `undoRedo` are resolved once at `setup()`, so a language change
+       * cannot be applied to the live instance — this rebuilds the whole chart instead.
+       */
+      function boot() {
+        if (statusUnsubscribe) { statusUnsubscribe.dispose(); statusUnsubscribe = null; }
+        if (gantt) gantt.dispose();
+
+        // Sibling factories snapshot their config before `create()` runs, so the translations have
+        // to be readable before there is a chart: `createDictionary()` is the same lookup engine
+        // without a host.
+        const dict = StarGantt.createDictionary({
+          locale: settings.locale,
+          fallbacks: settings.fallbacks,
+          translations: TRANSLATIONS,
+        });
+
+        const baseLanguage = String(settings.locale).split("-")[0];
+        const builders = BUILDERS[baseLanguage] ?? {};
+
+        // Wording comes from the dictionary; *formatting* comes from Intl. The built-in date
+        // columns are deliberately locale-neutral ISO, so a host that wants localized dates
+        // supplies its own formatter — the same one the detail pane uses.
+        const dateFormat = new Intl.DateTimeFormat(settings.locale, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+        const formatDate = (t) => dateFormat.format(new Date(t));
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          // The chart-wide `locale` drives the timeline header and date-column `Intl` formatting;
+          // it does not translate a single label — that is what the catalogs do.
+          locale: settings.locale,
+          plugins: [
+            ...StarGantt.presetStandard({
+              treeGrid: { messages: dict.catalog("treeGrid", DEFAULTS.treeGrid), formatDate },
+              taskBars: { messages: dict.catalog("taskBars", DEFAULTS.taskBars) },
+              undoRedo: { messages: dict.catalog("undoRedo", DEFAULTS.undoRedo) },
+              // side-panel/edit-dialog/context-menu/zoom-controls are nested groups of the ONE
+              // interaction plugin, sharing ONE merged `messages` catalog.
+              interaction: {
+                contextMenu: {},
+                zoomControls: {},
+                editDialog: {},
+                sidePanel: { formatDate },
+                messages: { ...dict.catalog("interaction", DEFAULTS.interaction), ...builders },
+              },
+            }),
+            // The plugin form publishes the same dictionary as the `stargantt.i18n` service, which
+            // the panels below drive at runtime.
+            StarGantt.i18n({
+              locale: settings.locale,
+              fallbacks: settings.fallbacks,
+              translations: TRANSLATIONS,
+            }),
+          ],
+        });
+
+        gantt.service("stargantt.data").load(dataset());
+
+        const svc = gantt.service("stargantt.i18n");
+        statusUnsubscribe = svc.state.subscribe((state, previous) => {
+          logEvent("locale=" + state.locale + (previous && previous.locale !== state.locale ? " (changed)" : " (translations updated)"));
+          refresh();
+        });
+
+        markLanguage(settings.locale);
+        fallbackInput.value = settings.fallbacks.join(", ");
+        svcLocaleEl.value = svc.state.get().locale;
+        jaTableToggle.setAttribute("aria-pressed", "true");
+        jaTableToggle.textContent = "ja table registered";
+
+        if (!keyList.children.length) {
+          for (const key of Object.keys(TRANSLATIONS.ja)) {
+            const option = document.createElement("option");
+            option.value = key;
+            keyList.appendChild(option);
+          }
+        }
+
+        refresh();
+        window.gantt = gantt;
+      }
+
+      function parseChain(text) {
+        return String(text).split(",").map((part) => part.trim()).filter((part) => part.length > 0);
+      }
+
+      function reboot(locale, fallbacks) {
+        settings = { locale, fallbacks };
+        boot();
+      }
+
+      langButtons.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-locale]");
+        if (!button) return;
+        reboot(button.dataset.locale, parseChain(fallbackInput.value));
+      });
+
+      document.getElementById("apply-fallback").addEventListener("click", () => {
+        reboot(settings.locale, parseChain(fallbackInput.value));
+      });
+
+      // Live service edits: they change lookups immediately but leave the chart alone, because
+      // every sibling plugin resolved its catalog once during setup.
+      svcLocaleEl.addEventListener("change", () => {
+        gantt.service("stargantt.i18n").setLocale(svcLocaleEl.value);
+        refresh();
+      });
+
+      jaTableToggle.addEventListener("click", () => {
+        const svc = gantt.service("stargantt.i18n");
+        const registered = jaTableToggle.getAttribute("aria-pressed") === "true";
+        if (registered) svc.remove("ja"); else svc.add("ja", TRANSLATIONS.ja);
+        jaTableToggle.setAttribute("aria-pressed", String(!registered));
+        jaTableToggle.textContent = registered ? "ja table removed" : "ja table registered";
+        refresh();
+      });
+
+      document.getElementById("lookup-btn").addEventListener("click", refreshLookup);
+      lookupKeyEl.addEventListener("change", refreshLookup);
+      catalogPrefixEl.addEventListener("change", refreshCatalog);
+
+      boot();
+    </script>
+  </body>
+</html>

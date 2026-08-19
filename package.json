@@ -1,0 +1,26 @@
+{
+  "name": "stargantt-v2-monorepo",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.18.0",
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=-1 run build",
+    "test": "pnpm run lint:arch && vitest run",
+    "typecheck": "pnpm -r run typecheck",
+    "lint:arch": "node tools/lint-deps.mjs && node tools/core-size-gate.mjs",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2",
+    "happy-dom": "^20.0.0",
+    "stargantt": "workspace:*",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  }
+}

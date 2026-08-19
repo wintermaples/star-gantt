@@ -1,0 +1,49 @@
+{
+  "name": "@stargantt/sdk",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "Plugin-author SDK for StarGantt: typed helpers over the core public API.",
+  "keywords": [
+    "gantt",
+    "gantt-chart",
+    "project-management",
+    "timeline",
+    "scheduling",
+    "typescript",
+    "plugin-architecture",
+    "zero-dependencies"
+  ],
+  "author": "wintermaples",
+  "homepage": "https://wintermaples.github.io/star-gantt/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wintermaples/star-gantt.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": "https://github.com/wintermaples/star-gantt/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@stargantt/core": "workspace:*"
+  },
+  "main": "./dist/sdk.umd.js",
+  "module": "./dist/sdk.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/sdk.js",
+      "default": "./dist/sdk.umd.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

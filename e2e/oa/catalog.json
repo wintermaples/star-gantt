@@ -1,0 +1,1383 @@
+{
+ "generatedFrom": "user-docs/src/generated/api.json (regenerated 2026-08-19)",
+ "fixtures": "const OA_C_DATA_SOURCE = { fetch: async () => ({ tasks: OA_RUN_DATASET.tasks.slice(), links: OA_RUN_DATASET.links.slice(), resources: OA_RUN_DATASET.resources.slice(), assignments: OA_RUN_DATASET.assignments.slice() }) };\nconst OA_C_LAZY_SOURCE = { fetchRange: async (request) => ({ tasks: OA_RUN_DATASET.tasks.slice(request.offset, request.offset + request.limit), total: OA_RUN_DATASET.tasks.length }) };\nconst OA_C_REALTIME_TRANSPORT = { connect: (handlers) => { handlers.onOpen(); }, disconnect: () => {} };\nconst OA_C_GQL_FETCH = async () => new Response(JSON.stringify({ data: { tasks: [] } }), { headers: { \"content-type\": \"application/json\" } });",
+ "plugins": [
+  {
+   "id": "stargantt.data-store",
+   "factory": "dataStore",
+   "category": "basic",
+   "inPreset": true,
+   "dependsOn": [],
+   "presetKey": "dataStore"
+  },
+  {
+   "id": "stargantt.task-bars",
+   "factory": "taskBars",
+   "category": "basic",
+   "inPreset": true,
+   "dependsOn": [
+    "stargantt.data-store",
+    "stargantt.view",
+    "stargantt.tree-grid"
+   ],
+   "presetKey": "taskBars"
+  },
+  {
+   "id": "stargantt.tree-grid",
+   "factory": "treeGrid",
+   "category": "basic",
+   "inPreset": true,
+   "dependsOn": [
+    "stargantt.data-store",
+    "stargantt.view"
+   ],
+   "presetKey": "treeGrid"
+  },
+  {
+   "id": "stargantt.view",
+   "factory": "view",
+   "category": "basic",
+   "inPreset": true,
+   "dependsOn": [
+    "stargantt.data-store"
+   ],
+   "presetKey": "view"
+  },
+  {
+   "id": "stargantt.data-sync",
+   "factory": "dataSync",
+   "category": "data",
+   "inPreset": false,
+   "dependsOn": [
+    "stargantt.data-store"
+   ],
+   "presetKey": "dataSync"
+  },
+  {
+   "id": "stargantt.i18n",
+   "factory": "i18n",
+   "category": "dev",
+   "inPreset": false,
+   "dependsOn": [],
+   "presetKey": "i18n"
+  },
+  {
+   "id": "stargantt.perf-tools",
+   "factory": "perfTools",
+   "category": "dev",
+   "inPreset": false,
+   "dependsOn": [],
+   "presetKey": "perfTools"
+  },
+  {
+   "id": "stargantt.export",
+   "factory": "exportPlugin",
+   "category": "export",
+   "inPreset": true,
+   "dependsOn": [
+    "stargantt.data-store",
+    "stargantt.view"
+   ],
+   "presetKey": "export"
+  },
+  {
+   "id": "stargantt.a11y",
+   "factory": "a11y",
+   "category": "interaction",
+   "inPreset": true,
+   "dependsOn": [
+    "stargantt.data-store",
+    "stargantt.view",
+    "stargantt.tree-grid",
+    "stargantt.task-bars"
+   ],
+   "presetKey": "a11y"
+  },
+  {
+   "id": "stargantt.interaction",
+   "factory": "interaction",
+   "category": "interaction",
+   "inPreset": true,
+   "dependsOn": [
+    "stargantt.data-store",
+    "stargantt.view",
+    "stargantt.tree-grid",
+    "stargantt.task-bars"
+   ],
+   "presetKey": "interaction"
+  },
+  {
+   "id": "stargantt.undo-redo",
+   "factory": "undoRedo",
+   "category": "interaction",
+   "inPreset": true,
+   "dependsOn": [
+    "stargantt.data-store"
+   ],
+   "presetKey": "undoRedo"
+  },
+  {
+   "id": "stargantt.portfolio",
+   "factory": "portfolio",
+   "category": "portfolio",
+   "inPreset": false,
+   "dependsOn": [
+    "stargantt.data-store"
+   ],
+   "presetKey": "portfolio"
+  },
+  {
+   "id": "stargantt.resource",
+   "factory": "resource",
+   "category": "resource",
+   "inPreset": false,
+   "dependsOn": [
+    "stargantt.data-store"
+   ],
+   "presetKey": "resource"
+  },
+  {
+   "id": "stargantt.scheduling",
+   "factory": "scheduling",
+   "category": "scheduling",
+   "inPreset": true,
+   "dependsOn": [
+    "stargantt.data-store"
+   ],
+   "presetKey": "scheduling"
+  },
+  {
+   "id": "stargantt.tracking",
+   "factory": "tracking",
+   "category": "scheduling",
+   "inPreset": false,
+   "dependsOn": [
+    "stargantt.data-store"
+   ],
+   "presetKey": "tracking"
+  }
+ ],
+ "factors": [
+  {
+   "id": "data-store.messages",
+   "plugin": "stargantt.data-store",
+   "field": "messages",
+   "type": "Partial<DataStoreMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ taskMove: \"OA Move\" }"
+   ]
+  },
+  {
+   "id": "data-store.customFields",
+   "plugin": "stargantt.data-store",
+   "field": "customFields",
+   "type": "{ fields?: readonly CustomFieldDef[]; }",
+   "levels": [
+    "(omit)",
+    "{ fields: [] }",
+    "{ fields: [{ key: \"oaText\", label: \"OA Text\" }, { key: \"oaNum\", type: \"number\", label: \"OA Num\", width: 80 }] }"
+   ]
+  },
+  {
+   "id": "task-bars.label",
+   "plugin": "stargantt.task-bars",
+   "field": "label",
+   "type": "BarLabelProvider | { text: BarLabelProvider; placement?: LabelPlacement; }",
+   "levels": [
+    "(omit)",
+    "(task) => task.name",
+    "{ text: (task) => (task.type === \"summary\" ? undefined : task.name), placement: \"inside\" }"
+   ]
+  },
+  {
+   "id": "task-bars.messages",
+   "plugin": "stargantt.task-bars",
+   "field": "messages",
+   "type": "Partial<TaskBarsMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ empty: \"OA no tasks\" }"
+   ]
+  },
+  {
+   "id": "task-bars.labelBackdrop",
+   "plugin": "stargantt.task-bars",
+   "field": "labelBackdrop",
+   "type": "boolean | { color?: string; padding?: number; radius?: number; }",
+   "levels": [
+    "(omit)",
+    "false",
+    "{ color: \"#fffbe6\", padding: 3, radius: 4 }"
+   ]
+  },
+  {
+   "id": "task-bars.durationLabel",
+   "plugin": "stargantt.task-bars",
+   "field": "durationLabel",
+   "type": "boolean | { placement?: LabelPlacement; }",
+   "levels": [
+    "(omit)",
+    "true",
+    "{ placement: \"left\" }"
+   ]
+  },
+  {
+   "id": "task-bars.progressLabel",
+   "plugin": "stargantt.task-bars",
+   "field": "progressLabel",
+   "type": "boolean | { placement?: LabelPlacement; }",
+   "levels": [
+    "(omit)",
+    "true",
+    "{ placement: \"right\" }"
+   ]
+  },
+  {
+   "id": "task-bars.renderBar",
+   "plugin": "stargantt.task-bars",
+   "field": "renderBar",
+   "type": "BarRenderer",
+   "levels": [
+    "(omit)",
+    "(g, a) => { a.defaultPaint(); g.strokeStyle = \"#1a365d\"; g.strokeRect(a.box.x + 0.5, a.box.y + 0.5, Math.max(1, a.box.width - 1), Math.max(1, a.box.height - 1)); }",
+    "(g, a) => { g.strokeStyle = \"#4a5568\"; g.strokeRect(a.box.x + 0.5, a.box.y + 0.5, Math.max(1, a.box.width - 1), Math.max(1, a.box.height - 1)); }"
+   ]
+  },
+  {
+   "id": "task-bars.milestoneShape",
+   "plugin": "stargantt.task-bars",
+   "field": "milestoneShape",
+   "type": "MilestoneShape | ((task: Readonly<Task>) => MilestoneShape | undefined)",
+   "levels": [
+    "(omit)",
+    "\"star\"",
+    "(task) => (task.type === \"milestone\" ? \"triangle\" : undefined)"
+   ]
+  },
+  {
+   "id": "task-bars.patternFill",
+   "plugin": "stargantt.task-bars",
+   "field": "patternFill",
+   "type": "boolean | BarPatternProvider",
+   "levels": [
+    "(omit)",
+    "true",
+    "(task) => (task.type === \"summary\" ? \"dots\" : \"diagonal\")"
+   ]
+  },
+  {
+   "id": "task-bars.barRadius",
+   "plugin": "stargantt.task-bars",
+   "field": "barRadius",
+   "type": "number",
+   "levels": [
+    "(omit)",
+    "0",
+    "10"
+   ]
+  },
+  {
+   "id": "task-bars.barIcons",
+   "plugin": "stargantt.task-bars",
+   "field": "barIcons",
+   "type": "BarIconProvider",
+   "levels": [
+    "(omit)",
+    "(task) => (task.type ? undefined : { left: \"!\", right: \"*\" })",
+    "() => undefined"
+   ]
+  },
+  {
+   "id": "task-bars.avatar",
+   "plugin": "stargantt.task-bars",
+   "field": "avatar",
+   "type": "BarAvatarProvider",
+   "levels": [
+    "(omit)",
+    "(task) => (task.id === \"oa-a\" ? { initials: \"OA\", color: \"#805ad5\" } : undefined)",
+    "() => undefined"
+   ]
+  },
+  {
+   "id": "task-bars.collapsedSummary",
+   "plugin": "stargantt.task-bars",
+   "field": "collapsedSummary",
+   "type": "CollapsedSummary",
+   "levels": [
+    "(omit)",
+    "\"hidden\"",
+    "\"split\""
+   ]
+  },
+  {
+   "id": "task-bars.expandedHitArea",
+   "plugin": "stargantt.task-bars",
+   "field": "expandedHitArea",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "tree-grid.messages",
+   "plugin": "stargantt.tree-grid",
+   "field": "messages",
+   "type": "Partial<TreeGridMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ nameColumn: \"OA Task\" }"
+   ]
+  },
+  {
+   "id": "tree-grid.rowHeight",
+   "plugin": "stargantt.tree-grid",
+   "field": "rowHeight",
+   "type": "number",
+   "levels": [
+    "(omit)",
+    "20",
+    "48"
+   ]
+  },
+  {
+   "id": "tree-grid.paneWidth",
+   "plugin": "stargantt.tree-grid",
+   "field": "paneWidth",
+   "type": "number",
+   "levels": [
+    "(omit)",
+    "240",
+    "400"
+   ]
+  },
+  {
+   "id": "tree-grid.indent",
+   "plugin": "stargantt.tree-grid",
+   "field": "indent",
+   "type": "number",
+   "levels": [
+    "(omit)",
+    "0",
+    "32"
+   ]
+  },
+  {
+   "id": "tree-grid.readOnly",
+   "plugin": "stargantt.tree-grid",
+   "field": "readOnly",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "tree-grid.columns",
+   "plugin": "stargantt.tree-grid",
+   "field": "columns",
+   "type": "ColumnDef[]",
+   "levels": [
+    "(omit)",
+    "[]",
+    "[{ id: \"oa-name\", header: \"Task\", width: 220, render: (el, task) => { el.textContent = task.name; }, getValue: (task) => task.name, compare: (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) }]"
+   ]
+  },
+  {
+   "id": "tree-grid.formatDate",
+   "plugin": "stargantt.tree-grid",
+   "field": "formatDate",
+   "type": "(t: number) => string",
+   "levels": [
+    "(omit)",
+    "(t) => new Date(t).toISOString().slice(5, 10)",
+    "() => \"\""
+   ]
+  },
+  {
+   "id": "tree-grid.formatProgress",
+   "plugin": "stargantt.tree-grid",
+   "field": "formatProgress",
+   "type": "(p: number) => string",
+   "levels": [
+    "(omit)",
+    "(p) => (p * 100).toFixed(1) + \" pct\"",
+    "() => \"\""
+   ]
+  },
+  {
+   "id": "tree-grid.columnLayout",
+   "plugin": "stargantt.tree-grid",
+   "field": "columnLayout",
+   "type": "ColumnLayoutConfig",
+   "levels": [
+    "(omit)",
+    "{ hidden: [\"progress\"] }",
+    "{ order: [\"end\", \"start\", \"name\"] }"
+   ]
+  },
+  {
+   "id": "tree-grid.cellRenderers",
+   "plugin": "stargantt.tree-grid",
+   "field": "cellRenderers",
+   "type": "Record<string, CellRenderer>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ name: (el, task) => { el.textContent = \"* \" + task.name; } }"
+   ]
+  },
+  {
+   "id": "tree-grid.rowClass",
+   "plugin": "stargantt.tree-grid",
+   "field": "rowClass",
+   "type": "(task: Readonly<Task>) => string | undefined",
+   "levels": [
+    "(omit)",
+    "(task) => (task.type === \"summary\" ? \"oa-row-summary\" : undefined)",
+    "() => undefined"
+   ]
+  },
+  {
+   "id": "tree-grid.wbs",
+   "plugin": "stargantt.tree-grid",
+   "field": "wbs",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "tree-grid.collapsedBadge",
+   "plugin": "stargantt.tree-grid",
+   "field": "collapsedBadge",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "tree-grid.outlineEditing",
+   "plugin": "stargantt.tree-grid",
+   "field": "outlineEditing",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "tree-grid.collation",
+   "plugin": "stargantt.tree-grid",
+   "field": "collation",
+   "type": "boolean | { locales?: string | string[]; options?: Intl.CollatorOptions; }",
+   "levels": [
+    "(omit)",
+    "true",
+    "{ locales: \"en\", options: { numeric: true, sensitivity: \"base\" } }"
+   ]
+  },
+  {
+   "id": "tree-grid.taskFields",
+   "plugin": "stargantt.tree-grid",
+   "field": "taskFields",
+   "type": "TaskFieldsConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ columns: [\"id\", \"status\", \"priority\", \"deadline\"], durationUnit: \"hours\", idNumbering: { prefix: \"T-\", start: 1, minDigits: 3 }, showAssigneeAvatars: false }"
+   ]
+  },
+  {
+   "id": "tree-grid.conditionalFormat",
+   "plugin": "stargantt.tree-grid",
+   "field": "conditionalFormat",
+   "type": "ConditionalFormatConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ rules: [{ when: { field: \"progress\", op: \"gte\", value: 0.5 }, style: { color: \"#2f855a\" }, legend: \"Half done\" }], overdue: true, progress: true, legend: true }"
+   ]
+  },
+  {
+   "id": "view.scroll",
+   "plugin": "stargantt.view",
+   "field": "scroll",
+   "type": "ScrollConfig",
+   "levels": [
+    "(omit)",
+    "{ scrollbar: false }",
+    "{ wheelSpeedFactor: 2.5 }"
+   ]
+  },
+  {
+   "id": "view.direction",
+   "plugin": "stargantt.view",
+   "field": "direction",
+   "type": "\"ltr\" | \"rtl\"",
+   "levels": [
+    "(omit)",
+    "\"ltr\"",
+    "\"rtl\""
+   ]
+  },
+  {
+   "id": "view.progressive",
+   "plugin": "stargantt.view",
+   "field": "progressive",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "view.dirtyRegions",
+   "plugin": "stargantt.view",
+   "field": "dirtyRegions",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "view.prefetch",
+   "plugin": "stargantt.view",
+   "field": "prefetch",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "view.panes",
+   "plugin": "stargantt.view",
+   "field": "panes",
+   "type": "PanesConfig",
+   "levels": [
+    "(omit)",
+    "{ initialViewMode: \"gantt\" }",
+    "{ initialViewMode: \"grid\" }"
+   ]
+  },
+  {
+   "id": "view.theme",
+   "plugin": "stargantt.view",
+   "field": "theme",
+   "type": "ThemeConfig",
+   "levels": [
+    "(omit)",
+    "{ preset: \"high-contrast\" }",
+    "{ colorScheme: \"dark\", diagnostics: false }"
+   ]
+  },
+  {
+   "id": "view.timeline",
+   "plugin": "stargantt.view",
+   "field": "timeline",
+   "type": "TimelineConfig",
+   "levels": [
+    "(omit)",
+    "{ origin: Date.UTC(2026, 7, 5), autoExtendOrigin: true }",
+    "{ initialZoom: \"week\", firstDayOfWeek: 0, headerRowRatio: 0.4, displayTimeZone: \"Asia/Tokyo\" }"
+   ]
+  },
+  {
+   "id": "view.gridLines",
+   "plugin": "stargantt.view",
+   "field": "gridLines",
+   "type": "GridLinesConfig",
+   "levels": [
+    "(omit)",
+    "{ vertical: \"both\", horizontal: true, rowHover: true }",
+    "{ vertical: \"none\", rowStripes: false, nonWorkingDays: { weekend: [0, 6] }, zones: [{ start: Date.UTC(2026, 7, 8), end: Date.UTC(2026, 7, 10) }] }"
+   ]
+  },
+  {
+   "id": "view.todayLine",
+   "plugin": "stargantt.view",
+   "field": "todayLine",
+   "type": "TodayLineConfig | false",
+   "levels": [
+    "(omit)",
+    "false",
+    "{ statusDate: \"2026-08-09\" }"
+   ]
+  },
+  {
+   "id": "data-sync.sources",
+   "plugin": "stargantt.data-sync",
+   "field": "sources",
+   "type": "Record<string, DataSourceAdapter>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ \"oa-src\": OA_C_DATA_SOURCE }"
+   ]
+  },
+  {
+   "id": "data-sync.active",
+   "plugin": "stargantt.data-sync",
+   "field": "active",
+   "type": "string",
+   "levels": [
+    "(omit)",
+    "\"oa-src\"",
+    "\"oa-missing-src\""
+   ]
+  },
+  {
+   "id": "data-sync.autoLoad",
+   "plugin": "stargantt.data-sync",
+   "field": "autoLoad",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "data-sync.rollbackOnError",
+   "plugin": "stargantt.data-sync",
+   "field": "rollbackOnError",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "data-sync.followFilter",
+   "plugin": "stargantt.data-sync",
+   "field": "followFilter",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "data-sync.followFilterDebounceMs",
+   "plugin": "stargantt.data-sync",
+   "field": "followFilterDebounceMs",
+   "type": "number",
+   "levels": [
+    "(omit)",
+    "0",
+    "5000"
+   ]
+  },
+  {
+   "id": "data-sync.graphql",
+   "plugin": "stargantt.data-sync",
+   "field": "graphql",
+   "type": "GraphqlSourceConfig",
+   "levels": [
+    "(omit)",
+    "{ name: \"oa-gql\" }",
+    "{ name: \"oa-gql\", url: \"https://oa.invalid/graphql\", operations: { load: \"query { tasks { id name start end } }\" }, fetch: OA_C_GQL_FETCH }"
+   ]
+  },
+  {
+   "id": "data-sync.lazyLoad",
+   "plugin": "stargantt.data-sync",
+   "field": "lazyLoad",
+   "type": "{\n  sources?: Record<string, LazyLoadAdapter>;\n  active?: string;\n  pageSize?: number;\n  autoLoad?: boolean;\n  followViewport?: boolean;\n  prefetchPages?: number;\n}",
+   "levels": [
+    "(omit)",
+    "{ sources: { \"oa-lazy\": OA_C_LAZY_SOURCE }, active: \"oa-lazy\", autoLoad: true, pageSize: 2 }",
+    "{ sources: { \"oa-lazy\": OA_C_LAZY_SOURCE }, active: \"oa-lazy\", followViewport: true, prefetchPages: 0 }"
+   ]
+  },
+  {
+   "id": "data-sync.offline",
+   "plugin": "stargantt.data-sync",
+   "field": "offline",
+   "type": "{\n  databaseName?: string;\n  documentKey?: string;\n  autoRestore?: boolean;\n  autoSave?: boolean;\n  autoSaveDebounceMs?: number;\n  registerSource?: boolean;\n  sourceName?: string;\n  indexedDB?: IDBFactory;\n}",
+   "levels": [
+    "(omit)",
+    "{ databaseName: \"oa-offline-db\", documentKey: \"oa-doc\" }",
+    "{ autoSave: true, autoSaveDebounceMs: 0, registerSource: false }"
+   ]
+  },
+  {
+   "id": "data-sync.realtime",
+   "plugin": "stargantt.data-sync",
+   "field": "realtime",
+   "type": "{\n  transports?: Record<string, RealtimeTransport>;\n  connect?: string;\n  autoReconnect?: boolean;\n  reconnectDelayMs?: number;\n  maxReconnectAttempts?: number;\n  resyncViaDataSource?: boolean;\n}",
+   "levels": [
+    "(omit)",
+    "{ transports: { \"oa-rt\": OA_C_REALTIME_TRANSPORT }, connect: \"oa-rt\" }",
+    "{ transports: { \"oa-rt\": OA_C_REALTIME_TRANSPORT }, connect: \"oa-rt\", autoReconnect: false, resyncViaDataSource: false }"
+   ]
+  },
+  {
+   "id": "i18n.locale",
+   "plugin": "stargantt.i18n",
+   "field": "locale",
+   "type": "string",
+   "levels": [
+    "(omit)",
+    "\"ja-JP\"",
+    "\"fr\""
+   ]
+  },
+  {
+   "id": "i18n.fallbacks",
+   "plugin": "stargantt.i18n",
+   "field": "fallbacks",
+   "type": "readonly string[]",
+   "levels": [
+    "(omit)",
+    "[]",
+    "[\"ja\", \"en\"]"
+   ]
+  },
+  {
+   "id": "i18n.translations",
+   "plugin": "stargantt.i18n",
+   "field": "translations",
+   "type": "Readonly<Record<string, TranslationEntries>>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ ja: { \"oa.greeting\": \"Konnichiwa\" } }"
+   ]
+  },
+  {
+   "id": "perf-tools.overlay",
+   "plugin": "stargantt.perf-tools",
+   "field": "overlay",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "perf-tools.sparkline",
+   "plugin": "stargantt.perf-tools",
+   "field": "sparkline",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "perf-tools.position",
+   "plugin": "stargantt.perf-tools",
+   "field": "position",
+   "type": "OverlayCorner",
+   "levels": [
+    "(omit)",
+    "\"bottom-left\"",
+    "\"top-left\""
+   ]
+  },
+  {
+   "id": "perf-tools.budgetMs",
+   "plugin": "stargantt.perf-tools",
+   "field": "budgetMs",
+   "type": "number",
+   "levels": [
+    "(omit)",
+    "1",
+    "100"
+   ]
+  },
+  {
+   "id": "perf-tools.windowSize",
+   "plugin": "stargantt.perf-tools",
+   "field": "windowSize",
+   "type": "number",
+   "levels": [
+    "(omit)",
+    "1",
+    "600"
+   ]
+  },
+  {
+   "id": "perf-tools.performanceMarks",
+   "plugin": "stargantt.perf-tools",
+   "field": "performanceMarks",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "perf-tools.messages",
+   "plugin": "stargantt.perf-tools",
+   "field": "messages",
+   "type": "Partial<PerfToolsMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ readout: (stats) => \"OA \" + Math.round(stats.fps) + \" fps / \" + stats.frames + \" frames\" }"
+   ]
+  },
+  {
+   "id": "export.messages",
+   "plugin": "stargantt.export",
+   "field": "messages",
+   "type": "Partial<ExportMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ pageNumber: (info) => \"p. \" + info.page + \"/\" + info.pages }"
+   ]
+  },
+  {
+   "id": "export.image",
+   "plugin": "stargantt.export",
+   "field": "image",
+   "type": "ImageCaptureConfig",
+   "levels": [
+    "(omit)",
+    "{ background: \"#ffffff\", pixelRatio: 1 }",
+    "{ range: \"full\", pixelRatio: 2 }"
+   ]
+  },
+  {
+   "id": "export.print",
+   "plugin": "stargantt.export",
+   "field": "print",
+   "type": "PrintOptions",
+   "levels": [
+    "(omit)",
+    "{ paper: \"letter\", orientation: \"portrait\" }",
+    "{ scale: 50, columns: [\"name\", \"start\", \"end\"], legend: false, header: { center: \"OA Print\" } }"
+   ]
+  },
+  {
+   "id": "export.importExport",
+   "plugin": "stargantt.export",
+   "field": "importExport",
+   "type": "{ csvDelimiter?: string; }",
+   "levels": [
+    "(omit)",
+    "{ csvDelimiter: \";\" }",
+    "{ csvDelimiter: \"\\t\" }"
+   ]
+  },
+  {
+   "id": "export.excel",
+   "plugin": "stargantt.export",
+   "field": "excel",
+   "type": "{ sheetName?: string; }",
+   "levels": [
+    "(omit)",
+    "{ sheetName: \"OA Sheet\" }",
+    "{ sheetName: \"OA[]:*?\" }"
+   ]
+  },
+  {
+   "id": "export.viewerEmbed",
+   "plugin": "stargantt.export",
+   "field": "viewerEmbed",
+   "type": "{\n  readOnly?: boolean;\n  embed?: boolean;\n  snapshotParam?: string;\n  autoRestore?: boolean;\n  readOnlyExemptOrigins?: readonly string[];\n}",
+   "levels": [
+    "(omit)",
+    "{ readOnly: true, snapshotParam: \"oa-snap\" }",
+    "{ embed: true, readOnly: false, autoRestore: true }"
+   ]
+  },
+  {
+   "id": "a11y.label",
+   "plugin": "stargantt.a11y",
+   "field": "label",
+   "type": "string",
+   "levels": [
+    "(omit)",
+    "\"OA Chart\"",
+    "\"   \""
+   ]
+  },
+  {
+   "id": "a11y.messages",
+   "plugin": "stargantt.a11y",
+   "field": "messages",
+   "type": "Partial<A11yMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ rowText: (parts) => parts.name + \" (\" + Math.round((parts.progress ?? 0) * 100) + \"%)\" }"
+   ]
+  },
+  {
+   "id": "a11y.syncSelection",
+   "plugin": "stargantt.a11y",
+   "field": "syncSelection",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "a11y.describeDependencies",
+   "plugin": "stargantt.a11y",
+   "field": "describeDependencies",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "a11y.shortcutHelp",
+   "plugin": "stargantt.a11y",
+   "field": "shortcutHelp",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "a11y.zoomKeys",
+   "plugin": "stargantt.a11y",
+   "field": "zoomKeys",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "a11y.summaryTable",
+   "plugin": "stargantt.a11y",
+   "field": "summaryTable",
+   "type": "boolean",
+   "levels": [
+    "(omit)",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "id": "interaction.selection",
+   "plugin": "stargantt.interaction",
+   "field": "selection",
+   "type": "SelectionConfig",
+   "levels": [
+    "(omit)",
+    "{ mode: \"multi\", shortcuts: { selectAll: true, clearOnEscape: true, deleteSelected: true } }",
+    "{ mode: \"none\", revealSelected: false }"
+   ]
+  },
+  {
+   "id": "interaction.dragEdit",
+   "plugin": "stargantt.interaction",
+   "field": "dragEdit",
+   "type": "DragEditConfig",
+   "levels": [
+    "(omit)",
+    "{ enabled: false }",
+    "{ liveUpdate: true, dragTooltip: true, rowDrag: true, autoScroll: true, dependencyPreview: true, frameSync: true, minDuration: 3600000 }"
+   ]
+  },
+  {
+   "id": "interaction.snap",
+   "plugin": "stargantt.interaction",
+   "field": "snap",
+   "type": "SnapConfig",
+   "levels": [
+    "(omit)",
+    "{ enabled: false }",
+    "{ unit: \"day\", rule: (base) => ({ snap: (t) => base.snap(t), step: (t, direction) => base.step(t, direction) }), alignToTasks: { tolerancePx: 12 }, pushSuccessors: true }"
+   ]
+  },
+  {
+   "id": "interaction.tooltip",
+   "plugin": "stargantt.interaction",
+   "field": "tooltip",
+   "type": "TooltipConfig",
+   "levels": [
+    "(omit)",
+    "{ trigger: \"hover\", showDelay: 0, hideDelay: 0 }",
+    "{ content: (hit) => \"OA tooltip\", trigger: \"both\" }"
+   ]
+  },
+  {
+   "id": "interaction.contextMenu",
+   "plugin": "stargantt.interaction",
+   "field": "contextMenu",
+   "type": "ContextMenuConfig",
+   "levels": [
+    "(omit)",
+    "{ insertMode: \"sibling\" }",
+    "{ items: (target) => [{ id: \"oa-item\", label: \"OA item\", run: () => {} }] }"
+   ]
+  },
+  {
+   "id": "interaction.zoomControls",
+   "plugin": "stargantt.interaction",
+   "field": "zoomControls",
+   "type": "ZoomControlsConfig",
+   "levels": [
+    "(omit)",
+    "{ position: \"top-left\" }",
+    "{ slider: false, zoomButtons: false, fitButton: false }"
+   ]
+  },
+  {
+   "id": "interaction.clipboard",
+   "plugin": "stargantt.interaction",
+   "field": "clipboard",
+   "type": "ClipboardConfig",
+   "levels": [
+    "(omit)",
+    "{ systemClipboard: false }",
+    "{ fields: [\"name\", \"progress\"] }"
+   ]
+  },
+  {
+   "id": "interaction.filterSearch",
+   "plugin": "stargantt.interaction",
+   "field": "filterSearch",
+   "type": "FilterSearchConfig",
+   "levels": [
+    "(omit)",
+    "{ searchBox: true }",
+    "{ filterPanel: true, fields: [{ id: \"oa-field\", label: \"OA Field\", value: (task) => task.type ?? \"task\" }] }"
+   ]
+  },
+  {
+   "id": "interaction.editDialog",
+   "plugin": "stargantt.interaction",
+   "field": "editDialog",
+   "type": "EditDialogConfig",
+   "levels": [
+    "(omit)",
+    "{ openOnDoubleClick: false }",
+    "{ renderBody: (host, ctx) => { host.textContent = \"OA dialog: \" + ctx.task.name; } }"
+   ]
+  },
+  {
+   "id": "interaction.sidePanel",
+   "plugin": "stargantt.interaction",
+   "field": "sidePanel",
+   "type": "SidePanelConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ formatDate: (t) => new Date(t).toISOString().slice(0, 10) }"
+   ]
+  },
+  {
+   "id": "interaction.messages",
+   "plugin": "stargantt.interaction",
+   "field": "messages",
+   "type": "Partial<InteractionMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ deleteConfirmTitle: (count) => \"Delete \" + count + \" task(s)?\" }"
+   ]
+  },
+  {
+   "id": "undo-redo.messages",
+   "plugin": "stargantt.undo-redo",
+   "field": "messages",
+   "type": "Partial<UndoRedoMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ undone: \"OA undone\", redone: \"\" }"
+   ]
+  },
+  {
+   "id": "undo-redo.limit",
+   "plugin": "stargantt.undo-redo",
+   "field": "limit",
+   "type": "number",
+   "levels": [
+    "(omit)",
+    "1",
+    "1000"
+   ]
+  },
+  {
+   "id": "undo-redo.keys",
+   "plugin": "stargantt.undo-redo",
+   "field": "keys",
+   "type": "{ undo?: string[]; redo?: string[]; }",
+   "levels": [
+    "(omit)",
+    "{ undo: [], redo: [] }",
+    "{ undo: [\"Ctrl+Alt+U\"], redo: [\"Ctrl+Alt+R\"] }"
+   ]
+  },
+  {
+   "id": "portfolio.nodes",
+   "plugin": "stargantt.portfolio",
+   "field": "nodes",
+   "type": "readonly PortfolioNodeInit[]",
+   "levels": [
+    "(omit)",
+    "[]",
+    "[{ id: \"oa-init\", kind: \"initiative\", name: \"OA Initiative\" }, { id: \"oa-node\", kind: \"project\", name: \"OA Project\", parentId: \"oa-init\", taskId: \"oa-p\" }]"
+   ]
+  },
+  {
+   "id": "portfolio.goals",
+   "plugin": "stargantt.portfolio",
+   "field": "goals",
+   "type": "readonly PortfolioGoalInit[]",
+   "levels": [
+    "(omit)",
+    "[]",
+    "[{ id: \"oa-goal\", name: \"OA Goal\", taskIds: [\"oa-a\"], nodeIds: [\"oa-node\"], target: 0.5 }]"
+   ]
+  },
+  {
+   "id": "portfolio.views",
+   "plugin": "stargantt.portfolio",
+   "field": "views",
+   "type": "Record<string, PortfolioView>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ \"oa-view\": { nodeIds: [\"oa-node\"] } }"
+   ]
+  },
+  {
+   "id": "portfolio.dashboard",
+   "plugin": "stargantt.portfolio",
+   "field": "dashboard",
+   "type": "PortfolioDashboardConfig",
+   "levels": [
+    "(omit)",
+    "{ open: true }",
+    "{ open: true, widgets: [\"summary\", \"status\", \"goals\", \"formulas\"], formulas: [{ id: \"oa-f1\", label: \"OA Task Count\", evaluate: (tasks) => tasks.length }], groupOf: (task) => (task.type === \"summary\" ? \"Summaries\" : \"Leaves\"), renderWidget: (host, ctx) => { if (ctx.widget === \"status\") { var d = document.createElement(\"div\"); d.textContent = \"OA custom \" + ctx.widget; host.appendChild(d); } } }"
+   ]
+  },
+  {
+   "id": "portfolio.messages",
+   "plugin": "stargantt.portfolio",
+   "field": "messages",
+   "type": "Partial<import(\"./internal/messages\").PortfolioMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ nodeName: (arg) => \"OA \" + arg.kind + \" \" + arg.ordinal }"
+   ]
+  },
+  {
+   "id": "resource.pool",
+   "plugin": "stargantt.resource",
+   "field": "pool",
+   "type": "ResourcePoolConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ resources: [{ id: \"oa-r1\", name: \"OA Resource\", kind: \"person\", capacity: 1, skills: [\"dev\"], costRate: 50 }, { id: \"oa-r2\", name: \"OA Equipment\", kind: \"equipment\", capacity: 0.5 }], bookings: [{ resourceId: \"oa-r1\", taskId: \"oa-a\", start: Date.UTC(2026, 7, 7), end: Date.UTC(2026, 7, 10), state: \"confirmed\", units: 0.5 }], syncToStore: true }"
+   ]
+  },
+  {
+   "id": "resource.assign",
+   "plugin": "stargantt.resource",
+   "field": "assign",
+   "type": "ResourceAssignConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ column: true, columnWidth: 220, dragReassign: false }"
+   ]
+  },
+  {
+   "id": "resource.view",
+   "plugin": "stargantt.resource",
+   "field": "view",
+   "type": "ResourceViewConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ startOpen: true, resizable: false, teams: [{ name: \"OA Team\", members: [\"oa-r1\"] }], projectOf: (task) => (task.parentId ? \"OA Project\" : null) }"
+   ]
+  },
+  {
+   "id": "resource.utilization",
+   "plugin": "stargantt.resource",
+   "field": "utilization",
+   "type": "ResourceUtilizationConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ bucket: \"week\", weekStart: \"sunday\", threshold: 0.5, summaryPanel: true, role: (entry) => entry.kind, resourceLoad: (input) => input.allocated * 2 }"
+   ]
+  },
+  {
+   "id": "resource.loadChart",
+   "plugin": "stargantt.resource",
+   "field": "loadChart",
+   "type": "LoadChartConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ bucket: \"week\", total: true, lanes: true, axisLabels: true, valueLabels: true, laneScale: \"shared\", load: (input) => input.tasks.length, capacity: (input) => (input.resources.length || 1) }"
+   ]
+  },
+  {
+   "id": "resource.messages",
+   "plugin": "stargantt.resource",
+   "field": "messages",
+   "type": "Partial<ResourceMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ assignColumnHeader: \"OA Resources\" }"
+   ]
+  },
+  {
+   "id": "scheduling.dependencies",
+   "plugin": "stargantt.scheduling",
+   "field": "dependencies",
+   "type": "DependenciesConfig",
+   "levels": [
+    "(omit)",
+    "{ routingStyle: \"straight\", linkStyle: { width: 2, arrowHead: \"open\" }, linkEditing: true, highlightPaths: true }",
+    "{ showLinks: false, allowLinkCreate: false }"
+   ]
+  },
+  {
+   "id": "scheduling.autoSchedule",
+   "plugin": "stargantt.scheduling",
+   "field": "autoSchedule",
+   "type": "AutoScheduleConfig",
+   "levels": [
+    "(omit)",
+    "{ enabled: true }",
+    "{ modeColumn: true }"
+   ]
+  },
+  {
+   "id": "scheduling.calendars",
+   "plugin": "stargantt.scheduling",
+   "field": "calendars",
+   "type": "CalendarsConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ calendars: [{ id: \"oa-cal\", name: \"OA Calendar\", workingDays: [1, 2, 3, 4, 5], isDefault: true }], editor: true }"
+   ]
+  },
+  {
+   "id": "scheduling.criticalPath",
+   "plugin": "stargantt.scheduling",
+   "field": "criticalPath",
+   "type": "CriticalPathConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ thresholdDays: 1, nearCriticalDays: 2, showFloat: true, criticalColor: \"#7c3aed\" }"
+   ]
+  },
+  {
+   "id": "scheduling.diagnostics",
+   "plugin": "stargantt.scheduling",
+   "field": "diagnostics",
+   "type": "DiagnosticsConfig",
+   "levels": [
+    "(omit)",
+    "{ panel: true }",
+    "{ panel: false }"
+   ]
+  },
+  {
+   "id": "scheduling.messages",
+   "plugin": "stargantt.scheduling",
+   "field": "messages",
+   "type": "Partial<SchedulingMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ modeColumnHeader: \"OA Mode\" }"
+   ]
+  },
+  {
+   "id": "tracking.baselines",
+   "plugin": "stargantt.tracking",
+   "field": "baselines",
+   "type": "BaselinesConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ baselines: [{ id: \"oa-bl\", name: \"OA Baseline\", tasks: [{ id: \"oa-a\", start: Date.UTC(2026, 7, 6, 12), end: Date.UTC(2026, 7, 10, 12) }, { id: \"oa-b\", start: Date.UTC(2026, 7, 11, 12), end: Date.UTC(2026, 7, 16, 12) }] }], active: \"oa-bl\", barStyle: \"overlay\", slipThresholdMs: 0, criticalPath: true }"
+   ]
+  },
+  {
+   "id": "tracking.progress",
+   "plugin": "stargantt.tracking",
+   "field": "progress",
+   "type": "ProgressConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ statusDate: Date.UTC(2026, 7, 9), progressLine: true, colorBars: true, progressWeighting: \"duration\", snapshots: [{ date: Date.UTC(2026, 7, 5), percentComplete: 10, completedCount: 0, lateCount: 0, taskCount: 2 }, { date: Date.UTC(2026, 7, 6), percentComplete: 25, completedCount: 0, lateCount: 1, taskCount: 2 }] }"
+   ]
+  },
+  {
+   "id": "tracking.cost",
+   "plugin": "stargantt.tracking",
+   "field": "cost",
+   "type": "CostConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ rates: [{ resourceId: \"oa-r1\", standard: 40, overtime: 60 }], hoursPerDay: 6, budget: 5000, budgets: { general: 2000 }, alertThreshold: 0.5, statusDate: Date.UTC(2026, 7, 9), formulas: [{ id: \"oa-cf\", label: \"OA Row Count\", evaluate: (input) => input.rows.length }] }"
+   ]
+  },
+  {
+   "id": "tracking.evm",
+   "plugin": "stargantt.tracking",
+   "field": "evm",
+   "type": "EvmConfig",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ method: \"fiftyFifty\", eacMethod: \"remaining\", statusDate: Date.UTC(2026, 7, 9), projectBac: 3000, snapshots: [{ t: Date.UTC(2026, 7, 5), ev: 200, ac: 250 }], formulas: [{ id: \"oa-ef\", label: \"OA Curve Points\", evaluate: (input) => input.curve.length }] }"
+   ]
+  },
+  {
+   "id": "tracking.messages",
+   "plugin": "stargantt.tracking",
+   "field": "messages",
+   "type": "Partial<TrackingMessages>",
+   "levels": [
+    "(omit)",
+    "{}",
+    "{ baselineName: (ordinal) => \"OA Baseline \" + ordinal }"
+   ]
+  }
+ ]
+}

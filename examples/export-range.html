@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Export range example (PNG/JPEG/SVG)</title>
+    <!--
+      Demonstrates `stargantt.export`'s image capture: `toPng()` / `toSvg()` and the `range`
+      option ("viewport" | "full" | { start, end }).
+
+      `range` (like `background`/`pixelRatio`) is a per-call option, passed straight to
+      `toPng()`/`toSvg()` on every call — no chart rebuild, no scroll/collapsed-row bookkeeping,
+      no rebuild-in-flight busy-guard needed. This per-call resolution (a shallow override of the
+      `image` config nest) is a deliberate design choice recorded in docs/specs/plugins/export.md
+      §1. The range buttons here just flip a plain JS variable.
+
+      `toJPEG(quality)` folds into `toPng({ format: "jpeg", quality })` (§1.1). This page never
+      calls a `download*` member (export.md §1.9) — it builds its own persistent object-URL
+      preview/download link (a visible `<a download>` the reader clicks, not an auto-triggered
+      save); `StarGantt.downloadFile()` would fire the save immediately instead of leaving a link
+      to click, so it doesn't fit this page's preview-first UI.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 6px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 420px;
+        border: 1px solid #ccc;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      .group {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .group-label {
+        font-weight: 600;
+        margin-right: 4px;
+      }
+      button {
+        font: inherit;
+        padding: 4px 8px;
+      }
+      button.active {
+        background: #d8e8ff;
+        border-color: #6ba0e8;
+      }
+      #exportStatus.error {
+        color: #a30000;
+      }
+      #exportStatus {
+        font-size: 12px;
+      }
+      .result {
+        margin-top: 6px;
+        font-size: 12px;
+      }
+      #exportPreview {
+        display: none;
+        max-width: 100%;
+        max-height: 260px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — export range (PNG/JPEG/SVG)</h1>
+    <details>
+      <summary>What's on this page</summary>
+      <code>toPng(options)</code>/<code>toSvg(options)</code> accept a per-call
+      <code>range</code>: "viewport" (visible only), "full" (the whole task extent), or an
+      explicit <code>{ start, end }</code> span (here, the first 20 days). JPEG shares the same
+      raster pipeline as PNG, via <code>toPng({ format: "jpeg", quality })</code> — quality 0..1,
+      anything else (including omitting it) leaves the encoder's own default (~0.92) in charge.
+      JPEG has no alpha channel, so this page configures <code>background: "#ffffff"</code>, which
+      is also what the encoder falls back to on its own.
+    </details>
+    <div class="toolbar">
+      <div class="group">
+        <span class="group-label">range</span>
+        <div class="group" id="rangeButtons">
+          <button data-range="viewport" class="active" aria-pressed="true" type="button">viewport</button>
+          <button data-range="full" aria-pressed="false" type="button">full</button>
+          <button data-range="custom" aria-pressed="false" type="button">{ start, end } (first 20 days)</button>
+        </div>
+      </div>
+      <div class="group">
+        <span class="group-label">export</span>
+        <button id="exportPngBtn" type="button">Export to PNG</button>
+        <button id="exportJpegBtn" type="button">Export to JPEG</button>
+        <button id="exportSvgBtn" type="button">Export to SVG</button>
+      </div>
+      <div class="group">
+        <label class="group-label" for="jpegQuality">quality (JPEG only)</label>
+        <select id="jpegQuality">
+          <option value="">(omitted) — encoder default</option>
+          <option value="0.92">0.92 — high</option>
+          <option value="0.5" selected>0.5 — medium</option>
+          <option value="0.05">0.05 — smallest</option>
+          <option value="2">2 — out of range, ignored</option>
+        </select>
+      </div>
+    </div>
+    <div id="chart"></div>
+    <div class="result">
+      <div id="exportStatus" role="status" aria-live="polite">No export yet.</div>
+      <img id="exportPreview" alt="Exported gantt chart preview" />
+      <div><a id="exportDownload" download style="display: none">Download the exported file</a></div>
+    </div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      // Fixed anchor date (not "now"): keeps the task layout stable across runs.
+      const DAY = 24 * 60 * 60 * 1000;
+      const T0 = Date.UTC(2026, 7, 3); // 2026-08-03, a Monday
+      const CUSTOM_RANGE = { start: T0, end: T0 + 20 * DAY };
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "p1", parentId: null, name: "Release program", start: T0, end: T0 + 60 * DAY, type: "summary" },
+            { id: "t1", parentId: "p1", name: "Planning", start: T0, end: T0 + 10 * DAY, type: "task", progress: 1 },
+            { id: "t2", parentId: "p1", name: "Design", start: T0 + 8 * DAY, end: T0 + 22 * DAY, type: "task", progress: 0.7 },
+            { id: "t3", parentId: "p1", name: "Build", start: T0 + 18 * DAY, end: T0 + 45 * DAY, type: "task", progress: 0.3 },
+            { id: "t4", parentId: "p1", name: "Test", start: T0 + 40 * DAY, end: T0 + 55 * DAY, type: "task" },
+            { id: "t5", parentId: "p1", name: "Ship", start: T0 + 60 * DAY, end: T0 + 60 * DAY, type: "milestone" },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          view: { timeline: { origin: T0 } },
+          export: { image: { background: "#ffffff" } },
+        }),
+        locale: "en",
+      });
+      gantt.service("stargantt.data").load(dataset());
+      window.gantt = gantt;
+
+      const exportSvc = gantt.service("stargantt.export");
+
+      const rangeButtons = Array.from(document.getElementById("rangeButtons").querySelectorAll("button"));
+      const exportPngBtn = document.getElementById("exportPngBtn");
+      const exportJpegBtn = document.getElementById("exportJpegBtn");
+      const exportSvgBtn = document.getElementById("exportSvgBtn");
+      const jpegQuality = document.getElementById("jpegQuality");
+      const exportStatus = document.getElementById("exportStatus");
+      const exportPreview = document.getElementById("exportPreview");
+      const exportDownload = document.getElementById("exportDownload");
+
+      let currentRange = "viewport";
+      let previousUrl = null;
+      let busy = false;
+
+      function rangeConfig() {
+        if (currentRange === "full") return "full";
+        if (currentRange === "custom") return CUSTOM_RANGE;
+        return "viewport";
+      }
+
+      function setBusy(next) {
+        busy = next;
+        exportPngBtn.disabled = next;
+        exportJpegBtn.disabled = next;
+        exportSvgBtn.disabled = next;
+        jpegQuality.disabled = next;
+        rangeButtons.forEach((b) => {
+          b.disabled = next;
+        });
+      }
+
+      rangeButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (busy || btn.dataset.range === currentRange) return;
+          currentRange = btn.dataset.range;
+          rangeButtons.forEach((b) => {
+            const isActive = b === btn;
+            b.classList.toggle("active", isActive);
+            b.setAttribute("aria-pressed", String(isActive));
+          });
+        });
+      });
+
+      function clearResult() {
+        if (previousUrl) {
+          URL.revokeObjectURL(previousUrl);
+          previousUrl = null;
+        }
+        exportPreview.removeAttribute("src");
+        exportPreview.style.display = "none";
+        exportDownload.removeAttribute("href");
+        exportDownload.style.display = "none";
+      }
+
+      // Turns the picker's current value into the `toPng({ format: "jpeg", quality })` argument
+      // plus the wording the Result line uses. The empty option omits `quality` entirely (a
+      // different call shape from an unusable number) — both end at the encoder's own default.
+      function jpegQualityChoice() {
+        const raw = jpegQuality.value;
+        if (raw === "") return { quality: undefined, note: "quality omitted → encoder default" };
+        const value = Number(raw);
+        const usable = Number.isFinite(value) && value >= 0 && value <= 1;
+        return {
+          quality: value,
+          note: usable ? `quality ${value}` : `quality ${value} outside [0, 1] → encoder default`,
+        };
+      }
+
+      function showResult(blob, extension, mimeType, note) {
+        clearResult();
+        const url = URL.createObjectURL(blob);
+        previousUrl = url;
+        exportPreview.src = url;
+        exportPreview.style.display = "block";
+        exportDownload.href = url;
+        exportDownload.download = `stargantt-export-${currentRange}.${extension}`;
+        exportDownload.style.display = "inline";
+        exportStatus.classList.remove("error");
+        exportStatus.setAttribute("role", "status");
+        exportStatus.textContent =
+          `range="${currentRange}" → ${mimeType}, ${(blob.size / 1024).toFixed(1)} KB` + (note ? ` (${note})` : "");
+      }
+
+      async function runExport(kind) {
+        setBusy(true);
+        clearResult();
+        exportStatus.classList.remove("error");
+        exportStatus.setAttribute("role", "status");
+        exportStatus.textContent = "Exporting…";
+        try {
+          if (kind === "png") {
+            const blob = await exportSvc.toPng({ range: rangeConfig() });
+            showResult(blob, "png", "image/png");
+          } else if (kind === "jpeg") {
+            const choice = jpegQualityChoice();
+            const blob = await exportSvc.toPng({ format: "jpeg", quality: choice.quality, range: rangeConfig() });
+            showResult(blob, "jpg", "image/jpeg", choice.note);
+          } else {
+            const svgText = await exportSvc.toSvg({ range: rangeConfig() });
+            const svgBlob = new Blob([svgText], { type: "image/svg+xml" });
+            showResult(svgBlob, "svg", "image/svg+xml");
+          }
+        } catch (err) {
+          // An explicit { start, end } that does not describe an exportable time span (non-finite,
+          // or under one pixel wide) rejects instead of silently falling back to a viewport export
+          // — err.message already names the offending values.
+          clearResult();
+          exportStatus.classList.add("error");
+          exportStatus.setAttribute("role", "alert");
+          exportStatus.textContent = `✗ Export failed: ${err.message}`;
+          console.error(err);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      exportPngBtn.addEventListener("click", () => runExport("png"));
+      exportJpegBtn.addEventListener("click", () => runExport("jpeg"));
+      exportSvgBtn.addEventListener("click", () => runExport("svg"));
+    </script>
+  </body>
+</html>

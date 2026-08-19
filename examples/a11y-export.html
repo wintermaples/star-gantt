@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Accessibility &amp; PNG export example</title>
+    <!--
+      Demonstrates `a11y` (always composed by presetStandard, configured here with
+      `describeDependencies`/`shortcutHelp`/`summaryTable`) combined with the merged
+      `stargantt.export` facade's `toPng()`.
+
+      DESIGN NOTES:
+      - `timelineScale` and keyboard a11y options nest under `view.timeline` and `a11y`
+        respectively, matching the plugin's own directory/id.
+      - `exportService.toPng()` returns a `Promise<Blob>`.
+      - No `download*` member is used here — the page builds its own preview via
+        `URL.createObjectURL`; no button downloads a file, only previews it, so no
+        `downloadFile` call is needed.
+      - The shortcut-help / summary-table / dependency-read-out keyboard demo, the live-region
+        mirror observing `.sg-a11y-live`, and the synthetic KeyboardEvent dispatch onto the
+        focused `.sg-a11y [role="row"][tabindex="0"]` mirror row all follow the a11y plugin's
+        DOM contract (`stargantt.focus` service, `.sg-a11y`/`.sg-a11y-live` classes, default
+        keyboard chords) per docs/specs/plugins/a11y.md.
+      - This page is self-contained, like `examples/scheduling.html`.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 6px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 400px;
+        border: 1px solid #ccc;
+      }
+      .layout {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .main {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      aside {
+        flex: 0 0 220px;
+        border: 1px solid #ddd;
+        padding: 6px 8px;
+        font-size: 11px;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 6px;
+        flex-wrap: wrap;
+      }
+      button {
+        font: inherit;
+        padding: 4px 8px;
+      }
+      .readout {
+        font-size: 12px;
+      }
+      #liveRegion {
+        max-height: 260px;
+        overflow-y: auto;
+      }
+      .announcement {
+        border-bottom: 1px solid #eee;
+        padding: 2px 0;
+      }
+      .panel {
+        border: 1px solid #ddd;
+        padding: 6px 8px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      .panel h3 {
+        font-size: 12px;
+        margin: 0 0 4px;
+      }
+      #exportPreview {
+        display: none;
+        max-width: 100%;
+        max-height: 260px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — accessibility &amp; PNG export</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Navigate the gantt chart rows with the keyboard (arrow keys, Enter key). A parallel ARIA
+      treegrid is generated for screen-reader support, here with the opt-in dependency read-out,
+      shortcut-help dialog and summary table turned on (see the keyboard panel below the chart).
+      The export button renders the chart's canvas surfaces (timeline, bars, dependencies) as a
+      PNG image; the tree-grid pane is DOM, not canvas, so it is not part of the export.
+    </details>
+    <div class="layout">
+      <div class="main">
+        <div class="toolbar">
+          <button id="exportBtn" type="button">📥 Export to PNG</button>
+          <span id="statusText" class="readout"></span>
+        </div>
+        <div id="chart"></div>
+
+        <section class="panel" aria-labelledby="kbdPanelTitle">
+          <h3 id="kbdPanelTitle">⌨️ Keyboard accessibility features</h3>
+          <p class="readout">
+            Tab into the chart, then: <kbd>?</kbd> opens the shortcut-help dialog, built from the
+            chart's live key bindings — one line per chord that carries a description, so the
+            navigation and a11y shortcuts are listed while the undescribed edit chords below are
+            not (<code>shortcutHelp</code>); <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> builds the
+            visually hidden screen-reader summary table of every task and moves the focus into it,
+            and closes it again (<code>summaryTable</code>);
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>→</kbd>
+            move the focused task's <em>start</em> edge by one day — the keyboard equivalent of
+            dragging the bar's left handle, announced in the log to the right; and arrow-key
+            navigation reads each row's predecessors and successors through
+            <code>aria-describedby</code> (<code>describeDependencies</code>), mirrored in the
+            read-out below. The buttons send those same keystrokes to the chart, so the features
+            are reachable with a pointer too.
+          </p>
+          <div class="toolbar">
+            <button id="focusRowBtn" type="button">Move focus into the chart</button>
+            <button id="shortcutHelpBtn" type="button" aria-haspopup="dialog">Shortcut help (?)</button>
+            <button id="summaryTableBtn" type="button">Summary table (Ctrl+Alt+S)</button>
+            <button id="startEarlierBtn" type="button">Start −1 day (Ctrl+Alt+←)</button>
+            <button id="startLaterBtn" type="button">Start +1 day (Ctrl+Alt+→)</button>
+          </div>
+          <div id="kbdStatus" class="readout" role="status">Nothing sent yet.</div>
+          <div><strong>🔗 Dependency read-out of the focused row</strong></div>
+          <div id="depReadout" class="readout">No chart row holds the keyboard focus yet.</div>
+        </section>
+
+        <div class="panel">
+          <h3>📸 PNG preview</h3>
+          <img id="exportPreview" alt="Exported gantt chart" />
+        </div>
+      </div>
+      <aside aria-label="Announcement log">
+        <strong>📣 Announcement log</strong>
+        <div id="liveRegion" role="log" aria-live="polite" aria-label="Announcements"></div>
+      </aside>
+    </div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      // The fixture sits in January 2024; the timeline origin is pinned to match.
+      const T0 = new Date(2024, 0, 1).getTime();
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "1", name: "Project planning", parentId: null, start: new Date(2024, 0, 1).getTime(), end: new Date(2024, 0, 31).getTime(), type: "summary" },
+            { id: "1-1", name: "Task 1: Requirements", parentId: "1", start: new Date(2024, 0, 1).getTime(), end: new Date(2024, 0, 8).getTime(), progress: 1.0 },
+            { id: "1-2", name: "Task 2: Design", parentId: "1", start: new Date(2024, 0, 8).getTime(), end: new Date(2024, 0, 15).getTime(), progress: 0.8 },
+            { id: "1-3", name: "Task 3: Implementation", parentId: "1", start: new Date(2024, 0, 15).getTime(), end: new Date(2024, 0, 25).getTime(), progress: 0.5 },
+            { id: "1-4", name: "Task 4: Testing", parentId: "1", start: new Date(2024, 0, 22).getTime(), end: new Date(2024, 0, 31).getTime(), progress: 0.2 },
+          ],
+          // Dependency links give `describeDependencies` something to read out: task 2 has one
+          // predecessor and two successors, task 3 only a predecessor, task 1 only a successor —
+          // so navigating the rows exercises every shape of the read-out.
+          links: [
+            { id: "link-1", sourceId: "1-1", targetId: "1-2", type: "FS", lag: 0 },
+            { id: "link-2", sourceId: "1-2", targetId: "1-3", type: "FS", lag: 0 },
+            { id: "link-3", sourceId: "1-2", targetId: "1-4", type: "FS", lag: 0 },
+          ],
+        };
+      }
+
+      const chartEl = document.getElementById("chart");
+      const gantt = StarGantt.create({
+        element: chartEl,
+        plugins: StarGantt.presetStandard({
+          view: { timeline: { origin: T0 } },
+          // All three a11y extras are opt-in and off by default; this page exists to show them.
+          a11y: {
+            describeDependencies: true,
+            shortcutHelp: true,
+            summaryTable: true,
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset());
+
+      const focusService = gantt.service("stargantt.focus");
+      const exportService = gantt.service("stargantt.export");
+      window.gantt = gantt;
+
+      // ===== Page chrome (export button + announcement log) =====
+      const exportBtn = document.getElementById("exportBtn");
+      const exportPreview = document.getElementById("exportPreview");
+      const liveRegionDiv = document.getElementById("liveRegion");
+      const statusText = document.getElementById("statusText");
+
+      let announcements = [];
+      let previousExportUrl = null;
+
+      function addAnnouncement(message) {
+        announcements.unshift(`[${new Date().toLocaleTimeString("en-US")}] ${message}`);
+        if (announcements.length > 10) announcements.pop();
+        liveRegionDiv.innerHTML = announcements.map((msg) => `<div class="announcement">${escapeHtml(msg)}</div>`).join("");
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // ===== Live-region mirror =====
+      // Observes the library's own live region (`.sg-a11y-live`, built by `stargantt.a11y`) and
+      // mirrors whatever it announces into the log, rather than intercepting `FocusService.announce()`
+      // — a published service object is not an interception point.
+      (() => {
+        const liveEl = chartEl.querySelector(".sg-a11y-live");
+        if (liveEl) {
+          const observer = new MutationObserver(() => {
+            const text = liveEl.textContent ?? "";
+            // The library writes `live.textContent = message` without clearing it first, so two
+            // identical consecutive announcements are a real, observable occurrence. Only an empty
+            // string (the region's reset state) is filtered.
+            if (text) addAnnouncement(text);
+          });
+          observer.observe(liveEl, { characterData: true, childList: true, subtree: true });
+        }
+        addAnnouncement("Gantt chart initialized. Navigate with the arrow keys, edit with Enter");
+      })();
+
+      // ===== Keyboard-a11y panel (shortcut help, summary table, start-edge chords, read-out) =====
+      const kbdStatus = document.getElementById("kbdStatus");
+      const depReadout = document.getElementById("depReadout");
+
+      // The mirrored row carrying the roving `tabindex="0"` is the one the chart considers focused.
+      function focusedMirrorRow() {
+        return chartEl.querySelector('.sg-a11y [role="row"][tabindex="0"]');
+      }
+
+      // Sends a chord to the chart. The a11y plugin's dispatcher listens on the document and scopes
+      // itself by event target, so the event is dispatched on an element inside the chart root —
+      // the focused mirror row when there is one.
+      function sendChord(init, label) {
+        const target = focusedMirrorRow() ?? chartEl;
+        target.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            bubbles: true,
+            cancelable: true,
+            ctrlKey: false,
+            altKey: false,
+            shiftKey: false,
+            ...init,
+          }),
+        );
+        kbdStatus.textContent = `Sent ${label} to the chart.`;
+        updateDepReadout();
+      }
+
+      // Mirrors the focused row's `aria-describedby` description — exactly the text a screen
+      // reader appends to the row after its name when `describeDependencies` is on.
+      function updateDepReadout() {
+        const row = focusedMirrorRow();
+        if (!row) {
+          depReadout.textContent = "No chart row holds the keyboard focus yet.";
+          return;
+        }
+        const rowText = (row.textContent ?? "").trim();
+        const described = (row.getAttribute("aria-describedby") ?? "")
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((id) => document.getElementById(id))
+          .map((el) => (el ? (el.textContent ?? "").trim() : ""))
+          .filter(Boolean)
+          .join(" ");
+        depReadout.textContent = described ? `${rowText} — ${described}` : `${rowText} — no dependency links, so this row carries no aria-describedby.`;
+      }
+
+      chartEl.addEventListener("focusin", () => updateDepReadout());
+
+      document.getElementById("focusRowBtn").addEventListener("click", () => {
+        const data = gantt.service("stargantt.data");
+        let target = data.getTask("1-3") ? "1-3" : undefined;
+        if (target === undefined) {
+          for (const id of data.taskIds()) {
+            const task = data.getTask(id);
+            if (task && task.type !== "summary") {
+              target = id;
+              break;
+            }
+          }
+        }
+        if (target === undefined) {
+          kbdStatus.textContent = "The dataset has no task to focus.";
+          return;
+        }
+        focusService.focus(target);
+        kbdStatus.textContent = "Keyboard focus moved into the chart. Arrow keys walk the rows.";
+        updateDepReadout();
+      });
+
+      document.getElementById("shortcutHelpBtn").addEventListener("click", () => sendChord({ key: "?", shiftKey: true }, '"?"'));
+      document.getElementById("summaryTableBtn").addEventListener("click", () => sendChord({ key: "s", ctrlKey: true, altKey: true }, "Ctrl+Alt+S"));
+      document.getElementById("startEarlierBtn").addEventListener("click", () => sendChord({ key: "ArrowLeft", ctrlKey: true, altKey: true }, "Ctrl+Alt+ArrowLeft"));
+      document.getElementById("startLaterBtn").addEventListener("click", () => sendChord({ key: "ArrowRight", ctrlKey: true, altKey: true }, "Ctrl+Alt+ArrowRight"));
+
+      // ===== PNG export =====
+      exportBtn.addEventListener("click", async () => {
+        // Disabling the focused button ejects keyboard focus to <body>; an aria-busy flag plus a
+        // re-entrancy guard keeps focus on the button for the whole export.
+        if (exportBtn.getAttribute("aria-busy") === "true") return;
+        exportBtn.setAttribute("aria-busy", "true");
+        statusText.textContent = "Exporting...";
+        exportPreview.style.display = "none";
+
+        try {
+          const blob = await exportService.toPng();
+
+          if (previousExportUrl) URL.revokeObjectURL(previousExportUrl);
+
+          const url = URL.createObjectURL(blob);
+          previousExportUrl = url;
+          exportPreview.src = url;
+          exportPreview.style.display = "block";
+
+          statusText.textContent = `✓ Export complete (${(blob.size / 1024).toFixed(1)} KB)`;
+          addAnnouncement(`PNG export complete (${(blob.size / 1024).toFixed(1)} KB)`);
+        } catch (err) {
+          statusText.textContent = `✗ Export error: ${err.message}`;
+          addAnnouncement(`Export error: ${err.message}`);
+          console.error("Export error:", err);
+        } finally {
+          exportBtn.removeAttribute("aria-busy");
+        }
+      });
+    </script>
+  </body>
+</html>

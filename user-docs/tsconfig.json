@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    // Off on purpose: `paths` pulls the library sources into this program, and their unused-symbol
+    // hygiene is the library's own tsconfig's business, not the docs site's.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "stargantt": ["../packages/stargantt/src/index.ts"],
+      "@stargantt/core": ["../packages/core/src/index.ts"],
+      "@stargantt/preset-standard": ["../packages/preset-standard/src/index.ts"],
+      "@stargantt/sdk": ["../packages/sdk/src/index.ts"],
+      "@stargantt/plugin-*": ["../packages/plugins/*/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

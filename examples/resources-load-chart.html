@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Load chart and side panel example</title>
+    <!--
+      This page's focus is the merged plugin's `loadChart` nest (docs/specs/plugins/resource.md
+      §3.6/§6.5): the aggregate band, the per-resource lanes, lane scaling, resizable strip
+      dividers and per-run value labels — plus side-panel / edit-dialog / view-mode chrome as
+      supporting teaching content (undo/redo, view modes, a rejected-edit demo).
+
+      - `loadChart` is a nest of the merged `StarGantt.resource({ loadChart: {...} })` factory
+        (resource.md §6.5), with 14 fields.
+      - `sidePanel` / `editDialog` are opt-in nests of `StarGantt.interaction({...})`
+        (interaction.md §6.9/§6.10) — disabled unless the nest is present.
+      - Interaction resolves ONE top-level `messages` catalog for all ten of its nests. The
+        `error*` overrides for edit-dialog and side-panel would otherwise collide, so both are
+        prefixed (`dialogError*` / `panelError*` — interaction.md §7/§8's collision table); this
+        page overrides both prefixes with the same wording.
+      - History and view-mode changes are observed through `stargantt.history`'s `state` store and
+        `stargantt.view`'s `viewMode` store.
+      - Selected task ids are read via `selection.state.get().taskIds`.
+      - `bucket`, `resources`, `lanes`/`total`/`resizable`/`laneScale`/`laneValueLabels`, and
+        whether `editDialog`/`treeGrid.readOnly` are composed are all read once at `setup()`
+        (resource.md §6, interaction.md §6.9), so every toolbar toggle below rebuilds the whole
+        chart (`gantt.dispose()` + a fresh `StarGantt.create()` — the pattern
+        `examples/basic-gantt.html` uses for its own setup-time toggles) instead of mutating a
+        live instance.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 560px;
+        border: 1px solid #ccc;
+      }
+      #toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+        align-items: center;
+        margin-bottom: 4px;
+      }
+      #toolbar span[role="group"] {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .group-label {
+        font-size: 11px;
+        color: #555;
+      }
+      #toolbar button {
+        min-height: 24px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .readout {
+        font-size: 11px;
+        color: #333;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — load chart and side panel</h1>
+    <details>
+      <summary>What's on this page</summary>
+      The load chart's aggregate band and resource lanes (with lane-scale, resizing and per-run
+      value-label toggles), the side panel, the optional edit dialog, view-mode switching and a
+      rejected-edit demo. See the header comment for the page's plugin composition.
+    </details>
+    <div id="toolbar">
+      <span role="group" aria-label="History">
+        <span class="group-label">History</span>
+        <button id="undo-btn" type="button" title="Ctrl+Z">↶ Undo</button>
+        <button id="redo-btn" type="button" title="Ctrl+Shift+Z">↷ Redo</button>
+      </span>
+      <span role="group" aria-label="View mode">
+        <span class="group-label">View</span>
+        <button id="view-split" type="button" aria-pressed="true">Split</button>
+        <button id="view-grid" type="button" aria-pressed="false">Table</button>
+        <button id="view-gantt" type="button" aria-pressed="false">Chart</button>
+        <span class="readout" id="view-readout" aria-live="polite">Mode: <strong>Split</strong></span>
+      </span>
+      <span role="group" aria-label="Resource lanes">
+        <span class="group-label">Lanes</span>
+        <button id="lane-ratio" type="button" aria-pressed="true">Ratio</button>
+        <button id="lane-shared" type="button" aria-pressed="false">Units</button>
+        <button id="lane-auto" type="button" aria-pressed="false">Per lane</button>
+        <button id="total-toggle" type="button" aria-pressed="true">Total band: on</button>
+        <button id="resize-toggle" type="button" aria-pressed="true">Dividers: on</button>
+        <button id="lane-values-toggle" type="button" aria-pressed="false">Values: off</button>
+      </span>
+      <span role="group" aria-label="Side panel">
+        <span class="group-label">Side panel</span>
+        <button id="dialog-toggle" type="button" aria-pressed="false">Edit dialog: off</button>
+        <button id="invalid-edit-btn" type="button">Try an invalid edit</button>
+      </span>
+    </div>
+    <p class="readout" id="lane-readout" aria-live="polite">
+      Scale: <strong>Ratio</strong> — every lane's 100% line sits at the same height.
+    </p>
+    <p class="readout" id="panel-readout" aria-live="polite">
+      Double-click opens the grid's inline cell editor.
+    </p>
+    <div id="chart"></div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "plan", name: "Planning", start: T0, end: T0 + 3 * DAY, progress: 1 },
+            { id: "design", name: "Design", start: T0 + 2 * DAY, end: T0 + 6 * DAY, progress: 0.6 },
+            { id: "impl", name: "Implementation", start: T0 + 5 * DAY, end: T0 + 12 * DAY, progress: 0.3 },
+            { id: "test", name: "Test design", start: T0 + 6 * DAY, end: T0 + 11 * DAY, progress: 0.1 },
+            { id: "review", name: "Review", start: T0 + 8 * DAY, end: T0 + 12 * DAY, progress: 0 },
+            { id: "release", name: "Release", start: T0 + 13 * DAY, end: T0 + 14 * DAY, progress: 0 },
+          ],
+          // Resources: capacity per day. Σcapacity = 1 + 1 + 0.5 = 2.5
+          resources: [
+            { id: "alice", name: "Alice", capacity: 1 },
+            { id: "bob", name: "Bob", capacity: 1 },
+            { id: "carol", name: "Carol", capacity: 0.5 },
+          ],
+          // On days 8-11, where Implementation + Test design + Review overlap, Σunits =
+          // 1 + 1 + 0.5 + 1 = 3.5 > 2.5, so the overload is visible.
+          assignments: [
+            { taskId: "plan", resourceId: "alice", units: 1 },
+            { taskId: "design", resourceId: "alice", units: 1 },
+            { taskId: "design", resourceId: "bob", units: 0.5 },
+            { taskId: "impl", resourceId: "alice", units: 1 },
+            { taskId: "impl", resourceId: "bob", units: 1 },
+            { taskId: "test", resourceId: "carol", units: 0.5 },
+            { taskId: "review", resourceId: "bob", units: 1 },
+            { taskId: "release", resourceId: "alice", units: 1 },
+          ],
+          links: [
+            { id: "l1", sourceId: "plan", targetId: "design", type: "FS", lag: 0 },
+            { id: "l2", sourceId: "design", targetId: "impl", type: "FS", lag: 0 },
+            { id: "l3", sourceId: "impl", targetId: "release", type: "FS", lag: 0 },
+          ],
+        };
+      }
+
+      // The three error cause texts, split into the collision-resolved dialog*/panel* catalog
+      // keys (interaction.md §7/§8) since edit-dialog and side-panel share one top-level
+      // `messages` catalog.
+      const CAUSE_INVALID_DATE = "Type the date as YYYY-MM-DD, for example 2026-03-01";
+      const CAUSE_DATE_ORDER = "End must be later than start — the edit was not applied";
+      const CAUSE_PROGRESS_RANGE = "Progress is a fraction from 0 to 1, for example 0.25";
+      const INTERACTION_MESSAGES = {
+        dialogErrorInvalidDate: CAUSE_INVALID_DATE,
+        dialogErrorDateOrder: CAUSE_DATE_ORDER,
+        dialogErrorProgressRange: CAUSE_PROGRESS_RANGE,
+        panelErrorInvalidDate: CAUSE_INVALID_DATE,
+        panelErrorDateOrder: CAUSE_DATE_ORDER,
+        panelErrorProgressRange: CAUSE_PROGRESS_RANGE,
+      };
+
+      const LANE_SCALES = ["ratio", "shared", "auto"];
+      const LANE_LABELS = { ratio: "Ratio", shared: "Units", auto: "Per lane" };
+      const LANE_NOTES = {
+        ratio: "every lane's 100% line sits at the same height.",
+        shared: "all lanes share one absolute units scale.",
+        auto: "each lane is fitted to its own peak.",
+      };
+      const MODE_LABELS = { split: "Split", grid: "Table", gantt: "Chart" };
+
+      // Setup-time toggle state; every field below is read once at StarGantt.create() and
+      // therefore needs a full rebuild to change (see the header comment).
+      let dialogOn = false;
+      let laneScale = "ratio";
+      let totalBand = true;
+      let resizable = true;
+      let laneValues = false;
+
+      let gantt;
+
+      function rebuild() {
+        if (gantt) gantt.dispose();
+
+        const presetConfig = {
+          view: { panes: { initialViewMode: "split" } },
+        };
+        if (dialogOn) {
+          // The modal edit dialog opens on the same double-click that starts the tree grid's
+          // inline cell editor, so the two must not be composed together — the grid runs
+          // read-only while the dialog is on.
+          presetConfig.treeGrid = { readOnly: true };
+        }
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: [
+            ...StarGantt.presetStandard({
+              ...presetConfig,
+              interaction: {
+                messages: INTERACTION_MESSAGES,
+                sidePanel: {},
+                ...(dialogOn ? { editDialog: {} } : {}),
+              },
+            }),
+            StarGantt.resource({
+              loadChart: {
+                axisLabels: true,
+                valueLabels: true,
+                // Both strips are off by default — composing the plugin reserves no chart height
+                // until a host asks for a strip — so a page about the load chart has to ask.
+                lanes: true,
+                total: totalBand,
+                laneScale: laneScale,
+                laneValueLabels: laneValues,
+                resizable: resizable,
+              },
+            }),
+          ],
+          locale: "en",
+        });
+
+        const dataService = gantt.service("stargantt.data");
+        dataService.load(dataset());
+
+        // History toolbar: the undo-redo plugin (included in presetStandard) also binds
+        // Ctrl+Z / Ctrl+Shift+Z on the chart itself, so the buttons and the chord drive the same
+        // history/undo / history/redo commands. `state.subscribe` replaces the abolished
+        // `history/changed` event.
+        const historyService = gantt.service("stargantt.history");
+        function updateHistoryUI(state) {
+          undoBtn.disabled = !state.canUndo;
+          redoBtn.disabled = !state.canRedo;
+        }
+        historyService.state.subscribe(updateHistoryUI);
+        updateHistoryUI(historyService.state.get());
+
+        // View-mode toolbar: the view plugin's `viewMode` store replaces the abolished
+        // `view/modeChanged` event.
+        function syncViewMode(mode) {
+          for (const key of Object.keys(modeButtons)) {
+            modeButtons[key].setAttribute("aria-pressed", String(key === mode));
+          }
+          const strong = document.createElement("strong");
+          strong.textContent = MODE_LABELS[mode] ?? String(mode);
+          viewReadout.textContent = "Mode: ";
+          viewReadout.appendChild(strong);
+        }
+        gantt.service("stargantt.view").viewMode.subscribe(syncViewMode);
+        syncViewMode("split");
+
+        // Reflect the state actually composed with this instance — a rebuild can never leave a
+        // toggle claiming something it did not apply.
+        dialogBtn.setAttribute("aria-pressed", String(dialogOn));
+        dialogBtn.textContent = dialogOn ? "Edit dialog: on" : "Edit dialog: off";
+        panelReadout.textContent = dialogOn
+          ? "Double-click a bar or a grid row to open the modal task editor (the grid is read-only while it is on)."
+          : "Double-click opens the grid's inline cell editor.";
+
+        for (const key of Object.keys(laneButtons)) {
+          laneButtons[key].setAttribute("aria-pressed", String(key === laneScale));
+        }
+        totalBtn.setAttribute("aria-pressed", String(totalBand));
+        totalBtn.textContent = totalBand ? "Total band: on" : "Total band: off";
+        resizeBtn.setAttribute("aria-pressed", String(resizable));
+        resizeBtn.textContent = resizable ? "Dividers: on" : "Dividers: off";
+        laneValuesBtn.setAttribute("aria-pressed", String(laneValues));
+        laneValuesBtn.textContent = laneValues ? "Values: on" : "Values: off";
+        const laneStrong = document.createElement("strong");
+        laneStrong.textContent = LANE_LABELS[laneScale];
+        laneReadout.textContent = "Scale: ";
+        laneReadout.appendChild(laneStrong);
+        laneReadout.appendChild(document.createTextNode(" — " + LANE_NOTES[laneScale]));
+
+        window.gantt = gantt;
+      }
+
+      // --- Toolbar element handles (created once; rebuild() re-reads live state into them) -----
+      const undoBtn = document.getElementById("undo-btn");
+      const redoBtn = document.getElementById("redo-btn");
+      const modeButtons = {
+        split: document.getElementById("view-split"),
+        grid: document.getElementById("view-grid"),
+        gantt: document.getElementById("view-gantt"),
+      };
+      const viewReadout = document.getElementById("view-readout");
+      const laneButtons = {
+        ratio: document.getElementById("lane-ratio"),
+        shared: document.getElementById("lane-shared"),
+        auto: document.getElementById("lane-auto"),
+      };
+      const totalBtn = document.getElementById("total-toggle");
+      const resizeBtn = document.getElementById("resize-toggle");
+      const laneValuesBtn = document.getElementById("lane-values-toggle");
+      const laneReadout = document.getElementById("lane-readout");
+      const dialogBtn = document.getElementById("dialog-toggle");
+      const panelReadout = document.getElementById("panel-readout");
+
+      // --- Wiring (resolves the live `gantt` at click time, since rebuild() replaces it) --------
+      undoBtn.addEventListener("click", () => {
+        if (gantt) gantt.dispatch("history/undo", undefined);
+      });
+      redoBtn.addEventListener("click", () => {
+        if (gantt) gantt.dispatch("history/redo", undefined);
+      });
+
+      // View modes: the buttons never write their own pressed state — the chart answers through
+      // the viewMode store and rebuild() (and its subscription) keeps the group honest.
+      [
+        ["view-split", "split"],
+        ["view-grid", "grid"],
+        ["view-gantt", "gantt"],
+      ].forEach(([id, mode]) => {
+        document.getElementById(id).addEventListener("click", () => {
+          if (gantt) gantt.dispatch("view/setViewMode", { mode });
+        });
+      });
+
+      // Lane scale / total band / resizable / lane values / edit dialog are all setup-time
+      // options: each button flips its variable and rebuilds.
+      [
+        ["lane-ratio", "ratio"],
+        ["lane-shared", "shared"],
+        ["lane-auto", "auto"],
+      ].forEach(([id, value]) => {
+        document.getElementById(id).addEventListener("click", () => {
+          laneScale = value;
+          rebuild();
+        });
+      });
+      totalBtn.addEventListener("click", () => {
+        totalBand = !totalBand;
+        rebuild();
+      });
+      resizeBtn.addEventListener("click", () => {
+        resizable = !resizable;
+        rebuild();
+      });
+      laneValuesBtn.addEventListener("click", () => {
+        laneValues = !laneValues;
+        rebuild();
+      });
+      dialogBtn.addEventListener("click", () => {
+        dialogOn = !dialogOn;
+        rebuild();
+      });
+
+      // "Try an invalid edit": types 5 into the panel's progress field and commits it. The value is
+      // outside 0..1, so the panel rejects it — the input gets aria-invalid, the cause text from
+      // messages.panelErrorProgressRange is attached, and aria-errormessage points at it.
+      document.getElementById("invalid-edit-btn").addEventListener("click", () => {
+        const readout = panelReadout;
+        if (!gantt) return;
+        const selection = gantt.service("stargantt.selection");
+        if (selection.state.get().taskIds.size !== 1) selection.select(["impl"]);
+        // The panel refreshes on the next animation frame, so wait one before touching its input.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const input = document.querySelector(".sg-side-panel-detail input[type=number]");
+            if (!input) {
+              readout.textContent = "Select a single task first, then try again.";
+              return;
+            }
+            input.value = "5";
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+            const errorId = input.getAttribute("aria-errormessage");
+            const error = errorId ? document.getElementById(errorId) : null;
+            readout.textContent = error
+              ? 'Rejected: aria-invalid=' +
+                input.getAttribute("aria-invalid") +
+                ', aria-errormessage → "' +
+                error.textContent +
+                '"'
+              : "The edit was not rejected.";
+          });
+        });
+      });
+
+      rebuild();
+    </script>
+  </body>
+</html>

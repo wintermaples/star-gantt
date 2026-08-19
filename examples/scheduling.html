@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Scheduling example</title>
+    <!--
+      One HTML file + one script tag, composed with `presetStandard()` and the scheduling plugin:
+      dependency links (creation by port drag / keyboard chord, selection, deletion,
+      inspector, conflict/driving/path highlighting), the headless auto-scheduling engine
+      (propagation on, so a predecessor edit visibly moves its successors), a working calendar with
+      weekends off, critical-path visuals (bars, links, free-float) and the schedule-diagnostics
+      panel. `interaction.snap.workingDays` is turned on too, so a drag that would land on a
+      non-working day snaps to the nearest working boundary through this plugin's
+      `snap/workingTime` contribution (scheduling.md §4.1).
+
+      The dataset below is small and deliberately deterministic (no Math.random(), fixed relative
+      offsets from "today") so both a manual pass through this page and e2e/scheduling.spec.ts see
+      the exact same shapes: one FS/SS/FF/SF sample of each dependency type, one isolated pair for
+      cycle rejection, one isolated pair for propagation (with a lag), one unlinked task for the
+      working-time snap and for on-demand link-creation tests, and one genuinely orphaned task so
+      the diagnostics panel has something to report. CLAUDE.md's documented viewport floor is
+      720x540 (tablet and up, no mobile breakpoints) — the chrome below is kept minimal.
+
+      `?tasks=N` switches to a deterministic N-task predecessor chain instead (all FS-linked,
+      propagation on) for the 10k-task reschedule performance measurement; see
+      e2e/scheduling.spec.ts's "performance" describe block.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — scheduling</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Dependency links (FS/SS/FF/SF samples, port drag / <kbd>Alt+L</kbd> creation, click to
+      select, Delete to remove, side-panel inspector), a working calendar (Sat/Sun off, shaded),
+      auto-scheduling (drag a predecessor and its successor follows), critical-path highlighting,
+      and the schedule diagnostics panel (top-left corner).
+    </details>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2). Anchoring the data there puts the chart in the initial view with zero
+      // configuration, and lets e2e/scheduling.spec.ts pin `Date.now()` and recompute the same
+      // offsets it reads here.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      // Every task and link below is annotated with the day offset it sits at, in DAY units from
+      // T0, so a reader (and e2e/scheduling.spec.ts) can recompute exact instants without loading
+      // the page: root 0..11, spec 0..3, impl 3..8, qa 8..11, ship 11..11 (milestone), audit 4..6,
+      // cycA 1..2, cycB 2..3, pred 5..7, succ 9..10, wk 0..3 (unlinked). Links: spec-FS->impl,
+      // impl-SS(lag 1d)->qa, qa-FF->ship, spec-SF->audit, cycA-FS->cycB, pred-FS(lag 2d)->succ.
+      function smallDataset() {
+        return {
+          tasks: [
+            { id: "root", parentId: null, name: "Project", type: "summary", start: T0, end: T0 + 11 * DAY },
+            { id: "spec", parentId: "root", name: "Design", start: T0, end: T0 + 3 * DAY },
+            { id: "impl", parentId: "root", name: "Build", start: T0 + 3 * DAY, end: T0 + 8 * DAY },
+            { id: "qa", parentId: "root", name: "Verify", start: T0 + 8 * DAY, end: T0 + 11 * DAY },
+            { id: "ship", parentId: "root", name: "Release", type: "milestone", start: T0 + 11 * DAY, end: T0 + 11 * DAY },
+            { id: "audit", parentId: "root", name: "Audit", start: T0 + 4 * DAY, end: T0 + 6 * DAY },
+            { id: "cycA", parentId: "root", name: "Loop A", start: T0 + 1 * DAY, end: T0 + 2 * DAY },
+            { id: "cycB", parentId: "root", name: "Loop B", start: T0 + 2 * DAY, end: T0 + 3 * DAY },
+            { id: "pred", parentId: "root", name: "Predecessor", start: T0 + 5 * DAY, end: T0 + 7 * DAY },
+            { id: "succ", parentId: "root", name: "Successor", start: T0 + 9 * DAY, end: T0 + 10 * DAY },
+            { id: "wk", parentId: "root", name: "Weekend Task", start: T0, end: T0 + 3 * DAY },
+          ],
+          links: [
+            { id: "l1", sourceId: "spec", targetId: "impl", type: "FS" },
+            { id: "l2", sourceId: "impl", targetId: "qa", type: "SS", lag: 1 * DAY },
+            { id: "l3", sourceId: "qa", targetId: "ship", type: "FF" },
+            { id: "l4", sourceId: "spec", targetId: "audit", type: "SF" },
+            { id: "l5", sourceId: "cycA", targetId: "cycB", type: "FS" },
+            { id: "l6", sourceId: "pred", targetId: "succ", type: "FS", lag: 2 * DAY },
+          ],
+        };
+      }
+
+      /** Deterministic N-task predecessor chain for the perf harness: every task
+       *  FS-linked to the previous one, so moving task 0 propagates through the whole chain. */
+      function chainDataset(count) {
+        const tasks = [{ id: "root", parentId: null, name: "Chain", type: "summary", start: T0, end: T0 + count * DAY }];
+        const links = [];
+        let prev = null;
+        for (let i = 0; i < count; i++) {
+          const id = "c" + i;
+          tasks.push({ id, parentId: "root", name: "Task " + (i + 1), start: T0 + i * DAY, end: T0 + (i + 1) * DAY });
+          if (prev !== null) links.push({ id: "cl" + i, sourceId: prev, targetId: id, type: "FS" });
+          prev = id;
+        }
+        return { tasks, links };
+      }
+
+      const params = new URLSearchParams(location.search);
+      const requestedCount = Number(params.get("tasks"));
+      const dataset =
+        Number.isFinite(requestedCount) && requestedCount > 0 ? chainDataset(requestedCount) : smallDataset();
+
+      // `?routing=elbow` switches the one link-routing option away from this page's own default
+      // demo choice ("straight"). It exists ONLY so e2e/scheduling.spec.ts can navigate to an
+      // isolated variant of this exact dataset via a second `page.goto` — changing exactly one
+      // option without also changing the manually-reviewed default page.
+      const routingStyle = params.get("routing") === "elbow" ? "elbow" : "straight";
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          interaction: {
+            // Working-time avoidance only; the rest of interaction's defaults (selection,
+            // dragEdit, tooltip) are already on through the four preset-bundled nests.
+            snap: { workingDays: true },
+          },
+          scheduling: {
+            dependencies: {
+              // "straight" (this page's default) keeps a link's route a single anchor-to-anchor
+              // segment, which is what lets e2e/scheduling.spec.ts compute a route's on-canvas
+              // pixels without reimplementing the elbow router (scheduling.md §5.3 — either style
+              // is a supported configuration, this is not a default-composition change).
+              routingStyle,
+              linkEditing: true,
+              highlightPaths: true,
+              highlightConflicts: true,
+              highlightDriving: true,
+              highlightDropTargets: true,
+              inspector: true,
+            },
+            autoSchedule: { enabled: true, modeColumn: true },
+            calendars: {
+              calendars: [{ id: "std", name: "Standard", isDefault: true, workingDays: [1, 2, 3, 4, 5] }],
+            },
+            criticalPath: { showFloat: true },
+            diagnostics: { panel: true },
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset);
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

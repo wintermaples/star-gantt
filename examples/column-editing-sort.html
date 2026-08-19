@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StarGantt v2 — Column editing and sort example</title>
+  <!--
+    Demonstrates the tree-grid's `wbs`, `columnLayout`, `cellRenderers`, `rowClass` and
+    `collation` config fields, plus a third-party plugin contributing extra editable columns (a
+    numeric editor, the bundled `selectEditor`, the bundled `dateEditor`) via `grid/columns`.
+
+    This page is self-contained (see examples/interaction.html for the pattern): a local
+    `boot()` function builds the `treeGrid` config from the checkbox/select state and creates a
+    fresh `StarGantt.create()` instance, disposing the previous one first (`gantt.dispose()`) —
+    since `wbs`/`columnLayout`/`cellRenderers`/`rowClass`/`collation` are all resolved once at
+    `setup()`, a live instance cannot apply a config change without being rebuilt. The timeline
+    origin is configured via `view.timeline.origin`. History changes are observed via
+    `gantt.service("stargantt.history").state.subscribe(renderHistory)`.
+    `StarGantt.definePlugin` / `ctx.contribute("grid/columns", ...)` / `StarGantt.selectEditor` /
+    `StarGantt.dateEditor` are used as documented (verified against
+    packages/plugins/tree-grid/src/index.ts exports).
+  -->
+  <style>
+    body {
+      margin: 0;
+      padding: 6px 12px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+    h2 {
+      font-size: 12px;
+      font-weight: 600;
+      margin: 8px 0 4px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 16px;
+      margin: 0 0 6px;
+    }
+    .group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11px;
+    }
+    .group-label {
+      font-weight: 600;
+      color: #555;
+    }
+    label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    #chart {
+      height: 420px;
+      border: 1px solid #ccc;
+    }
+    .lower {
+      display: flex;
+      gap: 16px;
+      margin-top: 6px;
+    }
+    .lower ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+    #historyLabels {
+      margin: 0;
+      padding-left: 18px;
+      font: 11px/1.4 ui-monospace, monospace;
+    }
+    #historyLabels .empty {
+      list-style: none;
+      margin-left: -18px;
+      color: #777;
+    }
+    /* cellRenderers demo painting */
+    .demo-meter {
+      display: inline-block;
+      width: 48px;
+      height: 6px;
+      background: #eee;
+      border-radius: 3px;
+      overflow: hidden;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+    .demo-meter-fill {
+      display: block;
+      height: 100%;
+      background: #0f766e;
+    }
+    .demo-meter-text {
+      font-size: 10px;
+      color: #555;
+    }
+    .demo-pill {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-size: 10px;
+      background: #eee;
+    }
+    .demo-pill--done { background: #d1fae5; }
+    .demo-pill--in-progress { background: #fef3c7; }
+    .demo-pill--open { background: #e5e7eb; }
+  </style>
+</head>
+<body>
+  <h1>StarGantt v2 — column editing and sort</h1>
+
+  <div class="toolbar">
+    <div class="group">
+      <span class="group-label">columns</span>
+      <label><input type="checkbox" id="wbsToggle" /><code>wbs</code>: WBS numbering column</label>
+      <label>
+        <code>columnLayout</code>
+        <select id="layoutSelect">
+          <option value="none">as contributed</option>
+          <option value="compact">hide Start &amp; End</option>
+          <option value="wbsFirst">WBS, Status, Name first</option>
+        </select>
+      </label>
+    </div>
+    <div class="group">
+      <span class="group-label">cell &amp; row painting</span>
+      <label><input type="checkbox" id="renderersToggle" /><code>cellRenderers</code>: Progress meter + Status pill</label>
+      <label><input type="checkbox" id="rowClassToggle" /><code>rowClass</code>: flag priority-1 rows</label>
+    </div>
+    <div class="group">
+      <span class="group-label">sorting</span>
+      <label><input type="checkbox" id="collationToggle" /><code>collation</code>: locale-aware, numeric Name sort</label>
+    </div>
+  </div>
+
+  <div id="chart"></div>
+
+  <div class="lower">
+    <div>
+      <h2>How to use</h2>
+      <ul>
+        <li>Double-click any cell to edit it. Select a row and press <strong>Enter</strong> to
+          edit its first editable column (Name).</li>
+        <li>Click the "Priority" header to sort ascending, click again for descending, a third time to turn sort off.</li>
+        <li>Drag a header column boundary to resize that column.</li>
+        <li>Every edit dispatches <code>task/update</code>, so it is undoable.</li>
+      </ul>
+      <h2>Config toggles</h2>
+      <ul>
+        <li><code>wbs</code> prepends a read-only "WBS" column (<code>1</code>, <code>1.1</code>,
+          …) computed from the store's sibling order; its header sorts numerically per segment.</li>
+        <li><code>columnLayout</code> only changes what the pane <em>displays</em> — hidden and
+          reordered columns keep their editing, sorting and resize behavior.</li>
+        <li><code>cellRenderers</code> replaces how Progress and Status paint their cells; the
+          headers, widths, editors and sorting are untouched.</li>
+        <li><code>rowClass</code> adds a stripe and bolder text to rows whose Priority is 1.</li>
+        <li><code>collation</code> gives the built-in Name header an <code>Intl.Collator</code>
+          sort (<code>numeric: true</code>, so "Phase 2" precedes "Phase 10"). With it off the
+          Name header stays inert — a column without <code>compare</code> does not sort.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>History</h2>
+      <ol id="historyLabels">
+        <li class="empty">Nothing to undo yet</li>
+      </ol>
+    </div>
+  </div>
+
+  <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+  <script>
+    const DAY = 24 * 60 * 60 * 1000;
+    // Fixed anchor date (not "now"): keeps screenshots stable across runs.
+    const T0 = Date.UTC(2026, 7, 3);
+
+    function dataset() {
+      return {
+        tasks: [
+          { id: "p1", parentId: null, name: "Discovery", start: T0, end: T0 + 8 * DAY, type: "summary" },
+          { id: "t1", parentId: "p1", name: "Spec review", start: T0, end: T0 + 3 * DAY, type: "task", progress: 1, meta: { priority: 2, status: "Done" } },
+          { id: "t2", parentId: "p1", name: "API design", start: T0 + 2 * DAY, end: T0 + 8 * DAY, type: "task", progress: 0.7, meta: { priority: 1, status: "In progress" } },
+          { id: "p2", parentId: null, name: "Build", start: T0 + 5 * DAY, end: T0 + 18 * DAY, type: "summary" },
+          { id: "t3", parentId: "p2", name: "Implementation", start: T0 + 5 * DAY, end: T0 + 16 * DAY, type: "task", progress: 0.3, meta: { priority: 3, status: "Open" } },
+          { id: "t4", parentId: "p2", name: "Test plan", start: T0 + 6 * DAY, end: T0 + 12 * DAY, type: "task", progress: 0.4, meta: { priority: 2, status: "In progress" } },
+          // "Phase 2" / "Phase 10": with `collation` on (numeric: true) the Name sort puts 2
+          // before 10; a plain string comparison would do the opposite.
+          { id: "t6", parentId: "p2", name: "Phase 2 hardening", start: T0 + 12 * DAY, end: T0 + 15 * DAY, type: "task", progress: 0.1, meta: { priority: 1, status: "Open" } },
+          { id: "t7", parentId: "p2", name: "Phase 10 hardening", start: T0 + 15 * DAY, end: T0 + 18 * DAY, type: "task", progress: 0, meta: { priority: 3, status: "Open" } },
+          { id: "t5", parentId: null, name: "Rollout", start: T0 + 16 * DAY, end: T0 + 20 * DAY, type: "task", progress: 0, meta: { priority: 1, status: "Open" } },
+        ],
+      };
+    }
+
+    const STATUS_VALUES = ["Open", "In progress", "Done"];
+    const STATUS_MARKS = { "Open": "○", "In progress": "◐", "Done": "●" };
+
+    function isChecked(id) {
+      const el = document.getElementById(id);
+      return el ? el.checked : false;
+    }
+    function selectedValue(id, fallback) {
+      const el = document.getElementById(id);
+      return el ? el.value : fallback;
+    }
+
+    function progressMeter(el, task) {
+      if (typeof task.progress !== "number" || !Number.isFinite(task.progress)) return;
+      const pct = Math.round(Math.max(0, Math.min(1, task.progress)) * 100);
+      const meter = document.createElement("span");
+      meter.className = "demo-meter";
+      const fill = document.createElement("span");
+      fill.className = "demo-meter-fill";
+      fill.style.width = pct + "%";
+      meter.appendChild(fill);
+      const text = document.createElement("span");
+      text.className = "demo-meter-text";
+      text.textContent = pct + "%";
+      el.appendChild(meter);
+      el.appendChild(text);
+    }
+
+    function statusPill(el, task) {
+      const status = (task.meta && task.meta.status) || "";
+      if (!status) return;
+      const pill = document.createElement("span");
+      pill.className = "demo-pill demo-pill--" + status.toLowerCase().replace(/\s+/g, "-");
+      pill.textContent = (STATUS_MARKS[status] || "•") + " " + status;
+      el.appendChild(pill);
+    }
+
+    function flagRow(task) {
+      return task.meta && task.meta.priority === 1 ? "demo-row-flagged" : undefined;
+    }
+
+    function buildTreeGridConfig() {
+      const treeGridConfig = { paneWidth: 760 };
+      if (isChecked("wbsToggle")) treeGridConfig.wbs = true;
+      const layout = selectedValue("layoutSelect", "none");
+      if (layout === "compact") {
+        treeGridConfig.columnLayout = { hidden: ["start", "end"] };
+      } else if (layout === "wbsFirst") {
+        treeGridConfig.columnLayout = { order: ["wbs", "status", "name"] };
+      }
+      if (isChecked("renderersToggle")) {
+        treeGridConfig.cellRenderers = { progress: progressMeter, status: statusPill };
+      }
+      if (isChecked("rowClassToggle")) treeGridConfig.rowClass = flagRow;
+      if (isChecked("collationToggle")) {
+        treeGridConfig.collation = { locales: "en", options: { numeric: true, sensitivity: "base" } };
+      }
+      return treeGridConfig;
+    }
+
+    // Third-party plugin: contributes a numeric "Priority" column (hand-written editor), a
+    // "Status" column (bundled selectEditor) and an editable "Due" column (bundled dateEditor).
+    const columnsPlugin = StarGantt.definePlugin({
+      meta: {
+        id: "demo.extra-columns",
+        dependsOn: ["stargantt.tree-grid", "stargantt.data-store"],
+        order: "normal",
+      },
+      setup(ctx) {
+        ctx.contribute("grid/columns", {
+          id: "priority",
+          header: "Priority",
+          width: 80,
+          render(el, task) {
+            el.textContent = String(task.meta && task.meta.priority != null ? task.meta.priority : "");
+            el.style.textAlign = "right";
+          },
+          getValue(task) {
+            return task.meta ? task.meta.priority : undefined;
+          },
+          setValue(task, value) {
+            if (value === "" || value == null) return;
+            const n = Number(value);
+            if (!Number.isFinite(n)) return;
+            task.meta = Object.assign({}, task.meta, { priority: n });
+          },
+          compare(a, b) {
+            const pa = a.meta && typeof a.meta.priority === "number" ? a.meta.priority : Infinity;
+            const pb = b.meta && typeof b.meta.priority === "number" ? b.meta.priority : Infinity;
+            return pa - pb;
+          },
+          editor(el, initialValue, done) {
+            const input = document.createElement("input");
+            input.type = "number";
+            input.className = "cell-editor";
+            input.value = initialValue != null ? String(initialValue) : "";
+            el.appendChild(input);
+            input.focus();
+            input.select();
+            input.addEventListener("keydown", (e) => {
+              if (e.key === "Enter") { e.preventDefault(); done.commit(input.value); }
+              else if (e.key === "Escape") { e.preventDefault(); done.cancel(); }
+            });
+            input.addEventListener("blur", () => done.commit(input.value));
+          },
+        });
+
+        ctx.contribute("grid/columns", {
+          id: "status",
+          header: "Status",
+          width: 100,
+          render(el, task) {
+            el.textContent = (task.meta && task.meta.status) || "";
+          },
+          getValue(task) {
+            return task.meta ? task.meta.status : undefined;
+          },
+          setValue(task, value) {
+            task.meta = Object.assign({}, task.meta, { status: value });
+          },
+          editor: StarGantt.selectEditor(STATUS_VALUES),
+        });
+
+        ctx.contribute("grid/columns", {
+          id: "due",
+          header: "Due",
+          width: 100,
+          render(el, task) {
+            el.textContent =
+              typeof task.end === "number" && Number.isFinite(task.end)
+                ? new Date(task.end).toISOString().slice(0, 10)
+                : "";
+          },
+          getValue(task) {
+            return task.end;
+          },
+          setValue(task, value) {
+            if (typeof value !== "number" || !Number.isFinite(value)) return;
+            task.end = value;
+          },
+          compare(a, b) {
+            const ea = typeof a.end === "number" ? a.end : Infinity;
+            const eb = typeof b.end === "number" ? b.end : Infinity;
+            return ea - eb;
+          },
+          editor: StarGantt.dateEditor(),
+        });
+      },
+    });
+
+    const historyLabelsEl = document.getElementById("historyLabels");
+    let gantt;
+
+    function renderHistory() {
+      const historyService = gantt.service("stargantt.history");
+      const next = historyService.peekUndo();
+      const labels = historyService.undoLabels();
+      if (next === undefined || labels.length === 0) {
+        historyLabelsEl.innerHTML = '<li class="empty">Nothing to undo yet</li>';
+        return;
+      }
+      historyLabelsEl.innerHTML = labels
+        .map((label, i) => `<li>${i === 0 ? "→ " : ""}${label}</li>`)
+        .join("");
+    }
+
+    // `wbs`/`columnLayout`/`cellRenderers`/`rowClass`/`collation` are all resolved once at
+    // `setup()`, so a toggle change cannot be applied to the live instance — this rebuilds the
+    // whole chart from the current control state instead.
+    function boot() {
+      if (gantt) gantt.dispose();
+
+      const treeGridConfig = buildTreeGridConfig();
+
+      gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          ...StarGantt.presetStandard({
+            treeGrid: treeGridConfig,
+            view: { timeline: { origin: T0 } },
+          }),
+          columnsPlugin,
+        ],
+        locale: "en",
+      });
+
+      gantt.service("stargantt.data").load(dataset());
+      gantt.service("stargantt.history").state.subscribe(renderHistory);
+      renderHistory();
+
+      window.gantt = gantt;
+    }
+
+    ["wbsToggle", "renderersToggle", "rowClassToggle", "collationToggle", "layoutSelect"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("change", boot);
+    });
+
+    boot();
+  </script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Dashboard example</title>
+    <!--
+      Demonstrates the OPT-IN `StarGantt.portfolio()` plugin's dashboard feature area. This page
+      composes `StarGantt.portfolio({ dashboard: {} })` (an empty `dashboard` nest is enough;
+      nodes/goals are left empty since this page demonstrates only the headless KPI panel, not
+      the hierarchy). `stargantt.dashboard` is one of the two services the `portfolio` plugin
+      registers (alongside `stargantt.portfolio`), reached via
+      `gantt.service("stargantt.dashboard")`. The dashboard's own events
+      (`dashboard/opened` / `dashboard/closed` / `dashboard/refreshed`) are retained activity
+      notifications, kept separate from the `sync/` namespace (which is used only by data-sync's
+      five merged areas).
+
+      The page is a single self-contained boot script, matching `examples/data-sync.html`'s
+      idiom.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      #chart {
+        height: 420px;
+        border: 1px solid #ccc;
+      }
+      #toolbar button {
+        min-height: 24px;
+        margin: 4px 4px 4px 0;
+        font: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — dashboard (KPI panel)</h1>
+    <details>
+      <summary>What's on this page</summary>
+      One <code>portfolio({ dashboard: {} })</code> composition. The dashboard is a feature area
+      of the merged portfolio plugin — no separate factory exists in v2.
+    </details>
+    <div id="toolbar">
+      <button id="dash-open">Open dashboard</button>
+    </div>
+    <div id="chart"></div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // Anchor the data at today 0:00 UTC — the default time-axis origin — so the chart opens on
+      // the data and the overdue widget has something past due to list.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "plan", name: "Planning", start: T0 - 7 * DAY, end: T0 - 4 * DAY, progress: 1 },
+            // Ended yesterday at 60% — the overdue widget's subject.
+            { id: "design", name: "Design", start: T0 - 5 * DAY, end: T0 - 1 * DAY, progress: 0.6 },
+            { id: "impl", name: "Implementation", start: T0 - 2 * DAY, end: T0 + 6 * DAY, progress: 0.2 },
+            { id: "review", name: "Review", start: T0 + 5 * DAY, end: T0 + 8 * DAY },
+            { id: "ship", name: "Ship", start: T0 + 8 * DAY, end: T0 + 8 * DAY, type: "milestone" },
+          ],
+          resources: [
+            { id: "alice", name: "Alice", capacity: 1 },
+            { id: "bob", name: "Bob", capacity: 1 },
+          ],
+          assignments: [
+            { taskId: "design", resourceId: "alice", units: 1 },
+            { taskId: "impl", resourceId: "bob", units: 1 },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          // "plan" starts at `T0 - 7 * DAY`, before the default today-anchored origin — without
+          // this, that content sits left of content x = 0 and no scroll gesture can reach it.
+          ...StarGantt.presetStandard({ view: { timeline: { origin: T0 - 7 * DAY } } }),
+          StarGantt.portfolio({ dashboard: {} }),
+        ],
+      });
+
+      gantt.service("stargantt.data").load(dataset());
+
+      document.getElementById("dash-open").addEventListener("click", () => {
+        gantt.service("stargantt.dashboard").open();
+      });
+
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

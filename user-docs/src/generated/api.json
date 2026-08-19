@@ -1,0 +1,1811 @@
+{
+  "schemaVersion": 1,
+  "core": {
+    "exports": [
+      "AnyPlugin",
+      "Cancelable",
+      "CommandRunner",
+      "Commands",
+      "ContributionFor",
+      "ContributionOf",
+      "Disposable",
+      "Events",
+      "ExtensionPoint",
+      "ExtensionPointDecl",
+      "ExtensionPoints",
+      "Gantt",
+      "GanttInstance",
+      "GanttOptions",
+      "OrderRegistration",
+      "Plugin",
+      "PluginContext",
+      "PluginMeta",
+      "PluginState",
+      "ResultFor",
+      "ResultOf",
+      "Services",
+      "SlotGrant",
+      "Store",
+      "WritableStore",
+      "collect",
+      "definePlugin",
+      "first",
+      "reduce"
+    ],
+    "interfaces": [
+      {
+        "name": "Disposable",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "Store",
+        "type": "interface",
+        "optional": false,
+        "doc": "Read side of a store: the current state, plus notification when it is replaced."
+      },
+      {
+        "name": "WritableStore",
+        "type": "interface",
+        "optional": false,
+        "doc": "Write side of a store, held by the service that owns the state."
+      },
+      {
+        "name": "Services",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "Events",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "Commands",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "ExtensionPoints",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "ExtensionPointDecl",
+        "type": "interface",
+        "optional": false,
+        "doc": "Phantom carrier used by `ExtensionPoints` entries. Never instantiated at runtime."
+      },
+      {
+        "name": "ContributionOf",
+        "type": "type",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "ResultOf",
+        "type": "type",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "ContributionFor",
+        "type": "type",
+        "optional": false,
+        "doc": "The contribution type declared for an extension-point key. Only keys declared on the\n`ExtensionPoints` interface (via declaration merging) are accepted; passing any other string is\na compile-time error."
+      },
+      {
+        "name": "ResultFor",
+        "type": "type",
+        "optional": false,
+        "doc": "The reduced-result type declared for an extension-point key; same key rules as `ContributionFor`."
+      },
+      {
+        "name": "Cancelable",
+        "type": "interface",
+        "optional": false,
+        "doc": "Shape shared by every cancelable \"will\" pre-event payload."
+      },
+      {
+        "name": "ExtensionPoint",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "collect",
+        "type": "function",
+        "optional": false,
+        "doc": "Merge strategy `collect`: all contributions as an array, in startup order."
+      },
+      {
+        "name": "first",
+        "type": "function",
+        "optional": false,
+        "doc": "Merge strategy `first`. Contributions are functions of a common signature; the reduced value is a\ncomposite of the same signature that calls each contribution in startup order and returns the\nfirst non-`undefined` result.\n\nThe per-contribution calls are the point-owning plugin's responsibility to guard — this\ncomposite deliberately does not try/catch."
+      },
+      {
+        "name": "reduce",
+        "type": "function",
+        "optional": false,
+        "doc": "Merge strategy `reduce`: arbitrary fold of the contributions to a single value."
+      },
+      {
+        "name": "SlotGrant",
+        "type": "interface",
+        "optional": false,
+        "doc": "The answer to a `claimSlot` request."
+      },
+      {
+        "name": "OrderRegistration",
+        "type": "interface",
+        "optional": false,
+        "doc": "One entry of an order scope, as reported by the instance handle's `orders()`."
+      },
+      {
+        "name": "CommandRunner",
+        "type": "type",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "PluginMeta",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "Plugin",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "AnyPlugin",
+        "type": "type",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "definePlugin",
+        "type": "function",
+        "optional": false,
+        "doc": "Identity function, purely for type inference of a plugin's config type. No runtime behavior."
+      },
+      {
+        "name": "PluginState",
+        "type": "type",
+        "optional": false,
+        "doc": "Lifecycle state of a registered plugin."
+      },
+      {
+        "name": "PluginContext",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "GanttOptions",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "GanttInstance",
+        "type": "interface",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "Gantt",
+        "type": "const",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "id": "stargantt.data-store",
+      "package": "@stargantt/plugin-data-store",
+      "category": "basic",
+      "dir": "packages/plugins/data-store",
+      "factory": "dataStore",
+      "configType": "DataStoreConfig",
+      "config": [
+        {
+          "name": "messages",
+          "type": "Partial<DataStoreMessages>",
+          "optional": true,
+          "doc": "Replacement transaction labels, per key. Keys left out keep their English defaults."
+        },
+        {
+          "name": "customFields",
+          "type": "{ fields?: readonly CustomFieldDef[]; }",
+          "optional": true,
+          "doc": "Former custom-fields config, nested."
+        }
+      ],
+      "dependsOn": [],
+      "services": [
+        {
+          "key": "stargantt.data",
+          "type": "DataService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.fields",
+          "type": "FieldsService",
+          "doc": ""
+        }
+      ],
+      "events": [
+        {
+          "key": "data/willApplyTransaction",
+          "type": "Cancelable & { transaction: Transaction; }",
+          "doc": "Emitted before a transaction is applied. Cancelable via `preventDefault()`; handlers may\nalso append their own patches to `transaction.patches`, which are applied in the same\natomic step and undone as part of the same history entry."
+        },
+        {
+          "key": "data/didApplyTransaction",
+          "type": "{ transaction: Transaction; }",
+          "doc": "Emitted once per applied transaction, immediately after its store burst, carrying the\ntransaction with its **final** patch list (will-phase appends and summary promotion\nincluded). Never fires for a transaction cancelled in the will phase, one whose atomic\napply throws, an empty-patch no-op, or a bulk path (`load()` / `materializeChildren()`).\nThe authoritative settle signal for transaction consumers (undo-redo records from this,\nnot from `data/willApplyTransaction` — see undo-redo.md §Recording)."
+        }
+      ],
+      "commands": [
+        {
+          "key": "task/move",
+          "type": "{ id: TaskId; start: number; end: number; coalesceKey?: string; }",
+          "doc": ""
+        },
+        {
+          "key": "task/setProgress",
+          "type": "{ id: TaskId; progress: number; coalesceKey?: string; }",
+          "doc": ""
+        },
+        {
+          "key": "task/add",
+          "type": "{ task: Partial<Task> & { name: string; }; index?: number; origin?: string; }",
+          "doc": ""
+        },
+        {
+          "key": "task/remove",
+          "type": "{ ids: TaskId[]; origin?: string; }",
+          "doc": ""
+        },
+        {
+          "key": "task/update",
+          "type": "{\n  id: TaskId;\n  after: Partial<Task>;\n  clears?: readonly (keyof Task)[];\n  origin?: string;\n}",
+          "doc": ""
+        },
+        {
+          "key": "link/add",
+          "type": "{\n  sourceId: TaskId;\n  targetId: TaskId;\n  type: LinkType;\n  lag?: number;\n  id?: LinkId;\n  origin?: string;\n}",
+          "doc": ""
+        },
+        {
+          "key": "link/update",
+          "type": "{ id: LinkId; type?: LinkType; lag?: number; origin?: string; }",
+          "doc": "Retypes and/or re-lags one existing link, keeping its id and its endpoints — the whole edit\nis one transaction, so it takes exactly one undo step.\n\nEach of `type` and `lag` is optional and, when omitted, leaves that side of the link alone.\n`lag: 0` removes the lag (a zero lag and no lag describe the same dependency). An `id` that\nnames no link, a non-finite `lag`, and a payload that would change nothing all leave the\nstore untouched and produce no history entry."
+        },
+        {
+          "key": "link/remove",
+          "type": "{ ids: LinkId[]; origin?: string; }",
+          "doc": "Deletes dependency links by id. An id that names no link is ignored."
+        },
+        {
+          "key": "resource/add",
+          "type": "{ resource: Partial<Resource> & { name: string; }; origin?: string; }",
+          "doc": ""
+        },
+        {
+          "key": "resource/update",
+          "type": "{ id: ResourceId; after: Partial<Resource>; origin?: string; }",
+          "doc": ""
+        },
+        {
+          "key": "resource/remove",
+          "type": "{ ids: ResourceId[]; origin?: string; }",
+          "doc": "Deletes resources by id, together with every assignment of the removed resources. An id\nthat names no resource is ignored."
+        },
+        {
+          "key": "assignment/set",
+          "type": "{ taskId: TaskId; resourceId: ResourceId; units: number; origin?: string; }",
+          "doc": "Upsert: creates the (taskId, resourceId) assignment or updates its `units`. A `units` that\nis not a finite number greater than zero, or an endpoint that does not exist, changes\nnothing."
+        },
+        {
+          "key": "assignment/remove",
+          "type": "{ taskId: TaskId; resourceId: ResourceId; origin?: string; }",
+          "doc": "Deletes one assignment by its composite key. A pair that names no assignment is ignored."
+        },
+        {
+          "key": "history/apply",
+          "type": "{ patches: readonly Patch[]; origin?: string; }",
+          "doc": "Applies an ordered list of patches as a single transaction, exactly as given: no patch is\nrebuilt from a command payload, and no builder re-validates it against the current store\nstate. Intended for replaying a previously recorded patch list (an undo/redo history entry\nabove all) in one atomic step rather than one command dispatch per patch."
+        }
+      ],
+      "extensionPoints": [],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/data-store.md"
+    },
+    {
+      "id": "stargantt.task-bars",
+      "package": "@stargantt/plugin-task-bars",
+      "category": "basic",
+      "dir": "packages/plugins/task-bars",
+      "factory": "taskBars",
+      "configType": "TaskBarsConfig",
+      "config": [
+        {
+          "name": "label",
+          "type": "BarLabelProvider | { text: BarLabelProvider; placement?: LabelPlacement; }",
+          "optional": true,
+          "doc": "Draws a text label beside each task's bar.\n\nOmit it and no bar carries a label, which is the default. Supply a function and it is called\nonce per visible bar on every paint; the string it returns is drawn past the bar's right edge,\nand returning `undefined` (or the empty string) leaves that bar unlabelled. The object form\ntakes the same function as `text` and moves every label to another side: `\"left\"` ends just\nbefore the bar, `\"inside\"` is centred on the bar and clipped to it."
+        },
+        {
+          "name": "messages",
+          "type": "Partial<TaskBarsMessages>",
+          "optional": true,
+          "doc": "Replacement wording for the built-in empty state, per key. Keys left out keep their English\ndefaults."
+        },
+        {
+          "name": "labelBackdrop",
+          "type": "boolean | { color?: string; padding?: number; radius?: number; }",
+          "optional": true,
+          "doc": "Paints a halo behind every label drawn *outside* a bar, so it stays legible where a dependency\nline crosses it.\n\nOn by default, which changes nothing until a chart asks for labels: with none configured there\nis nothing to put a halo behind. The fill comes from the `--sg-bar-label-backdrop` theme token\nand covers only the label's own text, so the line stays visible either side of it. Labels\nplaced inside a bar never get one — they sit on the bar's fill, not on the chart background.\n\nThe object form overrides the fill, the padding around the text in CSS px, and the corner\nradius. `false` paints bare text."
+        },
+        {
+          "name": "durationLabel",
+          "type": "boolean | { placement?: LabelPlacement; }",
+          "optional": true,
+          "doc": "Shows each bar's duration as a `\"3d\"`-style label, rounded to whole days (minimum one day).\n`true` places it past the bar's right edge; the object form also picks the placement.\nMilestones carry no duration and get none. Off by default."
+        },
+        {
+          "name": "progressLabel",
+          "type": "boolean | { placement?: LabelPlacement; }",
+          "optional": true,
+          "doc": "Shows each ordinary bar's completion as a `\"40%\"`-style label. `true` places it inside the\nbar; the object form also picks the placement. Milestones and summaries get none. Off by\ndefault."
+        },
+        {
+          "name": "renderBar",
+          "type": "BarRenderer",
+          "optional": true,
+          "doc": "Replaces the painting of every bar body. The function receives the canvas context, the bar's\nbox and task, and a `defaultPaint` callback that paints the built-in look, so it can decorate\naround the default instead of redrawing it. Labels, icons, avatars and overlay contributions\nstill draw on top afterwards. A renderer that throws is reported once, the affected bar falls\nback to the built-in look, and the renderer is disabled from then on. Off by default."
+        },
+        {
+          "name": "milestoneShape",
+          "type": "MilestoneShape | ((task: Readonly<Task>) => MilestoneShape | undefined)",
+          "optional": true,
+          "doc": "The marker shape milestones are painted as — `\"diamond\"` (the default), `\"triangle\"`,\n`\"star\"` or `\"square\"` — or a per-task chooser returning one of those (returning `undefined`\nfalls back to the diamond). Every shape fills the same square box, so hit-testing and label\nanchors are unaffected."
+        },
+        {
+          "name": "patternFill",
+          "type": "boolean | BarPatternProvider",
+          "optional": true,
+          "doc": "Distinguishes task types by texture as well as colour: `true` hatches ordinary bars\ndiagonally and cross-hatches summary bodies (milestones already differ by shape), and a\nfunction chooses the pattern per task, falling back to that built-in mapping when it returns\n`undefined`. Off by default."
+        },
+        {
+          "name": "barRadius",
+          "type": "number",
+          "optional": true,
+          "doc": "Corner radius of ordinary task bars in CSS px.\n\n`0` is an explicit choice of square corners and overrides whatever the theme asks for.\nOmitting the option — or giving it a negative or non-finite number — reads the\n`--sg-bar-radius` theme token instead; with neither set, bars keep their classic square\ncorners."
+        },
+        {
+          "name": "barIcons",
+          "type": "BarIconProvider",
+          "optional": true,
+          "doc": "Overlays status icon glyphs on the two ends of each bar. The function returns\n`{ left?, right? }` strings drawn centred inside the corresponding end, or `undefined` for\nnone; bars too narrow to fit a glyph per end (or milestones) draw none. Off by default."
+        },
+        {
+          "name": "avatar",
+          "type": "BarAvatarProvider",
+          "optional": true,
+          "doc": "Draws an assignee badge — a filled circle with initials — on each bar's right end. The\nfunction returns `{ initials?, color? }` or `undefined` for no badge on that task. Off by\ndefault."
+        },
+        {
+          "name": "collapsedSummary",
+          "type": "CollapsedSummary",
+          "optional": true,
+          "doc": "What a summary row shows while it is collapsed.\n\n`\"range\"` (the default) paints the summary's own span as the summary glyph, `\"hidden\"` paints\nand hit-tests nothing for it, and `\"split\"` paints the bars of its direct children inside its\nrow, so a folded project still shows what it contains and when. Those in-row bars are ordinary\nhorizontal editing surfaces — they can be dragged, resized and have their progress set like\nany other bar — and they are painted like one too, labels and colours included; what they do\nnot carry is end icons, avatars and overlay contributions. A child whose own row is hidden is\nleft out of the split row entirely. Expanding the row gives every child its own row again,\nwhich is also how the keyboard reaches them."
+        },
+        {
+          "name": "expandedHitArea",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Widens every bar's pointer target to at least 24 × 24 CSS px around its centre, so very\nshort or thin bars stay clickable; resize handles and the progress strip keep their exact\nzones. Nothing painted changes. Off by default."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store",
+        "stargantt.view",
+        "stargantt.tree-grid"
+      ],
+      "services": [
+        {
+          "key": "stargantt.task-bars",
+          "type": "TaskBarsService",
+          "doc": "Bar geometry: where each of the bars currently on screen sits on the chart canvas."
+        }
+      ],
+      "events": [],
+      "commands": [],
+      "extensionPoints": [
+        {
+          "key": "taskbars/overlays",
+          "type": "ExtensionPointDecl<BarOverlayRenderer, BarOverlayRenderer[]>",
+          "doc": "Extra painting layered on top of each task bar. Every contribution is called once per\nvisible bar, in plugin startup order, after that bar's labels and bar-end adornments — so an\noverlay is the last thing drawn for its bar, above the dependency lines and the selection\nframe and below the drag preview."
+        },
+        {
+          "key": "taskbars/style",
+          "type": "ExtensionPointDecl<BarStyleProvider, BarStyleProvider>",
+          "doc": "Per-task bar styling. Contributions are consulted in plugin startup order and the first\none to return a style wins; the reduced value is a single provider that performs that\nsearch."
+        },
+        {
+          "key": "taskbars/endGutter",
+          "type": "ExtensionPointDecl<EndGutterContribution, ResolvedEndGutter>",
+          "doc": "Clearance reserved outside bars' start and end edges, so connector ports and bar-end\ndecorations stop competing for the same strip. Each contribution names an end and a width;\nthe reduced value is the largest active reservation per end, published on every bar's box as\n`gutterStart` / `gutterEnd`."
+        }
+      ],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/task-bars.md"
+    },
+    {
+      "id": "stargantt.tree-grid",
+      "package": "@stargantt/plugin-tree-grid",
+      "category": "basic",
+      "dir": "packages/plugins/tree-grid",
+      "factory": "treeGrid",
+      "configType": "TreeGridConfig",
+      "config": [
+        {
+          "name": "messages",
+          "type": "Partial<TreeGridMessages>",
+          "optional": true,
+          "doc": "Replacement text, per key. Keys left out keep their English defaults."
+        },
+        {
+          "name": "rowHeight",
+          "type": "number",
+          "optional": true,
+          "doc": "The height of one chart row in CSS px, used for every row that no `rows/height` contribution\noverrides — and therefore also the `defaultHeight` those contributions receive. Defaults to 28.\n\nMust be a finite number greater than zero; any other value is ignored and the default is used."
+        },
+        {
+          "name": "paneWidth",
+          "type": "number",
+          "optional": true,
+          "doc": "The initial width of the grid pane in CSS px. Defaults to 580. The user can still drag the\ndivider afterwards; this only sets where it starts.\n\nMust be a finite number greater than zero; any other value is ignored and the default is used."
+        },
+        {
+          "name": "indent",
+          "type": "number",
+          "optional": true,
+          "doc": "How far each tree level indents the expand toggle and the tree column's content, in CSS px.\n\nThe tree column is the first displayed column that is not the WBS numbering column `wbs` adds —\nwith `wbs` off it is simply the first column; with `wbs` on the numbering column keeps its full\nwidth at every depth and the indentation applies to the column after it. No other column moves\nwith depth: the tree column's content box shrinks by exactly what the toggle gutter grows, so\nevery column stays aligned with its header at every depth. Depth 0 is never indented, and on\ntrees deep enough to exhaust the tree column's width the indent stops growing rather than\npushing the row wider than its header. Defaults to 16.\n\nMust be a finite number of at least zero — `0` legitimately means \"do not indent at all\". Any\nother value is ignored and the default is used."
+        },
+        {
+          "name": "readOnly",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Makes the whole grid read-only: every composed column behaves as if it declared\n`editable: false`, whatever its `setValue`. Nothing else about the columns changes — headers,\nwidths, rendering and sorting are untouched. Defaults to false."
+        },
+        {
+          "name": "columns",
+          "type": "ColumnDef[]",
+          "optional": true,
+          "doc": "Replaces the four built-in columns.\n\nOmit it and the grid contributes its built-in Name / Start / End / Progress columns, which is\nthe default. Supply an array and those four are not contributed at all: the grid contributes\nthese columns instead, in this order. Columns other plugins contribute are unaffected either\nway. The empty array is a legitimate value and means \"no built-in columns\"."
+        },
+        {
+          "name": "formatDate",
+          "type": "(t: number) => string",
+          "optional": true,
+          "doc": "Formats a task date for the built-in Start and End columns.\n\nDefaults to the ISO calendar date in UTC (`2026-08-07`). `t` is always a finite epoch-ms\ninstant — a task whose date is missing or not finite renders an empty cell without calling\nthis. Ignored when `columns` replaces the built-in columns."
+        },
+        {
+          "name": "formatProgress",
+          "type": "(p: number) => string",
+          "optional": true,
+          "doc": "Formats a task's progress for the built-in Progress column.\n\nDefaults to the value rounded to a whole percentage (`45%`). `p` is always a finite number and\nis the raw stored value, which is normally 0..1 but is not clamped — a task with no progress,\nor a non-finite one, renders an empty cell without calling this. Ignored when `columns`\nreplaces the built-in columns."
+        },
+        {
+          "name": "columnLayout",
+          "type": "ColumnLayoutConfig",
+          "optional": true,
+          "doc": "Hides and/or reorders the displayed columns by id, without changing what any plugin\ncontributes to the column composition. Omitted, the composed columns display as contributed,\nwhich is the default. A non-object value is ignored."
+        },
+        {
+          "name": "cellRenderers",
+          "type": "Record<string, CellRenderer>",
+          "optional": true,
+          "doc": "Replaces how named columns paint their cells: keys are column ids, values render into the\n(already cleared) cell element. Columns not named keep their own rendering; everything else\nabout an overridden column — header, editing, sorting — is untouched. A renderer that throws\nis reported once and then retired for the life of the instance, its column falling back to\nits own rendering. Non-function values are ignored. Defaults to no overrides."
+        },
+        {
+          "name": "rowClass",
+          "type": "(task: Readonly<Task>) => string | undefined",
+          "optional": true,
+          "doc": "Adds extra CSS class tokens to a row's element, computed from its task each time the row\npaints (space-separated for several at once; `undefined` for none). Purely presentational —\ngeometry and content are unaffected. A hook that throws is reported once and then not called\nagain for the life of the instance. Defaults to no extra classes."
+        },
+        {
+          "name": "wbs",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Adds a read-only WBS column showing each task's work-breakdown code (`1`, `1.2`, `1.2.3` …),\ncomputed from the tree in the store's sibling order, ahead of the other built-in columns. The\ncolumn sorts numerically per segment, never carries the tree indentation — that moves to the\ncolumn after it, so a code's room does not shrink as the code grows — and every cell carries\nits full code as a `title`, so a code too long for the column is never lost. Defaults to false;\na non-boolean value is ignored."
+        },
+        {
+          "name": "collapsedBadge",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Shows, on every collapsed row that has children, a small text badge after the tree column's\ncontent with the number of hidden descendants in parentheses. With `wbs` on that is the column\nafter the numbering column, so a WBS code is never truncated by a badge. Defaults to false; a\nnon-boolean value is ignored."
+        },
+        {
+          "name": "outlineEditing",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Enables outline editing from the keyboard: with the grid pane (or one of its rows) focused,\n`Tab` indents the active row's task under its preceding sibling and `Shift+Tab` outdents it —\nthe same undoable updates as the `view/rowIndent` / `view/rowOutdent` commands, which work\nregardless of this flag. While enabled, `Tab` inside the grid pane no longer moves the\nbrowser focus. Defaults to false; a non-boolean value is ignored."
+        },
+        {
+          "name": "collation",
+          "type": "boolean | { locales?: string | string[]; options?: Intl.CollatorOptions; }",
+          "optional": true,
+          "doc": "Sorts the built-in Name column with a locale-aware collator instead of leaving it unsortable:\n`true` uses the environment's default locale, and an object may name `locales` (a BCP 47 tag\nor list) and `Intl.Collator` `options`. Ignored when `columns` replaces the built-in columns,\nand ignored entirely — as if absent — when the environment rejects the locale. Defaults to\noff."
+        },
+        {
+          "name": "taskFields",
+          "type": "TaskFieldsConfig",
+          "optional": true,
+          "doc": "Enables the standard field columns, their bar decorations and their side-panel section.\n\nOmitting the nest leaves the whole feature dormant — no columns, no overlays, no panel\nsection. Supplying it, even as `{}`, enables the feature with its per-field defaults."
+        },
+        {
+          "name": "conditionalFormat",
+          "type": "ConditionalFormatConfig",
+          "optional": true,
+          "doc": "Enables conditional formatting: rule-driven bar colors, the overdue warning, progress-status\ncoloring and the legend.\n\nOmitting the nest leaves the whole feature dormant — nothing is recolored and no legend is\nmounted. Supplying it, even as `{}`, enables the feature with its per-field defaults."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store",
+        "stargantt.view"
+      ],
+      "services": [
+        {
+          "key": "stargantt.rows",
+          "type": "RowsService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.grid",
+          "type": "GridService",
+          "doc": ""
+        }
+      ],
+      "events": [
+        {
+          "key": "grid/rowPointerDown",
+          "type": "{\n  id: TaskId;\n  row: number;\n  ctrlKey: boolean;\n  metaKey: boolean;\n  shiftKey: boolean;\n  button: number;\n  pointerId: number;\n  x: number;\n  y: number;\n  clientX: number;\n  clientY: number;\n}",
+          "doc": "A pointerdown landed on a grid row — any cell, or the row's own padding — other than the\nexpand toggle (which dispatches `view/rowToggle` instead and emits no event here). `row` is\nthe visible-row index at press time; the modifier flags and the pressed `button` are copied\noff the originating pointer event, which is itself never put on the bus. Emitted for every\nbutton and for information only — the grid takes no selection action of its own, and a\nsubscriber that cares which button was pressed filters on `button`."
+        },
+        {
+          "key": "grid/rowPointerMove",
+          "type": "{\n  pointerId: number;\n  x: number;\n  y: number;\n  clientX: number;\n  clientY: number;\n  altKey: boolean;\n  ctrlKey: boolean;\n  metaKey: boolean;\n  shiftKey: boolean;\n}",
+          "doc": "A move of the pointer that pressed a grid row, delivered for as long as that press is\ntracked. `x` / `y` are relative to the grid body's top-left corner, so `y` shares the row\nmodel's viewport-local space; the originating pointer event is never put on the bus. The grid\ntakes no action of its own — the event is information, like the press it follows."
+        },
+        {
+          "key": "grid/rowPointerUp",
+          "type": "{\n  pointerId: number;\n  x: number;\n  y: number;\n  clientX: number;\n  clientY: number;\n  cancelled: boolean;\n}",
+          "doc": "The end of a tracked grid-row press: exactly one per `grid/rowPointerDown`, in the same\ncoordinate space as the move. `cancelled` is `true` when the press was cancelled rather\nthan released, which a consumer treats as an abandoned gesture."
+        },
+        {
+          "key": "grid/rowContextMenu",
+          "type": "{ id: TaskId; row: number; x: number; y: number; }",
+          "doc": "A context-menu request (right-press, or the keyboard's menu key) landed on a grid row other\nthan the expand toggle. `row` is the visible-row index at request time, and `x` / `y` are\nthe request's position relative to the top-left corner of the grid pane — the coordinates a\nmenu mounted in that pane is positioned with. The originating event is not put on the bus,\nand the grid neither opens a menu nor suppresses the browser's own: a plugin that answers\nthis event does both."
+        },
+        {
+          "key": "grid/backgroundContextMenu",
+          "type": "{ x: number; y: number; }",
+          "doc": "A context-menu request landed on the grid body's blank area — inside the body element but\nbelow the last row, resolving no row. `x` / `y` are the request's position relative to the\ntop-left corner of the grid pane, the same coordinate space `grid/rowContextMenu` uses. The\noriginating event is not put on the bus; the header emits nothing here, and the grid neither\nopens a menu nor suppresses the browser's own — a plugin that answers this event does both."
+        }
+      ],
+      "commands": [
+        {
+          "key": "view/rowToggle",
+          "type": "{ id: TaskId; expanded?: boolean; }",
+          "doc": "Expands or collapses one branch; with `expanded` omitted the current state is toggled."
+        },
+        {
+          "key": "view/rowsInvalidate",
+          "type": "void",
+          "doc": "Rebuilds the visible row set from the store and re-resolves every row height, then publishes\nthe result once. It carries no payload and changes no expand/collapse state: it is the\npublic way for a plugin whose `rows/height` contribution now answers differently — a filter\nbeing applied, say — to make the grid pick that answer up. Dispatching it when nothing\nactually changed is harmless; the rebuild itself is deferred to the next query of the row\nmodel."
+        },
+        {
+          "key": "view/editStart",
+          "type": "{ id: TaskId; columnId?: string; }",
+          "doc": "Starts inline editing of a cell in the grid pane, exactly as F2 or a double-click on the\ncell would. `columnId` names which column to edit; omitted, it targets the first editable\ncolumn in the grid's composed column order. Ignored (no error) when the task is not\ncurrently a visible row (unknown id, inside a collapsed branch, or scrolled outside the pane\nviewport), when `columnId` names no column or a column that is not editable, or when no\neditable column exists at all."
+        },
+        {
+          "key": "view/rowIndent",
+          "type": "{ id: TaskId; }",
+          "doc": "Makes the task a child of its immediately preceding sibling — one outline level deeper — via\nan ordinary undoable update. Ignored (no error) when the task is unknown or has no preceding\nsibling. The task keeps its `orderKey`, so its place among its new siblings follows that key."
+        },
+        {
+          "key": "view/rowOutdent",
+          "type": "{ id: TaskId; }",
+          "doc": "Moves the task up one outline level, making it a sibling of its current parent (a root when\nthe parent is a root) via an ordinary undoable update. Ignored (no error) when the task is\nunknown or already at the root level. The task keeps its `orderKey`, so its place among its\nnew siblings follows that key."
+        },
+        {
+          "key": "view/rowInsert",
+          "type": "{ id?: TaskId; position?: InsertPosition; name?: string; }",
+          "doc": "Creates a new task relative to an existing one: directly `\"above\"` or `\"below\"` it among its\nsiblings, or appended as its last `\"child\"`. With `id` omitted the task is appended at the\nend of the root level; `position` omitted (or unusable) means `\"child\"`, since an insert\nasked for from a row means \"something under this task\". A collapsed parent is expanded so\nthe new row is never created out of sight — expansion is display state, not a second undo\nstep.\n\nThe new task takes `name` (default: the `newTaskName` catalog message), starts where the\nreference task starts, and lasts one grid cell of the chart's current zoom level (one day\nwhen no time axis is composed). With no reference task it carries no dates. Ignored (no\nerror) when `id` names no task. Undoable as one step."
+        },
+        {
+          "key": "view/expandToLevel",
+          "type": "{ level: number; }",
+          "doc": "Expands and collapses whole outline levels at once so that exactly the rows of depth ≤\n`level` are visible: `0` shows only the roots, `1` the roots and their children, and so on.\nDisplay state only — nothing is written to the store and it is not undoable. A `level` that\nis not a finite number ≥ 0 is ignored (no error); a fractional one is floored."
+        },
+        {
+          "key": "view/dropIndicator",
+          "type": "{ y: number; depth: number; } | null",
+          "doc": "Draws — or, with a `null` payload, hides — the grid pane's drop-indicator line: a 2px\ninsertion line across the body at the viewport-local `y`, inset by `depth` indent steps so it\nshows which outline level a drop would file a task at.\n\nDisplay state only: nothing is written to the store, nothing is undoable and nothing is\nannounced. It is owned and cleared by whichever plugin is dragging. A non-finite `y` or\n`depth` hides the line rather than erroring."
+        }
+      ],
+      "extensionPoints": [
+        {
+          "key": "grid/columns",
+          "type": "ExtensionPointDecl<ColumnDef, ColumnDef[]>",
+          "doc": ""
+        },
+        {
+          "key": "rows/height",
+          "type": "ExtensionPointDecl<RowHeightContribution, ResolvedRowHeight>",
+          "doc": ""
+        }
+      ],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/tree-grid.md"
+    },
+    {
+      "id": "stargantt.view",
+      "package": "@stargantt/plugin-view",
+      "category": "basic",
+      "dir": "packages/plugins/view",
+      "factory": "view",
+      "configType": "ViewConfig",
+      "config": [
+        {
+          "name": "scroll",
+          "type": "ScrollConfig",
+          "optional": true,
+          "doc": "Wheel speed and the synthetic scrollbars."
+        },
+        {
+          "name": "direction",
+          "type": "\"ltr\" | \"rtl\"",
+          "optional": true,
+          "doc": "The chart's base text direction. `\"rtl\"` marks the chart pane `dir=\"rtl\"`, sets the canvas\ncontexts' text direction to right-to-left, and is reported to every plugin through\n`ViewService.direction()` so the composition mirrors consistently. Defaults to `\"ltr\"`;\nany other value is ignored."
+        },
+        {
+          "name": "progressive",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Enables progressive rendering: frames painted while the chart is actively scrolling carry\n`Viewport.detail === \"coarse\"` so layer contributions may skip expensive detail, and a short\nquiet period after the last scroll triggers one full repaint with `detail === \"fine\"`.\nDefaults to `false`, in which case `Viewport.detail` is never set and nothing changes."
+        },
+        {
+          "name": "dirtyRegions",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Enables dirty-region repaints: a layer invalidated only through rectangles repaints just the\nunion of those rectangles instead of the full viewport. Defaults to `false`; rectangles passed\nto `invalidate` are then ignored and every repaint stays full, which is the historical\nbehavior."
+        },
+        {
+          "name": "prefetch",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Enables scroll prediction and off-screen prefetch: recent scroll velocity is extrapolated\ninto the viewport about to become visible (`ViewService.predictedViewport()`), and after\neach painted scroll frame the renderer runs a warm off-screen composite over that predicted\nviewport so contribution-side caches are populated before the region scrolls in. Defaults to\n`false`."
+        },
+        {
+          "name": "panes",
+          "type": "PanesConfig",
+          "optional": true,
+          "doc": "The pane row's own options."
+        },
+        {
+          "name": "theme",
+          "type": "ThemeConfig",
+          "optional": true,
+          "doc": "Theme presets, the colour-scheme pin, forced colors and the setup diagnostics."
+        },
+        {
+          "name": "timeline",
+          "type": "TimelineConfig",
+          "optional": true,
+          "doc": "The time axis: origin, zoom ladder, header layout, display calendar and zone."
+        },
+        {
+          "name": "gridLines",
+          "type": "GridLinesConfig",
+          "optional": true,
+          "doc": "The background grid: lines, stripes, shading, zones and the hovered-row fill."
+        },
+        {
+          "name": "todayLine",
+          "type": "TodayLineConfig | false",
+          "optional": true,
+          "doc": "The today line and its optional dashed status line. `false` switches the whole pass off — the\nreplacement for simply leaving the plugin out of the composition."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store"
+      ],
+      "services": [
+        {
+          "key": "stargantt.view",
+          "type": "ViewService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.timeline",
+          "type": "TimelineService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.theme",
+          "type": "ThemeService",
+          "doc": ""
+        }
+      ],
+      "events": [
+        {
+          "key": "view/scrolled",
+          "type": "{ scrollTop: number; scrollLeft: number; }",
+          "doc": "The chart body scrolled. Emitted from the one clamp path every scroll mutation goes through\n— wheel input, `ViewService.scrollTo`, the scrollbar thumb drag, a re-clamp after the\ncontent shrank — so this plugin is the only emitter, whoever asked for the scroll. The\n`viewport` store is set in the same pass."
+        },
+        {
+          "key": "pointer/barDown",
+          "type": "{ hit: HitResult; x: number; y: number; event: PointerEvent; }",
+          "doc": "Emitted when a pointer goes down on a shape the hit test recognized. The raw pointer event\nis captured and re-emitted annotated with the hit result and the viewport-local coordinates.\nSuch a press also starts a gesture, whose movement and release arrive as `pointer/barMove`\nand `pointer/barUp`."
+        },
+        {
+          "key": "pointer/barMove",
+          "type": "{ hit?: HitResult; x: number; y: number; event: PointerEvent; }",
+          "doc": "Pointer movement during an active gesture — one started by a `pointer/barDown` (press on a\nhit shape) or by a `pointer/background` (press on empty space). Emitted synchronously from\nthe raw pointer-move handler, never frame-batched, so the raw event's modifier-key state is\nexact at delivery. `hit` is the initiating `pointer/barDown`'s hit, unchanged for the whole\ngesture, and is absent throughout a background-initiated gesture; `x` / `y` track the current\npointer position in viewport-local CSS pixels."
+        },
+        {
+          "key": "pointer/barUp",
+          "type": "{ hit?: HitResult; x: number; y: number; event: PointerEvent; }",
+          "doc": "End of an active gesture — one started by a `pointer/barDown` or by a `pointer/background`:\nthe pointer was released or the capture was cancelled. Emitted synchronously, exactly once\nper gesture, with the final pointer position. `hit` is the initiating hit, and is absent when\nthe gesture started on empty space."
+        },
+        {
+          "key": "pointer/barHover",
+          "type": "{ hit?: HitResult; x: number; y: number; }",
+          "doc": "The hover target changed: the frame-rate hit resolution produced a different result than the\nprevious frame. `hit` is the newly resolved target, or absent when the pointer moved off\nevery hit shape. Resolved once per animation frame at most, on the latest recorded pointer\nposition, so it carries no raw event and trails the pointer by up to one frame. No hover is\nresolved while a gesture is active."
+        },
+        {
+          "key": "pointer/background",
+          "type": "{ x: number; y: number; event: PointerEvent; }",
+          "doc": "Pointer-down on empty chart space: no hit-test contribution claimed the position. Emitted\nsynchronously. Such a press also starts a gesture — subsequent movement and the release are\ndelivered as `pointer/barMove` / `pointer/barUp` with no `hit` — so consumers such as a\nrubber-band selection can track a drag that begins on empty space."
+        },
+        {
+          "key": "view/bottomPaneResized",
+          "type": "{ id: string; height: number; }",
+          "doc": "Emitted after a bottom pane's applied height actually changed — by pointer drag, keyboard\nstep or the `view/setBottomPaneHeight` command. `height` is the height the pane now\noccupies, in CSS px."
+        }
+      ],
+      "commands": [
+        {
+          "key": "timeline/zoomIn",
+          "type": "{ anchorTime?: number; }",
+          "doc": "Steps the timeline to the next finer zoom level — the registered level with the next\nhigher pixels-per-day density, the same ladder the Ctrl+wheel gesture climbs. A no-op at\nthe finest level. `anchorTime` (epoch milliseconds) keeps that instant under the same point\nof the visible chart area across the change; omitted, the middle of that area stays put."
+        },
+        {
+          "key": "timeline/zoomOut",
+          "type": "{ anchorTime?: number; }",
+          "doc": "Steps the timeline to the next coarser zoom level — the registered level with the next\nlower pixels-per-day density. A no-op at the coarsest level. `anchorTime` (epoch\nmilliseconds) keeps that instant under the same point of the visible chart area across the\nchange — as far as the chart's left edge allows, since nothing scrolls before the axis's\nstart; omitted, the middle of that area stays put."
+        },
+        {
+          "key": "view/paneToggle",
+          "type": "{ id: string; collapsed?: boolean; }",
+          "doc": "Collapses or expands a collapsible pane. `id` is the pane contribution's id; `collapsed`\nsets the state explicitly, and omitting it toggles the current state. Targeting an unknown\nid, or a pane whose contribution did not opt into `collapsible: true`, is a no-op."
+        },
+        {
+          "key": "view/setViewMode",
+          "type": "{ mode: ViewMode; }",
+          "doc": "Switches how the root row presents its panes: `\"split\"` (side panes and chart together —\nthe default), `\"grid\"` (table view: only the left-side panes are shown and the innermost of\nthem fills the freed width), or `\"gantt\"` (chart view: every contributed pane is hidden and\nthe chart fills the row). Pane content stays mounted across switches and every pane's\nremembered width is untouched, so switching back restores the previous layout exactly.\nA `mode` that is not one of the three literals is ignored, and `\"grid\"` is ignored when no\nleft-side pane exists. Not undoable — this is view state, not model state. If the currently\nfocused element sits inside something the switch hides, focus moves first to a still-visible\nanchor (the chart pane, or the pane taking the grow) so it never falls through to `<body>`."
+        },
+        {
+          "key": "view/setBottomPaneHeight",
+          "type": "{ id: string; height: number; }",
+          "doc": "Sets a bottom pane's height. `id` is the `view/bottomPanes` contribution's id; `height` is\nclamped to the pane's effective range before it is applied — on a resizable pane that range\nnever goes below 24 px, so the pane's divider cannot be resized away. An unknown id or an\nunusable height is a no-op. Not undoable — view state only."
+        }
+      ],
+      "extensionPoints": [
+        {
+          "key": "renderer/layers",
+          "type": "ExtensionPointDecl<LayerContribution, LayerContribution[]>",
+          "doc": "Canvas drawing passes. `zIndex` orders the contributions and selects the canvas each paints\ninto; `draw` receives that canvas's 2d context, already scaled to CSS pixels, together with\nthe current viewport. Each draw is fault-isolated and bracketed in `save`/`restore`; claim\nthe order with `ctx.claimOrder(\"renderer/layers\", key, order)`."
+        },
+        {
+          "key": "renderer/hitTest",
+          "type": "ExtensionPointDecl<HitTester, HitTester>",
+          "doc": "Hit testers, consulted in registration order until one answers. A tester that throws counts\nas \"no hit\" and the search falls through to the next."
+        },
+        {
+          "key": "renderer/insets",
+          "type": "ExtensionPointDecl<InsetContribution, ResolvedInsets>",
+          "doc": "Horizontal strips reserved at the top and bottom edges of the chart pane for chrome drawn by\nother plugins — a timeline header, a load histogram, a minimap. Contributions to one side are\nstacked outermost-first by ascending `order` (ties by registration order), each is told the\nrectangle it was given through its `placed` callback, and the side reserves the sum of their\nsizes (0 when nothing contributes). The canvases and the DOM overlay sit inside the remaining\nband and the viewport height excludes both."
+        },
+        {
+          "key": "renderer/domOverlays",
+          "type": "ExtensionPointDecl<DomOverlayContribution, DomOverlayContribution[]>",
+          "doc": "HTML placed inside the chart body and anchored in content coordinates. Each contribution gets\nits own wrapper element, clipped to the chart viewport and kept aligned with the canvas layers\nas the chart scrolls, so a contribution positions its children once per data change rather\nthan once per scroll. Wrappers are appended in contribution order and stack by document order;\nthere is no `zIndex` field."
+        },
+        {
+          "key": "renderer/contentExtent",
+          "type": "ExtensionPointDecl<ContentExtentContribution, ContentExtentContribution[]>",
+          "doc": "Content-size contributions that bound the scrollable range. They are reduced at clamp time —\nper axis, the maximum of the finite values the contributions currently report — rather than\nthrough the point's own reduction, because `measure()` must be re-invoked on every clamp\nrather than cached; an axis with no finite contribution stays unbounded."
+        },
+        {
+          "key": "renderer/rowGeometry",
+          "type": "ExtensionPointDecl<RowGeometryProvider, RowGeometryProvider | undefined>",
+          "doc": "Row geometry for the row-dependent background passes: the horizontal separators, the row\nstripes and the hovered-row fill. The first registered provider wins and the rest are never\nconsulted; with no provider at all those passes silently draw nothing while the vertical\npasses are unaffected. Repainting when the geometry moves is the contributor's job —\n`ViewService.invalidate(\"background\")`."
+        },
+        {
+          "key": "view/panes",
+          "type": "ExtensionPointDecl<PaneContribution, PaneContribution[]>",
+          "doc": "Side panes placed around the chart pane, mounted on `lifecycle/ready`."
+        },
+        {
+          "key": "view/bottomPanes",
+          "type": "ExtensionPointDecl<BottomPaneContribution, BottomPaneContribution[]>",
+          "doc": "Full-width strips stacked below the pane row; each contribution is one strip."
+        },
+        {
+          "key": "timeline/zoomLevels",
+          "type": "ExtensionPointDecl<ZoomLevel, ZoomLevel[]>",
+          "doc": "Zoom levels added to the ladder. Purely additive: `timeline.zoomLevels` in the config\nreplaces only the built-in six, never what other plugins contribute here."
+        }
+      ],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/view.md"
+    },
+    {
+      "id": "stargantt.data-sync",
+      "package": "@stargantt/plugin-data-sync",
+      "category": "data",
+      "dir": "packages/plugins/data-sync",
+      "factory": "dataSync",
+      "configType": "DataSyncConfig",
+      "config": [
+        {
+          "name": "sources",
+          "type": "Record<string, DataSourceAdapter>",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "active",
+          "type": "string",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "autoLoad",
+          "type": "boolean",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "rollbackOnError",
+          "type": "boolean",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "followFilter",
+          "type": "boolean",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "followFilterDebounceMs",
+          "type": "number",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "graphql",
+          "type": "GraphqlSourceConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "lazyLoad",
+          "type": "{\n  sources?: Record<string, LazyLoadAdapter>;\n  active?: string;\n  pageSize?: number;\n  autoLoad?: boolean;\n  followViewport?: boolean;\n  prefetchPages?: number;\n}",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "offline",
+          "type": "{\n  databaseName?: string;\n  documentKey?: string;\n  autoRestore?: boolean;\n  autoSave?: boolean;\n  autoSaveDebounceMs?: number;\n  registerSource?: boolean;\n  sourceName?: string;\n  indexedDB?: IDBFactory;\n}",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "realtime",
+          "type": "{\n  transports?: Record<string, RealtimeTransport>;\n  connect?: string;\n  autoReconnect?: boolean;\n  reconnectDelayMs?: number;\n  maxReconnectAttempts?: number;\n  resyncViaDataSource?: boolean;\n}",
+          "optional": true,
+          "doc": ""
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store"
+      ],
+      "services": [
+        {
+          "key": "stargantt.data-sync",
+          "type": "DataSyncService",
+          "doc": ""
+        }
+      ],
+      "events": [
+        {
+          "key": "sync/sourceSynced",
+          "type": "{ source: string; mode: \"full\" | \"delta\"; applied: AppliedCounts; }",
+          "doc": ""
+        },
+        {
+          "key": "sync/sourceFlushed",
+          "type": "{\n  source: string;\n  sent: {\n    creates: number;\n    updates: number;\n    removes: number;\n  };\n}",
+          "doc": ""
+        },
+        {
+          "key": "sync/sourceRolledBack",
+          "type": "{ source?: string; tasks: number; cause: \"flush\" | \"api\"; }",
+          "doc": ""
+        },
+        {
+          "key": "sync/lazyRangeLoaded",
+          "type": "{ source: string; offset: number; count: number; total?: number; }",
+          "doc": ""
+        },
+        {
+          "key": "sync/lazyChangesApplied",
+          "type": "{ applied: LazyLoadAppliedCounts; }",
+          "doc": ""
+        },
+        {
+          "key": "sync/offlineSaved",
+          "type": "{ key: string; tasks: number; }",
+          "doc": ""
+        },
+        {
+          "key": "sync/offlineRestored",
+          "type": "{ key: string; tasks: number; }",
+          "doc": ""
+        },
+        {
+          "key": "sync/offlineCleared",
+          "type": "{ key: string; }",
+          "doc": ""
+        },
+        {
+          "key": "sync/realtimeApplied",
+          "type": "{ applied: AppliedCounts; transport?: string; }",
+          "doc": ""
+        },
+        {
+          "key": "sync/activity",
+          "type": "SyncActivity",
+          "doc": ""
+        }
+      ],
+      "commands": [],
+      "extensionPoints": [
+        {
+          "key": "storage/snapshot",
+          "type": "ExtensionPointDecl<SnapshotContribution, SnapshotContribution[]>",
+          "doc": ""
+        }
+      ],
+      "inPresetStandard": false,
+      "contract": "docs/specs/plugins/data-sync.md"
+    },
+    {
+      "id": "stargantt.i18n",
+      "package": "@stargantt/plugin-i18n",
+      "category": "dev",
+      "dir": "packages/plugins/i18n",
+      "factory": "i18n",
+      "configType": "I18nConfig",
+      "config": [
+        {
+          "name": "locale",
+          "type": "string",
+          "optional": true,
+          "doc": "The active locale, as a BCP-47 tag such as `\"en\"` or `\"ja-JP\"`. Defaults to the chart's\nlocale (`\"en\"` for the hostless dictionary). An unusable value is silently ignored."
+        },
+        {
+          "name": "fallbacks",
+          "type": "readonly string[]",
+          "optional": true,
+          "doc": "Fallback locales consulted, in order, after the active locale when a key is missing.\n`\"en\"` is always appended as the terminal fallback. Default `[\"en\"]`."
+        },
+        {
+          "name": "translations",
+          "type": "Readonly<Record<string, TranslationEntries>>",
+          "optional": true,
+          "doc": "Initial dictionaries, keyed by locale tag. Default: none."
+        }
+      ],
+      "dependsOn": [],
+      "services": [
+        {
+          "key": "stargantt.i18n",
+          "type": "I18nService",
+          "doc": "The multilingual dictionary: locale tables, fallback chain, lookup, catalog builder."
+        }
+      ],
+      "events": [],
+      "commands": [],
+      "extensionPoints": [],
+      "inPresetStandard": false,
+      "contract": "docs/specs/plugins/i18n.md"
+    },
+    {
+      "id": "stargantt.perf-tools",
+      "package": "@stargantt/plugin-perf-tools",
+      "category": "dev",
+      "dir": "packages/plugins/perf-tools",
+      "factory": "perfTools",
+      "configType": "PerfToolsConfig",
+      "config": [
+        {
+          "name": "overlay",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Whether the overlay exists and is initially visible. Defaults to `true`. `false` creates no\nDOM (and claims no corner) until `setOverlayVisible(true)`."
+        },
+        {
+          "name": "sparkline",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Whether the overlay includes the frame-duration sparkline. Defaults to `true`."
+        },
+        {
+          "name": "position",
+          "type": "OverlayCorner",
+          "optional": true,
+          "doc": "The chart-pane corner the overlay floats in, with a 12px margin. Defaults to `\"top-right\"`."
+        },
+        {
+          "name": "budgetMs",
+          "type": "number",
+          "optional": true,
+          "doc": "The frame budget in milliseconds: frames longer than this count as over budget and the\nsparkline's guide line sits at this duration. Defaults to `16.7`."
+        },
+        {
+          "name": "windowSize",
+          "type": "number",
+          "optional": true,
+          "doc": "How many recent frames the rolling window and the sparkline hold. Defaults to `120`."
+        },
+        {
+          "name": "performanceMarks",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Whether marks and recordings are mirrored to the Performance API\n(`performance.mark` / `performance.measure`) under the `stargantt:` prefix. Defaults to\n`true`; silently inert where the API is unavailable."
+        },
+        {
+          "name": "messages",
+          "type": "Partial<PerfToolsMessages>",
+          "optional": true,
+          "doc": "Replaces any subset of the overlay's user-visible strings."
+        }
+      ],
+      "dependsOn": [],
+      "services": [
+        {
+          "key": "stargantt.perf-tools",
+          "type": "PerfToolsService",
+          "doc": ""
+        }
+      ],
+      "events": [],
+      "commands": [],
+      "extensionPoints": [],
+      "inPresetStandard": false,
+      "contract": "docs/specs/plugins/perf-tools.md"
+    },
+    {
+      "id": "stargantt.export",
+      "package": "@stargantt/plugin-export",
+      "category": "export",
+      "dir": "packages/plugins/export",
+      "factory": "exportPlugin",
+      "configType": "ExportConfig",
+      "config": [
+        {
+          "name": "messages",
+          "type": "Partial<ExportMessages>",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "image",
+          "type": "ImageCaptureConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "print",
+          "type": "PrintOptions",
+          "optional": true,
+          "doc": "Factory-level print defaults; each `PrintOptions` call overrides per key. (Resolution note in\nthe spec: the design card writes `print?: {}`, but that's read as an elision — this type\ncarries real factory `PrintOptions` defaults.)"
+        },
+        {
+          "name": "importExport",
+          "type": "{ csvDelimiter?: string; }",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "excel",
+          "type": "{ sheetName?: string; }",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "viewerEmbed",
+          "type": "{\n  readOnly?: boolean;\n  embed?: boolean;\n  snapshotParam?: string;\n  autoRestore?: boolean;\n  readOnlyExemptOrigins?: readonly string[];\n}",
+          "optional": true,
+          "doc": ""
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store",
+        "stargantt.view"
+      ],
+      "services": [
+        {
+          "key": "stargantt.export",
+          "type": "ExportService",
+          "doc": ""
+        }
+      ],
+      "events": [
+        {
+          "key": "importexport/applied",
+          "type": "{ result: ImportApplyResult; cause: ImportApplyCause; }",
+          "doc": ""
+        },
+        {
+          "key": "msprojectio/applied",
+          "type": "{ result: MsProjectApplyResult; }",
+          "doc": ""
+        },
+        {
+          "key": "viewerembed/readOnlyChanged",
+          "type": "{ readOnly: boolean; cause: ReadOnlyCause; }",
+          "doc": ""
+        },
+        {
+          "key": "viewerembed/snapshotApplied",
+          "type": "{ source: SnapshotSource; droppedTasks: number; }",
+          "doc": ""
+        }
+      ],
+      "commands": [],
+      "extensionPoints": [
+        {
+          "key": "export/auxiliarySurfaces",
+          "type": "ExtensionPointDecl<AuxiliarySurfaceContribution, AuxiliarySurfaceContribution[]>",
+          "doc": ""
+        }
+      ],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/export.md"
+    },
+    {
+      "id": "stargantt.a11y",
+      "package": "@stargantt/plugin-a11y",
+      "category": "interaction",
+      "dir": "packages/plugins/a11y",
+      "factory": "a11y",
+      "configType": "A11yConfig",
+      "config": [
+        {
+          "name": "label",
+          "type": "string",
+          "optional": true,
+          "doc": "The accessible name announced for the chart's row grid.\n\nBecomes the `aria-label` of the `role=\"treegrid\"` element, so a page holding several widgets\ncan tell them apart. Defaults to `\"Gantt chart\"`. An empty or blank string is ignored and the\ndefault used, since a nameless grid is announced as a bare \"treegrid\". Applied when the mirror\nis created and never re-read."
+        },
+        {
+          "name": "messages",
+          "type": "Partial<A11yMessages>",
+          "optional": true,
+          "doc": "Replacement screen-reader text, one key at a time.\n\nA key left out keeps its English default, and a key whose value is not a function is ignored.\nA builder that throws is reported as a plugin error and the built-in default answers that one\ncall. The grid's accessible name is not part of this catalog — it is `label` above."
+        },
+        {
+          "name": "syncSelection",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Whether moving the keyboard focus also replaces the selection. Defaults to `true`: arrowing\nthrough rows (or calling `FocusService.focus`) selects the focused task, so a chart with no\nother visual distinction between focus and selection still shows where the focus is. Set to\n`false` and focus moves on its own, drawn as its own stroke-only box.\n\nWithout a composed `stargantt.selection` there is nothing to sync and this option has no\neffect either way."
+        },
+        {
+          "name": "describeDependencies",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Whether each mirrored row also describes its task's dependencies to a screen reader, through\nan `aria-describedby` node naming its predecessors and successors. Defaults to `false`; with\nit off the mirror's DOM is byte-identical to the pre-feature output."
+        },
+        {
+          "name": "shortcutHelp",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Whether `?` opens a dialog listing the chart's current keyboard shortcuts. Defaults to\n`false`. While the dialog is open no chart shortcut runs, and `Tab` / `Shift`+`Tab` cycle the\ndialog's own focus ring so the close button is reachable without a pointer."
+        },
+        {
+          "name": "zoomKeys",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Whether the timeline zoom level can be stepped from the keyboard with plain `+` / `-`.\nDefaults to `false`. The chords are never `Ctrl`+`±`, so the browser's own page zoom keeps\nworking; while this is on they shadow the `+` / `-` expand-collapse aliases, which stay\navailable on `ArrowRight` / `ArrowLeft`."
+        },
+        {
+          "name": "summaryTable",
+          "type": "boolean",
+          "optional": true,
+          "doc": "Whether `Ctrl`+`Alt`+`S` builds — on demand only — a visually hidden table of every task, so a\nscreen-reader user can survey the whole chart with the reader's own table commands. Defaults to\n`false`. Very large charts are capped at the first 1000 tasks, which the caption states."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store",
+        "stargantt.view",
+        "stargantt.tree-grid",
+        "stargantt.task-bars"
+      ],
+      "services": [
+        {
+          "key": "stargantt.focus",
+          "type": "FocusService",
+          "doc": ""
+        }
+      ],
+      "events": [],
+      "commands": [],
+      "extensionPoints": [
+        {
+          "key": "keys/bindings",
+          "type": "ExtensionPointDecl<KeyBinding, KeyBinding[]>",
+          "doc": ""
+        }
+      ],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/a11y.md"
+    },
+    {
+      "id": "stargantt.interaction",
+      "package": "@stargantt/plugin-interaction",
+      "category": "interaction",
+      "dir": "packages/plugins/interaction",
+      "factory": "interaction",
+      "configType": "InteractionConfig",
+      "config": [
+        {
+          "name": "selection",
+          "type": "SelectionConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "dragEdit",
+          "type": "DragEditConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "snap",
+          "type": "SnapConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "tooltip",
+          "type": "TooltipConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "contextMenu",
+          "type": "ContextMenuConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "zoomControls",
+          "type": "ZoomControlsConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "clipboard",
+          "type": "ClipboardConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "filterSearch",
+          "type": "FilterSearchConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "editDialog",
+          "type": "EditDialogConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "sidePanel",
+          "type": "SidePanelConfig",
+          "optional": true,
+          "doc": ""
+        },
+        {
+          "name": "messages",
+          "type": "Partial<InteractionMessages>",
+          "optional": true,
+          "doc": "Replacement wording, one key at a time (§8). A key left out keeps its English default, a key\nof the wrong kind is ignored, and a builder that throws is reported and answered by the\nbuilt-in default for that call."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store",
+        "stargantt.view",
+        "stargantt.tree-grid",
+        "stargantt.task-bars"
+      ],
+      "services": [
+        {
+          "key": "stargantt.selection",
+          "type": "SelectionService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.snap",
+          "type": "SnapService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.filter",
+          "type": "FilterService",
+          "doc": ""
+        }
+      ],
+      "events": [],
+      "commands": [
+        {
+          "key": "clipboard/copy",
+          "type": "void",
+          "doc": "Captures the selected tasks into the internal clipboard, mirroring to the system clipboard\n where allowed; announces `copied(count)`."
+        },
+        {
+          "key": "clipboard/paste",
+          "type": "ClipboardPasteOptions | undefined",
+          "doc": "Creates tasks from the held (or given) transfer, one transaction; announces `pasted(count)`."
+        },
+        {
+          "key": "clipboard/duplicate",
+          "type": "void",
+          "doc": "Copy + paste of the selection in one step, one transaction; announces `duplicated(count)`."
+        },
+        {
+          "key": "edit-dialog/open",
+          "type": "{ id: TaskId; }",
+          "doc": "Opens the task-edit dialog for one task, replacing an already open one. A task the store\ndoes not know is a silent no-op."
+        }
+      ],
+      "extensionPoints": [
+        {
+          "key": "snap/workingTime",
+          "type": "ExtensionPointDecl<WorkingTimeProvider, WorkingTimeProvider | undefined>",
+          "doc": "The working-time authority for `snap.workingDays` (first: the first usable contribution\nwins). A contribution without a `boundaries` member is treated as absent."
+        },
+        {
+          "key": "snap/pushGuards",
+          "type": "ExtensionPointDecl<PushGuard, PushGuard[]>",
+          "doc": "Stand-down predicates for the successor push-out pass (collect, OR-combined). No\ncontributions means the pass runs."
+        },
+        {
+          "key": "drag/lanes",
+          "type": "ExtensionPointDecl<LaneDragProvider, LaneDragProvider | undefined>",
+          "doc": "The resource-lane drag seam (first: the first usable contribution wins). A contribution\nmissing `laneAt` or `reassign` is treated as absent."
+        },
+        {
+          "key": "tooltip/content",
+          "type": "ExtensionPointDecl<TooltipContentProvider, TooltipContentProvider>",
+          "doc": "First non-`undefined` answer wins; the config `tooltip.content` fallback is consulted only\n when the composed point declines."
+        },
+        {
+          "key": "contextmenu/items",
+          "type": "ExtensionPointDecl<ContextMenuItemProvider, ContextMenuItemProvider[]>",
+          "doc": "Contributed entries appear after the built-in (or config-replaced) entries."
+        },
+        {
+          "key": "sidepanel/fields",
+          "type": "ExtensionPointDecl<SidePanelFieldContribution, SidePanelFieldContribution[]>",
+          "doc": "Custom sections appended below the side panel's built-in content, in collect (registration)\norder. Purely additive: built-in fields are neither removable nor reorderable through it.\nRead exactly once, when the pane mounts; a contribution registered later is never mounted."
+        }
+      ],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/interaction.md"
+    },
+    {
+      "id": "stargantt.undo-redo",
+      "package": "@stargantt/plugin-undo-redo",
+      "category": "interaction",
+      "dir": "packages/plugins/undo-redo",
+      "factory": "undoRedo",
+      "configType": "UndoRedoConfig",
+      "config": [
+        {
+          "name": "messages",
+          "type": "Partial<UndoRedoMessages>",
+          "optional": true,
+          "doc": "Replacement announcements, one key at a time.\n\nA key left out keeps its English default, and a key whose value is not a string is ignored.\nSetting a key to the empty string suppresses that announcement entirely: the live region is\nleft untouched for that step rather than being blanked."
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "optional": true,
+          "doc": "How many transactions the history keeps before the oldest one is dropped.\n\nDefaults to 200. A value that is not a positive finite integer is ignored."
+        },
+        {
+          "name": "keys",
+          "type": "{ undo?: string[]; redo?: string[]; }",
+          "optional": true,
+          "doc": "The keyboard chords that trigger undo and redo.\n\nEach chord is written as `Modifier+…+Key` (`\"Ctrl+Z\"`, `\"Meta+Shift+Z\"`, recognized modifiers\n`Ctrl` / `Alt` / `Shift` / `Meta`), matched case- and order-insensitively. Undo defaults to\n`[\"Ctrl+Z\", \"Meta+Z\"]` and redo to `[\"Ctrl+Shift+Z\", \"Meta+Shift+Z\", \"Ctrl+Y\"]`, which covers\nthe Windows/Linux and macOS conventions out of the box. An array given here **replaces** its\ndefault entirely rather than adding to it, and an empty array leaves that operation with no\nkeyboard chord at all — the commands stay available either way."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store"
+      ],
+      "services": [
+        {
+          "key": "stargantt.history",
+          "type": "HistoryService",
+          "doc": ""
+        }
+      ],
+      "events": [],
+      "commands": [
+        {
+          "key": "history/undo",
+          "type": "void",
+          "doc": ""
+        },
+        {
+          "key": "history/redo",
+          "type": "void",
+          "doc": ""
+        }
+      ],
+      "extensionPoints": [],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/undo-redo.md"
+    },
+    {
+      "id": "stargantt.portfolio",
+      "package": "@stargantt/plugin-portfolio",
+      "category": "portfolio",
+      "dir": "packages/plugins/portfolio",
+      "factory": "portfolio",
+      "configType": "PortfolioConfig",
+      "config": [
+        {
+          "name": "nodes",
+          "type": "readonly PortfolioNodeInit[]",
+          "optional": true,
+          "doc": "Nodes defined at setup, in order (parents must precede children to be honored)."
+        },
+        {
+          "name": "goals",
+          "type": "readonly PortfolioGoalInit[]",
+          "optional": true,
+          "doc": "Goals defined at setup, in order."
+        },
+        {
+          "name": "views",
+          "type": "Record<string, PortfolioView>",
+          "optional": true,
+          "doc": "Saved portfolio views seeded before any `savePortfolioView`."
+        },
+        {
+          "name": "dashboard",
+          "type": "PortfolioDashboardConfig",
+          "optional": true,
+          "doc": "The dashboard panel's own options."
+        },
+        {
+          "name": "messages",
+          "type": "Partial<import(\"./internal/messages\").PortfolioMessages>",
+          "optional": true,
+          "doc": "Per-key overrides of the plugin's built-in English text."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store"
+      ],
+      "services": [
+        {
+          "key": "stargantt.portfolio",
+          "type": "PortfolioService",
+          "doc": "The portfolio service: node hierarchy, health, goals, templates, filtering and task moves."
+        },
+        {
+          "key": "stargantt.dashboard",
+          "type": "DashboardService",
+          "doc": "The dashboard service: the KPI panel, the widget aggregations and the report export."
+        }
+      ],
+      "events": [
+        {
+          "key": "dashboard/opened",
+          "type": "void",
+          "doc": "The dashboard panel was opened."
+        },
+        {
+          "key": "dashboard/closed",
+          "type": "void",
+          "doc": "The dashboard panel was closed."
+        },
+        {
+          "key": "dashboard/refreshed",
+          "type": "{ cause: \"data\" | \"api\"; }",
+          "doc": "The dashboard aggregations were recomputed: `cause` is `\"data\"` for the automatic\npost-change refresh, `\"api\"` for an explicit `refresh()` call."
+        }
+      ],
+      "commands": [],
+      "extensionPoints": [],
+      "inPresetStandard": false,
+      "contract": "docs/specs/plugins/portfolio.md"
+    },
+    {
+      "id": "stargantt.resource",
+      "package": "@stargantt/plugin-resource",
+      "category": "resource",
+      "dir": "packages/plugins/resource",
+      "factory": "resource",
+      "configType": "ResourceConfig",
+      "config": [
+        {
+          "name": "pool",
+          "type": "ResourcePoolConfig",
+          "optional": true,
+          "doc": "The resource pool (§6.1). Dormant when omitted."
+        },
+        {
+          "name": "assign",
+          "type": "ResourceAssignConfig",
+          "optional": true,
+          "doc": "The assignment grid column and editor (§6.2). Dormant when omitted."
+        },
+        {
+          "name": "view",
+          "type": "ResourceViewConfig",
+          "optional": true,
+          "doc": "The resource-view bottom strip (§6.3). Dormant when omitted."
+        },
+        {
+          "name": "utilization",
+          "type": "ResourceUtilizationConfig",
+          "optional": true,
+          "doc": "Utilization analysis (§6.4). Dormant when omitted."
+        },
+        {
+          "name": "loadChart",
+          "type": "LoadChartConfig",
+          "optional": true,
+          "doc": "The load chart (§6.5). Dormant when omitted."
+        },
+        {
+          "name": "messages",
+          "type": "Partial<ResourceMessages>",
+          "optional": true,
+          "doc": "Per-key replacements for the plugin's single merged catalog (§7)."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store"
+      ],
+      "services": [
+        {
+          "key": "stargantt.resource-pool",
+          "type": "ResourcePoolService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.utilization",
+          "type": "UtilizationService",
+          "doc": ""
+        }
+      ],
+      "events": [
+        {
+          "key": "resourceView/toggled",
+          "type": "{ open: boolean; cause: \"api\"; }",
+          "doc": "Emitted when the resource-view strip crosses between shown and hidden. Visibility rides the\nstrip's height (`view/setBottomPaneHeight` on `stargantt.resource-view:panel`, a positive\nheight showing and `0` releasing), and the plugin observes the APPLIED height through the\ncontribution's `onResize`, so the event reports what the layout actually did rather than\nwhat was asked for. The boot state emits nothing."
+        }
+      ],
+      "commands": [],
+      "extensionPoints": [],
+      "inPresetStandard": false,
+      "contract": "docs/specs/plugins/resource.md"
+    },
+    {
+      "id": "stargantt.scheduling",
+      "package": "@stargantt/plugin-scheduling",
+      "category": "scheduling",
+      "dir": "packages/plugins/scheduling",
+      "factory": "scheduling",
+      "configType": "SchedulingConfig",
+      "config": [
+        {
+          "name": "dependencies",
+          "type": "DependenciesConfig",
+          "optional": true,
+          "doc": "Dependency links (§5). Enabled with its defaults when omitted."
+        },
+        {
+          "name": "autoSchedule",
+          "type": "AutoScheduleConfig",
+          "optional": true,
+          "doc": "The headless engine (§2)."
+        },
+        {
+          "name": "calendars",
+          "type": "CalendarsConfig",
+          "optional": true,
+          "doc": "Working calendars (§6). Dormant when omitted."
+        },
+        {
+          "name": "criticalPath",
+          "type": "CriticalPathConfig",
+          "optional": true,
+          "doc": "Critical path (§7). Dormant when omitted."
+        },
+        {
+          "name": "diagnostics",
+          "type": "DiagnosticsConfig",
+          "optional": true,
+          "doc": "Schedule diagnostics (§8). Dormant when omitted."
+        },
+        {
+          "name": "messages",
+          "type": "Partial<SchedulingMessages>",
+          "optional": true,
+          "doc": "Per-key replacements for the plugin's user-visible strings (§12)."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store"
+      ],
+      "services": [
+        {
+          "key": "stargantt.scheduler",
+          "type": "SchedulerService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.calendars",
+          "type": "CalendarsService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.critical-path",
+          "type": "CriticalPathService",
+          "doc": ""
+        }
+      ],
+      "events": [
+        {
+          "key": "schedule/cycleRejected",
+          "type": "{ chain: readonly LinkId[]; }",
+          "doc": "Emitted when a `link/add` was refused for closing a dependency cycle: the transaction is\ncancelled in the will phase and this fires once, synchronously, after the cancellation.\n`chain` names the existing links that, together with the refused edge, would form the cycle,\nin walk order."
+        }
+      ],
+      "commands": [
+        {
+          "key": "schedule/reschedule",
+          "type": "{ statusDate: number; }",
+          "doc": "Repositions the incomplete part of the work at or after `statusDate`, based on each task's\nrecorded progress: unstarted tasks that start earlier move bodily to the status date, and\nin-progress tasks keep their start while their end is pushed out so the remaining share of\ntheir duration fits after it. Completed, manually scheduled and summary tasks never move.\nAll resulting changes — including the downstream moves automatic propagation appends — form\none transaction, i.e. one undo step. A non-finite `statusDate` is ignored; so is a run that\nwould move nothing."
+        },
+        {
+          "key": "schedule/setTaskMode",
+          "type": "{ id: TaskId; mode: TaskScheduleMode; }",
+          "doc": "Switches one task between automatic and manual scheduling via one undoable `task/update`.\nManual tasks keep their dates against every engine pass; `\"auto\"` returns the task to normal\npropagation. Ignored (no error) for an unknown id, an unusable `mode` value, or a task\nalready in the requested mode."
+        }
+      ],
+      "extensionPoints": [
+        {
+          "key": "schedule/constraintBounds",
+          "type": "ExtensionPointDecl<ConstraintBoundsContribution, ConstraintBoundsContribution>",
+          "doc": ""
+        },
+        {
+          "key": "schedule/propagationRule",
+          "type": "ExtensionPointDecl<PropagationRuleContribution, PropagationRuleContribution>",
+          "doc": ""
+        }
+      ],
+      "inPresetStandard": true,
+      "contract": "docs/specs/plugins/scheduling.md"
+    },
+    {
+      "id": "stargantt.tracking",
+      "package": "@stargantt/plugin-tracking",
+      "category": "scheduling",
+      "dir": "packages/plugins/tracking",
+      "factory": "tracking",
+      "configType": "TrackingConfig",
+      "config": [
+        {
+          "name": "baselines",
+          "type": "BaselinesConfig",
+          "optional": true,
+          "doc": "Baselines (§2.3/§2.4). Dormant when omitted."
+        },
+        {
+          "name": "progress",
+          "type": "ProgressConfig",
+          "optional": true,
+          "doc": "Progress tracking (§2.5/§2.6/§2.7). Dormant when omitted."
+        },
+        {
+          "name": "cost",
+          "type": "CostConfig",
+          "optional": true,
+          "doc": "Cost tracking (§2.8–§2.13). Dormant when omitted."
+        },
+        {
+          "name": "evm",
+          "type": "EvmConfig",
+          "optional": true,
+          "doc": "Earned value management (§2.14/§2.15). Dormant when omitted."
+        },
+        {
+          "name": "messages",
+          "type": "Partial<TrackingMessages>",
+          "optional": true,
+          "doc": "Per-key replacements for the plugin's user-visible strings (§6)."
+        }
+      ],
+      "dependsOn": [
+        "stargantt.data-store"
+      ],
+      "services": [
+        {
+          "key": "stargantt.baselines",
+          "type": "BaselinesService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.progress",
+          "type": "ProgressService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.cost",
+          "type": "CostService",
+          "doc": ""
+        },
+        {
+          "key": "stargantt.evm",
+          "type": "EvmService",
+          "doc": ""
+        }
+      ],
+      "events": [],
+      "commands": [],
+      "extensionPoints": [],
+      "inPresetStandard": false,
+      "contract": "docs/specs/plugins/tracking.md"
+    }
+  ]
+}

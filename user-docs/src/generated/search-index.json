@@ -1,0 +1,3779 @@
+{
+  "entries": [
+    {
+      "kind": "command",
+      "title": "assignment/remove",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "Deletes one assignment by its composite key.",
+      "keywords": "{ taskId: TaskId; resourceId: ResourceId; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "assignment/set",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "Upsert: creates the (taskId, resourceId) assignment or updates its units.",
+      "keywords": "{ taskId: TaskId; resourceId: ResourceId; units: number; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "history/apply",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "Applies an ordered list of patches as a single transaction, exactly as given: no patch is rebuilt from a command payload, and no builder re-validates it against the current store…",
+      "keywords": "{ patches: readonly Patch[]; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "link/add",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "",
+      "keywords": "{\n  sourceId: TaskId;\n  targetId: TaskId;\n  type: LinkType;\n  lag?: number;\n  id?: LinkId;\n  origin?: string;\n}"
+    },
+    {
+      "kind": "command",
+      "title": "link/remove",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "Deletes dependency links by id. An id that names no link is ignored.",
+      "keywords": "{ ids: LinkId[]; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "link/update",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "Retypes and/or re-lags one existing link, keeping its id and its endpoints — the whole edit is one transaction, so it takes exactly one undo step.",
+      "keywords": "{ id: LinkId; type?: LinkType; lag?: number; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "resource/add",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "",
+      "keywords": "{ resource: Partial<Resource> & { name: string; }; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "resource/remove",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "Deletes resources by id, together with every assignment of the removed resources.",
+      "keywords": "{ ids: ResourceId[]; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "resource/update",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "",
+      "keywords": "{ id: ResourceId; after: Partial<Resource>; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "task/add",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "",
+      "keywords": "{ task: Partial<Task> & { name: string; }; index?: number; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "task/move",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "",
+      "keywords": "{ id: TaskId; start: number; end: number; coalesceKey?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "task/remove",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "",
+      "keywords": "{ ids: TaskId[]; origin?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "task/setProgress",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "",
+      "keywords": "{ id: TaskId; progress: number; coalesceKey?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "task/update",
+      "context": "data-store · command",
+      "path": "/reference/data-store?tab=commands",
+      "text": "",
+      "keywords": "{\n  id: TaskId;\n  after: Partial<Task>;\n  clears?: readonly (keyof Task)[];\n  origin?: string;\n}"
+    },
+    {
+      "kind": "command",
+      "title": "clipboard/copy",
+      "context": "interaction · command",
+      "path": "/reference/interaction?tab=commands",
+      "text": "Captures the selected tasks into the internal clipboard, mirroring to the system clipboard where allowed; announces copied(count).",
+      "keywords": "void"
+    },
+    {
+      "kind": "command",
+      "title": "clipboard/duplicate",
+      "context": "interaction · command",
+      "path": "/reference/interaction?tab=commands",
+      "text": "Copy + paste of the selection in one step, one transaction; announces duplicated(count).",
+      "keywords": "void"
+    },
+    {
+      "kind": "command",
+      "title": "clipboard/paste",
+      "context": "interaction · command",
+      "path": "/reference/interaction?tab=commands",
+      "text": "Creates tasks from the held (or given) transfer, one transaction; announces pasted(count).",
+      "keywords": "ClipboardPasteOptions | undefined"
+    },
+    {
+      "kind": "command",
+      "title": "edit-dialog/open",
+      "context": "interaction · command",
+      "path": "/reference/interaction?tab=commands",
+      "text": "Opens the task-edit dialog for one task, replacing an already open one.",
+      "keywords": "{ id: TaskId; }"
+    },
+    {
+      "kind": "command",
+      "title": "schedule/reschedule",
+      "context": "scheduling · command",
+      "path": "/reference/scheduling?tab=commands",
+      "text": "Repositions the incomplete part of the work at or after statusDate, based on each task's recorded progress: unstarted tasks that start earlier move bodily to the status date, and…",
+      "keywords": "{ statusDate: number; }"
+    },
+    {
+      "kind": "command",
+      "title": "schedule/setTaskMode",
+      "context": "scheduling · command",
+      "path": "/reference/scheduling?tab=commands",
+      "text": "Switches one task between automatic and manual scheduling via one undoable task/update.",
+      "keywords": "{ id: TaskId; mode: TaskScheduleMode; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/dropIndicator",
+      "context": "tree-grid · command",
+      "path": "/reference/tree-grid?tab=commands",
+      "text": "Draws — or, with a null payload, hides — the grid pane's drop-indicator line: a 2px insertion line across the body at the viewport-local y, inset by depth indent steps so it shows…",
+      "keywords": "{ y: number; depth: number; } | null"
+    },
+    {
+      "kind": "command",
+      "title": "view/editStart",
+      "context": "tree-grid · command",
+      "path": "/reference/tree-grid?tab=commands",
+      "text": "Starts inline editing of a cell in the grid pane, exactly as F2 or a double-click on the cell would.",
+      "keywords": "{ id: TaskId; columnId?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/expandToLevel",
+      "context": "tree-grid · command",
+      "path": "/reference/tree-grid?tab=commands",
+      "text": "Expands and collapses whole outline levels at once so that exactly the rows of depth ≤ level are visible: 0 shows only the roots, 1 the roots and their children, and so on.",
+      "keywords": "{ level: number; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/rowIndent",
+      "context": "tree-grid · command",
+      "path": "/reference/tree-grid?tab=commands",
+      "text": "Makes the task a child of its immediately preceding sibling — one outline level deeper — via an ordinary undoable update.",
+      "keywords": "{ id: TaskId; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/rowInsert",
+      "context": "tree-grid · command",
+      "path": "/reference/tree-grid?tab=commands",
+      "text": "Creates a new task relative to an existing one: directly \"above\" or \"below\" it among its siblings, or appended as its last \"child\".",
+      "keywords": "{ id?: TaskId; position?: InsertPosition; name?: string; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/rowOutdent",
+      "context": "tree-grid · command",
+      "path": "/reference/tree-grid?tab=commands",
+      "text": "Moves the task up one outline level, making it a sibling of its current parent (a root when the parent is a root) via an ordinary undoable update.",
+      "keywords": "{ id: TaskId; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/rowsInvalidate",
+      "context": "tree-grid · command",
+      "path": "/reference/tree-grid?tab=commands",
+      "text": "Rebuilds the visible row set from the store and re-resolves every row height, then publishes the result once.",
+      "keywords": "void"
+    },
+    {
+      "kind": "command",
+      "title": "view/rowToggle",
+      "context": "tree-grid · command",
+      "path": "/reference/tree-grid?tab=commands",
+      "text": "Expands or collapses one branch; with expanded omitted the current state is toggled.",
+      "keywords": "{ id: TaskId; expanded?: boolean; }"
+    },
+    {
+      "kind": "command",
+      "title": "history/redo",
+      "context": "undo-redo · command",
+      "path": "/reference/undo-redo?tab=commands",
+      "text": "",
+      "keywords": "void"
+    },
+    {
+      "kind": "command",
+      "title": "history/undo",
+      "context": "undo-redo · command",
+      "path": "/reference/undo-redo?tab=commands",
+      "text": "",
+      "keywords": "void"
+    },
+    {
+      "kind": "command",
+      "title": "timeline/zoomIn",
+      "context": "view · command",
+      "path": "/reference/view?tab=commands",
+      "text": "Steps the timeline to the next finer zoom level — the registered level with the next higher pixels-per-day density, the same ladder the Ctrl+wheel gesture climbs.",
+      "keywords": "{ anchorTime?: number; }"
+    },
+    {
+      "kind": "command",
+      "title": "timeline/zoomOut",
+      "context": "view · command",
+      "path": "/reference/view?tab=commands",
+      "text": "Steps the timeline to the next coarser zoom level — the registered level with the next lower pixels-per-day density.",
+      "keywords": "{ anchorTime?: number; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/paneToggle",
+      "context": "view · command",
+      "path": "/reference/view?tab=commands",
+      "text": "Collapses or expands a collapsible pane.",
+      "keywords": "{ id: string; collapsed?: boolean; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/setBottomPaneHeight",
+      "context": "view · command",
+      "path": "/reference/view?tab=commands",
+      "text": "Sets a bottom pane's height. id is the view/bottomPanes contribution's id; height is clamped to the pane's effective range before it is applied — on a resizable pane that range ne…",
+      "keywords": "{ id: string; height: number; }"
+    },
+    {
+      "kind": "command",
+      "title": "view/setViewMode",
+      "context": "view · command",
+      "path": "/reference/view?tab=commands",
+      "text": "Switches how the root row presents its panes: \"split\" (side panes and chart together — the default), \"grid\" (table view: only the left-side panes are shown and the innermost of th…",
+      "keywords": "{ mode: ViewMode; }"
+    },
+    {
+      "kind": "core",
+      "title": "The command bus",
+      "context": "core concept",
+      "path": "/core/command-bus",
+      "text": "Every change the chart makes to its own data goes through the same door: dispatch a command, a registered handler runs it, and what it does becomes a reversible patch inside a tra…",
+      "keywords": "command bus"
+    },
+    {
+      "kind": "core",
+      "title": "The event bus",
+      "context": "core concept",
+      "path": "/core/event-bus",
+      "text": "An event says something already happened; nobody upstream is waiting for a reply.",
+      "keywords": "event bus"
+    },
+    {
+      "kind": "core",
+      "title": "Extension points",
+      "context": "core concept",
+      "path": "/core/extension-points",
+      "text": "One plugin defines a point and decides what happens with the contributions; any number of other plugins add to it.",
+      "keywords": "extension points"
+    },
+    {
+      "kind": "core",
+      "title": "Lifecycle and ctx.own()",
+      "context": "core concept",
+      "path": "/core/lifecycle-and-ownership",
+      "text": "A plugin never tears down its own listeners, DOM nodes or timers.",
+      "keywords": "lifecycle and ownership"
+    },
+    {
+      "kind": "core",
+      "title": "The plugin host",
+      "context": "core concept",
+      "path": "/core/plugin-host",
+      "text": "The kernel knows nothing about tasks, dates or drawing.",
+      "keywords": "plugin host"
+    },
+    {
+      "kind": "core",
+      "title": "The service registry",
+      "context": "core concept",
+      "path": "/core/service-registry",
+      "text": "Plugins import each other's types, and never each other's values.",
+      "keywords": "service registry"
+    },
+    {
+      "kind": "event",
+      "title": "data/didApplyTransaction",
+      "context": "data-store · event",
+      "path": "/reference/data-store?tab=events",
+      "text": "Emitted once per applied transaction, immediately after its store burst, carrying the transaction with its **final** patch list (will-phase appends and summary promotion included).",
+      "keywords": "{ transaction: Transaction; }"
+    },
+    {
+      "kind": "event",
+      "title": "data/willApplyTransaction",
+      "context": "data-store · event",
+      "path": "/reference/data-store?tab=events",
+      "text": "Emitted before a transaction is applied.",
+      "keywords": "Cancelable & { transaction: Transaction; }"
+    },
+    {
+      "kind": "event",
+      "title": "sync/activity",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "SyncActivity"
+    },
+    {
+      "kind": "event",
+      "title": "sync/lazyChangesApplied",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{ applied: LazyLoadAppliedCounts; }"
+    },
+    {
+      "kind": "event",
+      "title": "sync/lazyRangeLoaded",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{ source: string; offset: number; count: number; total?: number; }"
+    },
+    {
+      "kind": "event",
+      "title": "sync/offlineCleared",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{ key: string; }"
+    },
+    {
+      "kind": "event",
+      "title": "sync/offlineRestored",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{ key: string; tasks: number; }"
+    },
+    {
+      "kind": "event",
+      "title": "sync/offlineSaved",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{ key: string; tasks: number; }"
+    },
+    {
+      "kind": "event",
+      "title": "sync/realtimeApplied",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{ applied: AppliedCounts; transport?: string; }"
+    },
+    {
+      "kind": "event",
+      "title": "sync/sourceFlushed",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{\n  source: string;\n  sent: {\n    creates: number;\n    updates: number;\n    removes: number;\n  };\n}"
+    },
+    {
+      "kind": "event",
+      "title": "sync/sourceRolledBack",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{ source?: string; tasks: number; cause: \"flush\" | \"api\"; }"
+    },
+    {
+      "kind": "event",
+      "title": "sync/sourceSynced",
+      "context": "data-sync · event",
+      "path": "/reference/data-sync?tab=events",
+      "text": "",
+      "keywords": "{ source: string; mode: \"full\" | \"delta\"; applied: AppliedCounts; }"
+    },
+    {
+      "kind": "event",
+      "title": "importexport/applied",
+      "context": "export · event",
+      "path": "/reference/export?tab=events",
+      "text": "",
+      "keywords": "{ result: ImportApplyResult; cause: ImportApplyCause; }"
+    },
+    {
+      "kind": "event",
+      "title": "msprojectio/applied",
+      "context": "export · event",
+      "path": "/reference/export?tab=events",
+      "text": "",
+      "keywords": "{ result: MsProjectApplyResult; }"
+    },
+    {
+      "kind": "event",
+      "title": "viewerembed/readOnlyChanged",
+      "context": "export · event",
+      "path": "/reference/export?tab=events",
+      "text": "",
+      "keywords": "{ readOnly: boolean; cause: ReadOnlyCause; }"
+    },
+    {
+      "kind": "event",
+      "title": "viewerembed/snapshotApplied",
+      "context": "export · event",
+      "path": "/reference/export?tab=events",
+      "text": "",
+      "keywords": "{ source: SnapshotSource; droppedTasks: number; }"
+    },
+    {
+      "kind": "event",
+      "title": "dashboard/closed",
+      "context": "portfolio · event",
+      "path": "/reference/portfolio?tab=events",
+      "text": "The dashboard panel was closed.",
+      "keywords": "void"
+    },
+    {
+      "kind": "event",
+      "title": "dashboard/opened",
+      "context": "portfolio · event",
+      "path": "/reference/portfolio?tab=events",
+      "text": "The dashboard panel was opened.",
+      "keywords": "void"
+    },
+    {
+      "kind": "event",
+      "title": "dashboard/refreshed",
+      "context": "portfolio · event",
+      "path": "/reference/portfolio?tab=events",
+      "text": "The dashboard aggregations were recomputed: cause is \"data\" for the automatic post-change refresh, \"api\" for an explicit refresh() call.",
+      "keywords": "{ cause: \"data\" | \"api\"; }"
+    },
+    {
+      "kind": "event",
+      "title": "resourceView/toggled",
+      "context": "resource · event",
+      "path": "/reference/resource?tab=events",
+      "text": "Emitted when the resource-view strip crosses between shown and hidden.",
+      "keywords": "{ open: boolean; cause: \"api\"; }"
+    },
+    {
+      "kind": "event",
+      "title": "schedule/cycleRejected",
+      "context": "scheduling · event",
+      "path": "/reference/scheduling?tab=events",
+      "text": "Emitted when a link/add was refused for closing a dependency cycle: the transaction is cancelled in the will phase and this fires once, synchronously, after the cancellation.",
+      "keywords": "{ chain: readonly LinkId[]; }"
+    },
+    {
+      "kind": "event",
+      "title": "grid/backgroundContextMenu",
+      "context": "tree-grid · event",
+      "path": "/reference/tree-grid?tab=events",
+      "text": "A context-menu request landed on the grid body's blank area — inside the body element but below the last row, resolving no row.",
+      "keywords": "{ x: number; y: number; }"
+    },
+    {
+      "kind": "event",
+      "title": "grid/rowContextMenu",
+      "context": "tree-grid · event",
+      "path": "/reference/tree-grid?tab=events",
+      "text": "A context-menu request (right-press, or the keyboard's menu key) landed on a grid row other than the expand toggle.",
+      "keywords": "{ id: TaskId; row: number; x: number; y: number; }"
+    },
+    {
+      "kind": "event",
+      "title": "grid/rowPointerDown",
+      "context": "tree-grid · event",
+      "path": "/reference/tree-grid?tab=events",
+      "text": "A pointerdown landed on a grid row — any cell, or the row's own padding — other than the expand toggle (which dispatches view/rowToggle instead and emits no event here).",
+      "keywords": "{\n  id: TaskId;\n  row: number;\n  ctrlKey: boolean;\n  metaKey: boolean;\n  shiftKey: boolean;\n  button: number;\n  pointerId: number;\n  x: number;\n  y: number;\n  clientX: number;\n  clientY: number;\n}"
+    },
+    {
+      "kind": "event",
+      "title": "grid/rowPointerMove",
+      "context": "tree-grid · event",
+      "path": "/reference/tree-grid?tab=events",
+      "text": "A move of the pointer that pressed a grid row, delivered for as long as that press is tracked.",
+      "keywords": "{\n  pointerId: number;\n  x: number;\n  y: number;\n  clientX: number;\n  clientY: number;\n  altKey: boolean;\n  ctrlKey: boolean;\n  metaKey: boolean;\n  shiftKey: boolean;\n}"
+    },
+    {
+      "kind": "event",
+      "title": "grid/rowPointerUp",
+      "context": "tree-grid · event",
+      "path": "/reference/tree-grid?tab=events",
+      "text": "The end of a tracked grid-row press: exactly one per grid/rowPointerDown, in the same coordinate space as the move.",
+      "keywords": "{\n  pointerId: number;\n  x: number;\n  y: number;\n  clientX: number;\n  clientY: number;\n  cancelled: boolean;\n}"
+    },
+    {
+      "kind": "event",
+      "title": "pointer/background",
+      "context": "view · event",
+      "path": "/reference/view?tab=events",
+      "text": "Pointer-down on empty chart space: no hit-test contribution claimed the position.",
+      "keywords": "{ x: number; y: number; event: PointerEvent; }"
+    },
+    {
+      "kind": "event",
+      "title": "pointer/barDown",
+      "context": "view · event",
+      "path": "/reference/view?tab=events",
+      "text": "Emitted when a pointer goes down on a shape the hit test recognized.",
+      "keywords": "{ hit: HitResult; x: number; y: number; event: PointerEvent; }"
+    },
+    {
+      "kind": "event",
+      "title": "pointer/barHover",
+      "context": "view · event",
+      "path": "/reference/view?tab=events",
+      "text": "The hover target changed: the frame-rate hit resolution produced a different result than the previous frame.",
+      "keywords": "{ hit?: HitResult; x: number; y: number; }"
+    },
+    {
+      "kind": "event",
+      "title": "pointer/barMove",
+      "context": "view · event",
+      "path": "/reference/view?tab=events",
+      "text": "Pointer movement during an active gesture — one started by a pointer/barDown (press on a hit shape) or by a pointer/background (press on empty space).",
+      "keywords": "{ hit?: HitResult; x: number; y: number; event: PointerEvent; }"
+    },
+    {
+      "kind": "event",
+      "title": "pointer/barUp",
+      "context": "view · event",
+      "path": "/reference/view?tab=events",
+      "text": "End of an active gesture — one started by a pointer/barDown or by a pointer/background: the pointer was released or the capture was cancelled.",
+      "keywords": "{ hit?: HitResult; x: number; y: number; event: PointerEvent; }"
+    },
+    {
+      "kind": "event",
+      "title": "view/bottomPaneResized",
+      "context": "view · event",
+      "path": "/reference/view?tab=events",
+      "text": "Emitted after a bottom pane's applied height actually changed — by pointer drag, keyboard step or the view/setBottomPaneHeight command.",
+      "keywords": "{ id: string; height: number; }"
+    },
+    {
+      "kind": "event",
+      "title": "view/scrolled",
+      "context": "view · event",
+      "path": "/reference/view?tab=events",
+      "text": "The chart body scrolled. Emitted from the one clamp path every scroll mutation goes through — wheel input, ViewService.scrollTo, the scrollbar thumb drag, a re-clamp after the con…",
+      "keywords": "{ scrollTop: number; scrollLeft: number; }"
+    },
+    {
+      "kind": "guide",
+      "title": "Baselines and tracking progress",
+      "context": "guide",
+      "path": "/guides/baselines-and-progress",
+      "text": "The plan you agreed to, the plan you are working to now, and where the work actually is.",
+      "keywords": "baselines and progress"
+    },
+    {
+      "kind": "guide",
+      "title": "Loading data from a server",
+      "context": "guide",
+      "path": "/guides/data-from-a-server",
+      "text": "Getting rows from a backend instead of a literal array — plus paging, an offline cache, and live updates from other people.",
+      "keywords": "data from a server"
+    },
+    {
+      "kind": "guide",
+      "title": "Dependencies and automatic scheduling",
+      "context": "guide",
+      "path": "/guides/dependencies-and-scheduling",
+      "text": "The four kinds of link, what happens when one is broken, and how to make tasks move themselves when the task before them slips.",
+      "keywords": "dependencies and scheduling"
+    },
+    {
+      "kind": "guide",
+      "title": "Earned value management",
+      "context": "guide",
+      "path": "/guides/earned-value-management",
+      "text": "A chart shows whether the work is on time.",
+      "keywords": "earned value management"
+    },
+    {
+      "kind": "guide",
+      "title": "Editing by drag",
+      "context": "guide",
+      "path": "/guides/editing-by-drag",
+      "text": "Move a bar, resize it, set its progress, reorder rows, draw a dependency.",
+      "keywords": "editing by drag"
+    },
+    {
+      "kind": "guide",
+      "title": "Exporting and printing",
+      "context": "guide",
+      "path": "/guides/exporting-and-printing",
+      "text": "Getting a chart out of the browser: as an image, as a printable document, or as a read-only link.",
+      "keywords": "exporting and printing"
+    },
+    {
+      "kind": "guide",
+      "title": "Finding tasks in a large plan",
+      "context": "guide",
+      "path": "/guides/finding-tasks",
+      "text": "Scrolling works at a hundred rows.",
+      "keywords": "finding tasks"
+    },
+    {
+      "kind": "guide",
+      "title": "Keyboard and screen-reader access",
+      "context": "guide",
+      "path": "/guides/keyboard-and-screen-readers",
+      "text": "The chart is drawn on a canvas, so it keeps a second, invisible copy for screen readers and keyboard focus.",
+      "keywords": "keyboard and screen readers"
+    },
+    {
+      "kind": "guide",
+      "title": "Listening to events",
+      "context": "guide",
+      "path": "/guides/listening-to-events",
+      "text": "How to find out what the chart just did — through a momentary event or a state you can subscribe to — and how to step in before a change happens.",
+      "keywords": "listening to events"
+    },
+    {
+      "kind": "guide",
+      "title": "Loading your data",
+      "context": "guide",
+      "path": "/guides/loading-your-data",
+      "text": "Tasks, summaries, milestones and dependencies all go in one array.",
+      "keywords": "loading your data"
+    },
+    {
+      "kind": "guide",
+      "title": "Reading the timeline",
+      "context": "guide",
+      "path": "/guides/reading-the-timeline",
+      "text": "A chart opens on a few weeks out of a much longer axis.",
+      "keywords": "reading the timeline"
+    },
+    {
+      "kind": "guide",
+      "title": "Resources and workload",
+      "context": "guide",
+      "path": "/guides/resources-and-workload",
+      "text": "Who is on a task, how busy that makes them, and what the chart shows when two tasks want the same person at once.",
+      "keywords": "resources and workload"
+    },
+    {
+      "kind": "guide",
+      "title": "Sizing task bars",
+      "context": "guide",
+      "path": "/guides/sizing-task-bars",
+      "text": "How tall a row is, how tall the bar inside it is, and the settings that make bars easier to hit and easier to read.",
+      "keywords": "sizing task bars"
+    },
+    {
+      "kind": "guide",
+      "title": "Ten thousand tasks",
+      "context": "guide",
+      "path": "/guides/ten-thousand-tasks",
+      "text": "Nothing about the API changes as a plan gets big.",
+      "keywords": "ten thousand tasks"
+    },
+    {
+      "kind": "guide",
+      "title": "Theming and dark mode",
+      "context": "guide",
+      "path": "/guides/theming",
+      "text": "Every colour in the chart comes from a CSS variable, so you restyle it with a stylesheet like anything else on your page.",
+      "keywords": "theming"
+    },
+    {
+      "kind": "guide",
+      "title": "What the standard preset loads",
+      "context": "guide",
+      "path": "/guides/what-the-standard-preset-loads",
+      "text": "presetStandard() is the composition every example starts from.",
+      "keywords": "what the standard preset loads"
+    },
+    {
+      "kind": "guide",
+      "title": "Writing your own plugin",
+      "context": "guide",
+      "path": "/guides/writing-a-plugin",
+      "text": "Everything in the standard preset is written with the same API you get.",
+      "keywords": "writing a plugin"
+    },
+    {
+      "kind": "guide",
+      "title": "Your first chart",
+      "context": "guide",
+      "path": "/guides/your-first-chart",
+      "text": "One HTML file, one script tag, one call to create().",
+      "keywords": "your first chart"
+    },
+    {
+      "kind": "option",
+      "title": "describeDependencies",
+      "context": "a11y · config",
+      "path": "/reference/a11y/config?p=describeDependencies",
+      "text": "Whether each mirrored row also describes its task's dependencies to a screen reader, through an aria-describedby node naming its predecessors and successors.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "label",
+      "context": "a11y · config",
+      "path": "/reference/a11y/config?p=label",
+      "text": "The accessible name announced for the chart's row grid.",
+      "keywords": "string"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "a11y · config",
+      "path": "/reference/a11y/config?p=messages",
+      "text": "Replacement screen-reader text, one key at a time.",
+      "keywords": "Partial<A11yMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "shortcutHelp",
+      "context": "a11y · config",
+      "path": "/reference/a11y/config?p=shortcutHelp",
+      "text": "Whether ? opens a dialog listing the chart's current keyboard shortcuts.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "summaryTable",
+      "context": "a11y · config",
+      "path": "/reference/a11y/config?p=summaryTable",
+      "text": "Whether Ctrl+Alt+S builds — on demand only — a visually hidden table of every task, so a screen-reader user can survey the whole chart with the reader's own table commands.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "syncSelection",
+      "context": "a11y · config",
+      "path": "/reference/a11y/config?p=syncSelection",
+      "text": "Whether moving the keyboard focus also replaces the selection.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "zoomKeys",
+      "context": "a11y · config",
+      "path": "/reference/a11y/config?p=zoomKeys",
+      "text": "Whether the timeline zoom level can be stepped from the keyboard with plain + / -.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "customFields",
+      "context": "data-store · config",
+      "path": "/reference/data-store/config?p=customFields",
+      "text": "Former custom-fields config, nested.",
+      "keywords": "{ fields?: readonly CustomFieldDef[]; }"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "data-store · config",
+      "path": "/reference/data-store/config?p=messages",
+      "text": "Replacement transaction labels, per key.",
+      "keywords": "Partial<DataStoreMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "active",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=active",
+      "text": "",
+      "keywords": "string"
+    },
+    {
+      "kind": "option",
+      "title": "autoLoad",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=autoLoad",
+      "text": "",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "followFilter",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=followFilter",
+      "text": "",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "followFilterDebounceMs",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=followFilterDebounceMs",
+      "text": "",
+      "keywords": "number"
+    },
+    {
+      "kind": "option",
+      "title": "graphql",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=graphql",
+      "text": "",
+      "keywords": "GraphqlSourceConfig"
+    },
+    {
+      "kind": "option",
+      "title": "lazyLoad",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=lazyLoad",
+      "text": "",
+      "keywords": "{\n  sources?: Record<string, LazyLoadAdapter>;\n  active?: string;\n  pageSize?: number;\n  autoLoad?: boolean;\n  followViewport?: boolean;\n  prefetchPages?: number;\n}"
+    },
+    {
+      "kind": "option",
+      "title": "offline",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=offline",
+      "text": "",
+      "keywords": "{\n  databaseName?: string;\n  documentKey?: string;\n  autoRestore?: boolean;\n  autoSave?: boolean;\n  autoSaveDebounceMs?: number;\n  registerSource?: boolean;\n  sourceName?: string;\n  indexedDB?: IDBFactory;\n}"
+    },
+    {
+      "kind": "option",
+      "title": "realtime",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=realtime",
+      "text": "",
+      "keywords": "{\n  transports?: Record<string, RealtimeTransport>;\n  connect?: string;\n  autoReconnect?: boolean;\n  reconnectDelayMs?: number;\n  maxReconnectAttempts?: number;\n  resyncViaDataSource?: boolean;\n}"
+    },
+    {
+      "kind": "option",
+      "title": "rollbackOnError",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=rollbackOnError",
+      "text": "",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "sources",
+      "context": "data-sync · config",
+      "path": "/reference/data-sync/config?p=sources",
+      "text": "",
+      "keywords": "Record<string, DataSourceAdapter>"
+    },
+    {
+      "kind": "option",
+      "title": "excel",
+      "context": "export · config",
+      "path": "/reference/export/config?p=excel",
+      "text": "",
+      "keywords": "{ sheetName?: string; }"
+    },
+    {
+      "kind": "option",
+      "title": "image",
+      "context": "export · config",
+      "path": "/reference/export/config?p=image",
+      "text": "",
+      "keywords": "ImageCaptureConfig"
+    },
+    {
+      "kind": "option",
+      "title": "importExport",
+      "context": "export · config",
+      "path": "/reference/export/config?p=importExport",
+      "text": "",
+      "keywords": "{ csvDelimiter?: string; }"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "export · config",
+      "path": "/reference/export/config?p=messages",
+      "text": "",
+      "keywords": "Partial<ExportMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "print",
+      "context": "export · config",
+      "path": "/reference/export/config?p=print",
+      "text": "Factory-level print defaults; each PrintOptions call overrides per key.",
+      "keywords": "PrintOptions"
+    },
+    {
+      "kind": "option",
+      "title": "viewerEmbed",
+      "context": "export · config",
+      "path": "/reference/export/config?p=viewerEmbed",
+      "text": "",
+      "keywords": "{\n  readOnly?: boolean;\n  embed?: boolean;\n  snapshotParam?: string;\n  autoRestore?: boolean;\n  readOnlyExemptOrigins?: readonly string[];\n}"
+    },
+    {
+      "kind": "option",
+      "title": "fallbacks",
+      "context": "i18n · config",
+      "path": "/reference/i18n/config?p=fallbacks",
+      "text": "Fallback locales consulted, in order, after the active locale when a key is missing.",
+      "keywords": "readonly string[]"
+    },
+    {
+      "kind": "option",
+      "title": "locale",
+      "context": "i18n · config",
+      "path": "/reference/i18n/config?p=locale",
+      "text": "The active locale, as a BCP-47 tag such as \"en\" or \"ja-JP\".",
+      "keywords": "string"
+    },
+    {
+      "kind": "option",
+      "title": "translations",
+      "context": "i18n · config",
+      "path": "/reference/i18n/config?p=translations",
+      "text": "Initial dictionaries, keyed by locale tag.",
+      "keywords": "Readonly<Record<string, TranslationEntries>>"
+    },
+    {
+      "kind": "option",
+      "title": "clipboard",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=clipboard",
+      "text": "",
+      "keywords": "ClipboardConfig"
+    },
+    {
+      "kind": "option",
+      "title": "contextMenu",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=contextMenu",
+      "text": "",
+      "keywords": "ContextMenuConfig"
+    },
+    {
+      "kind": "option",
+      "title": "dragEdit",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=dragEdit",
+      "text": "",
+      "keywords": "DragEditConfig"
+    },
+    {
+      "kind": "option",
+      "title": "editDialog",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=editDialog",
+      "text": "",
+      "keywords": "EditDialogConfig"
+    },
+    {
+      "kind": "option",
+      "title": "filterSearch",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=filterSearch",
+      "text": "",
+      "keywords": "FilterSearchConfig"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=messages",
+      "text": "Replacement wording, one key at a time (§8).",
+      "keywords": "Partial<InteractionMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "selection",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=selection",
+      "text": "",
+      "keywords": "SelectionConfig"
+    },
+    {
+      "kind": "option",
+      "title": "sidePanel",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=sidePanel",
+      "text": "",
+      "keywords": "SidePanelConfig"
+    },
+    {
+      "kind": "option",
+      "title": "snap",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=snap",
+      "text": "",
+      "keywords": "SnapConfig"
+    },
+    {
+      "kind": "option",
+      "title": "tooltip",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=tooltip",
+      "text": "",
+      "keywords": "TooltipConfig"
+    },
+    {
+      "kind": "option",
+      "title": "zoomControls",
+      "context": "interaction · config",
+      "path": "/reference/interaction/config?p=zoomControls",
+      "text": "",
+      "keywords": "ZoomControlsConfig"
+    },
+    {
+      "kind": "option",
+      "title": "budgetMs",
+      "context": "perf-tools · config",
+      "path": "/reference/perf-tools/config?p=budgetMs",
+      "text": "The frame budget in milliseconds: frames longer than this count as over budget and the sparkline's guide line sits at this duration.",
+      "keywords": "number"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "perf-tools · config",
+      "path": "/reference/perf-tools/config?p=messages",
+      "text": "Replaces any subset of the overlay's user-visible strings.",
+      "keywords": "Partial<PerfToolsMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "overlay",
+      "context": "perf-tools · config",
+      "path": "/reference/perf-tools/config?p=overlay",
+      "text": "Whether the overlay exists and is initially visible.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "performanceMarks",
+      "context": "perf-tools · config",
+      "path": "/reference/perf-tools/config?p=performanceMarks",
+      "text": "Whether marks and recordings are mirrored to the Performance API (performance.mark / performance.measure) under the stargantt: prefix.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "position",
+      "context": "perf-tools · config",
+      "path": "/reference/perf-tools/config?p=position",
+      "text": "The chart-pane corner the overlay floats in, with a 12px margin.",
+      "keywords": "OverlayCorner"
+    },
+    {
+      "kind": "option",
+      "title": "sparkline",
+      "context": "perf-tools · config",
+      "path": "/reference/perf-tools/config?p=sparkline",
+      "text": "Whether the overlay includes the frame-duration sparkline.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "windowSize",
+      "context": "perf-tools · config",
+      "path": "/reference/perf-tools/config?p=windowSize",
+      "text": "How many recent frames the rolling window and the sparkline hold.",
+      "keywords": "number"
+    },
+    {
+      "kind": "option",
+      "title": "dashboard",
+      "context": "portfolio · config",
+      "path": "/reference/portfolio/config?p=dashboard",
+      "text": "The dashboard panel's own options.",
+      "keywords": "PortfolioDashboardConfig"
+    },
+    {
+      "kind": "option",
+      "title": "goals",
+      "context": "portfolio · config",
+      "path": "/reference/portfolio/config?p=goals",
+      "text": "Goals defined at setup, in order.",
+      "keywords": "readonly PortfolioGoalInit[]"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "portfolio · config",
+      "path": "/reference/portfolio/config?p=messages",
+      "text": "Per-key overrides of the plugin's built-in English text.",
+      "keywords": "Partial<import(\"./internal/messages\").PortfolioMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "nodes",
+      "context": "portfolio · config",
+      "path": "/reference/portfolio/config?p=nodes",
+      "text": "Nodes defined at setup, in order (parents must precede children to be honored).",
+      "keywords": "readonly PortfolioNodeInit[]"
+    },
+    {
+      "kind": "option",
+      "title": "views",
+      "context": "portfolio · config",
+      "path": "/reference/portfolio/config?p=views",
+      "text": "Saved portfolio views seeded before any savePortfolioView.",
+      "keywords": "Record<string, PortfolioView>"
+    },
+    {
+      "kind": "option",
+      "title": "assign",
+      "context": "resource · config",
+      "path": "/reference/resource/config?p=assign",
+      "text": "The assignment grid column and editor (§6.2).",
+      "keywords": "ResourceAssignConfig"
+    },
+    {
+      "kind": "option",
+      "title": "loadChart",
+      "context": "resource · config",
+      "path": "/reference/resource/config?p=loadChart",
+      "text": "The load chart (§6.5). Dormant when omitted.",
+      "keywords": "LoadChartConfig"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "resource · config",
+      "path": "/reference/resource/config?p=messages",
+      "text": "Per-key replacements for the plugin's single merged catalog (§7).",
+      "keywords": "Partial<ResourceMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "pool",
+      "context": "resource · config",
+      "path": "/reference/resource/config?p=pool",
+      "text": "The resource pool (§6.1). Dormant when omitted.",
+      "keywords": "ResourcePoolConfig"
+    },
+    {
+      "kind": "option",
+      "title": "utilization",
+      "context": "resource · config",
+      "path": "/reference/resource/config?p=utilization",
+      "text": "Utilization analysis (§6.4). Dormant when omitted.",
+      "keywords": "ResourceUtilizationConfig"
+    },
+    {
+      "kind": "option",
+      "title": "view",
+      "context": "resource · config",
+      "path": "/reference/resource/config?p=view",
+      "text": "The resource-view bottom strip (§6.3).",
+      "keywords": "ResourceViewConfig"
+    },
+    {
+      "kind": "option",
+      "title": "autoSchedule",
+      "context": "scheduling · config",
+      "path": "/reference/scheduling/config?p=autoSchedule",
+      "text": "The headless engine (§2).",
+      "keywords": "AutoScheduleConfig"
+    },
+    {
+      "kind": "option",
+      "title": "calendars",
+      "context": "scheduling · config",
+      "path": "/reference/scheduling/config?p=calendars",
+      "text": "Working calendars (§6). Dormant when omitted.",
+      "keywords": "CalendarsConfig"
+    },
+    {
+      "kind": "option",
+      "title": "criticalPath",
+      "context": "scheduling · config",
+      "path": "/reference/scheduling/config?p=criticalPath",
+      "text": "Critical path (§7). Dormant when omitted.",
+      "keywords": "CriticalPathConfig"
+    },
+    {
+      "kind": "option",
+      "title": "dependencies",
+      "context": "scheduling · config",
+      "path": "/reference/scheduling/config?p=dependencies",
+      "text": "Dependency links (§5). Enabled with its defaults when omitted.",
+      "keywords": "DependenciesConfig"
+    },
+    {
+      "kind": "option",
+      "title": "diagnostics",
+      "context": "scheduling · config",
+      "path": "/reference/scheduling/config?p=diagnostics",
+      "text": "Schedule diagnostics (§8). Dormant when omitted.",
+      "keywords": "DiagnosticsConfig"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "scheduling · config",
+      "path": "/reference/scheduling/config?p=messages",
+      "text": "Per-key replacements for the plugin's user-visible strings (§12).",
+      "keywords": "Partial<SchedulingMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "avatar",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=avatar",
+      "text": "Draws an assignee badge — a filled circle with initials — on each bar's right end.",
+      "keywords": "BarAvatarProvider"
+    },
+    {
+      "kind": "option",
+      "title": "barIcons",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=barIcons",
+      "text": "Overlays status icon glyphs on the two ends of each bar.",
+      "keywords": "BarIconProvider"
+    },
+    {
+      "kind": "option",
+      "title": "barRadius",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=barRadius",
+      "text": "Corner radius of ordinary task bars in CSS px.",
+      "keywords": "number"
+    },
+    {
+      "kind": "option",
+      "title": "collapsedSummary",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=collapsedSummary",
+      "text": "What a summary row shows while it is collapsed.",
+      "keywords": "CollapsedSummary"
+    },
+    {
+      "kind": "option",
+      "title": "durationLabel",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=durationLabel",
+      "text": "Shows each bar's duration as a \"3d\"-style label, rounded to whole days (minimum one day).",
+      "keywords": "boolean | { placement?: LabelPlacement; }"
+    },
+    {
+      "kind": "option",
+      "title": "expandedHitArea",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=expandedHitArea",
+      "text": "Widens every bar's pointer target to at least 24 × 24 CSS px around its centre, so very short or thin bars stay clickable; resize handles and the progress strip keep their exact z…",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "label",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=label",
+      "text": "Draws a text label beside each task's bar.",
+      "keywords": "BarLabelProvider | { text: BarLabelProvider; placement?: LabelPlacement; }"
+    },
+    {
+      "kind": "option",
+      "title": "labelBackdrop",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=labelBackdrop",
+      "text": "Paints a halo behind every label drawn *outside* a bar, so it stays legible where a dependency line crosses it.",
+      "keywords": "boolean | { color?: string; padding?: number; radius?: number; }"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=messages",
+      "text": "Replacement wording for the built-in empty state, per key.",
+      "keywords": "Partial<TaskBarsMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "milestoneShape",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=milestoneShape",
+      "text": "The marker shape milestones are painted as — \"diamond\" (the default), \"triangle\", \"star\" or \"square\" — or a per-task chooser returning one of those (returning undefined falls back…",
+      "keywords": "MilestoneShape | ((task: Readonly<Task>) => MilestoneShape | undefined)"
+    },
+    {
+      "kind": "option",
+      "title": "patternFill",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=patternFill",
+      "text": "Distinguishes task types by texture as well as colour: true hatches ordinary bars diagonally and cross-hatches summary bodies (milestones already differ by shape), and a function…",
+      "keywords": "boolean | BarPatternProvider"
+    },
+    {
+      "kind": "option",
+      "title": "progressLabel",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=progressLabel",
+      "text": "Shows each ordinary bar's completion as a \"40%\"-style label.",
+      "keywords": "boolean | { placement?: LabelPlacement; }"
+    },
+    {
+      "kind": "option",
+      "title": "renderBar",
+      "context": "task-bars · config",
+      "path": "/reference/task-bars/config?p=renderBar",
+      "text": "Replaces the painting of every bar body.",
+      "keywords": "BarRenderer"
+    },
+    {
+      "kind": "option",
+      "title": "baselines",
+      "context": "tracking · config",
+      "path": "/reference/tracking/config?p=baselines",
+      "text": "Baselines (§2.3/§2.4). Dormant when omitted.",
+      "keywords": "BaselinesConfig"
+    },
+    {
+      "kind": "option",
+      "title": "cost",
+      "context": "tracking · config",
+      "path": "/reference/tracking/config?p=cost",
+      "text": "Cost tracking (§2.8–§2.13). Dormant when omitted.",
+      "keywords": "CostConfig"
+    },
+    {
+      "kind": "option",
+      "title": "evm",
+      "context": "tracking · config",
+      "path": "/reference/tracking/config?p=evm",
+      "text": "Earned value management (§2.14/§2.15).",
+      "keywords": "EvmConfig"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "tracking · config",
+      "path": "/reference/tracking/config?p=messages",
+      "text": "Per-key replacements for the plugin's user-visible strings (§6).",
+      "keywords": "Partial<TrackingMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "progress",
+      "context": "tracking · config",
+      "path": "/reference/tracking/config?p=progress",
+      "text": "Progress tracking (§2.5/§2.6/§2.7).",
+      "keywords": "ProgressConfig"
+    },
+    {
+      "kind": "option",
+      "title": "cellRenderers",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=cellRenderers",
+      "text": "Replaces how named columns paint their cells: keys are column ids, values render into the (already cleared) cell element.",
+      "keywords": "Record<string, CellRenderer>"
+    },
+    {
+      "kind": "option",
+      "title": "collapsedBadge",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=collapsedBadge",
+      "text": "Shows, on every collapsed row that has children, a small text badge after the tree column's content with the number of hidden descendants in parentheses.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "collation",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=collation",
+      "text": "Sorts the built-in Name column with a locale-aware collator instead of leaving it unsortable: true uses the environment's default locale, and an object may name locales (a BCP 47…",
+      "keywords": "boolean | { locales?: string | string[]; options?: Intl.CollatorOptions; }"
+    },
+    {
+      "kind": "option",
+      "title": "columnLayout",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=columnLayout",
+      "text": "Hides and/or reorders the displayed columns by id, without changing what any plugin contributes to the column composition.",
+      "keywords": "ColumnLayoutConfig"
+    },
+    {
+      "kind": "option",
+      "title": "columns",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=columns",
+      "text": "Replaces the four built-in columns.",
+      "keywords": "ColumnDef[]"
+    },
+    {
+      "kind": "option",
+      "title": "conditionalFormat",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=conditionalFormat",
+      "text": "Enables conditional formatting: rule-driven bar colors, the overdue warning, progress-status coloring and the legend.",
+      "keywords": "ConditionalFormatConfig"
+    },
+    {
+      "kind": "option",
+      "title": "formatDate",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=formatDate",
+      "text": "Formats a task date for the built-in Start and End columns.",
+      "keywords": "(t: number) => string"
+    },
+    {
+      "kind": "option",
+      "title": "formatProgress",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=formatProgress",
+      "text": "Formats a task's progress for the built-in Progress column.",
+      "keywords": "(p: number) => string"
+    },
+    {
+      "kind": "option",
+      "title": "indent",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=indent",
+      "text": "How far each tree level indents the expand toggle and the tree column's content, in CSS px.",
+      "keywords": "number"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=messages",
+      "text": "Replacement text, per key. Keys left out keep their English defaults.",
+      "keywords": "Partial<TreeGridMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "outlineEditing",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=outlineEditing",
+      "text": "Enables outline editing from the keyboard: with the grid pane (or one of its rows) focused, Tab indents the active row's task under its preceding sibling and Shift+Tab outdents it…",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "paneWidth",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=paneWidth",
+      "text": "The initial width of the grid pane in CSS px.",
+      "keywords": "number"
+    },
+    {
+      "kind": "option",
+      "title": "readOnly",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=readOnly",
+      "text": "Makes the whole grid read-only: every composed column behaves as if it declared editable: false, whatever its setValue.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "rowClass",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=rowClass",
+      "text": "Adds extra CSS class tokens to a row's element, computed from its task each time the row paints (space-separated for several at once; undefined for none).",
+      "keywords": "(task: Readonly<Task>) => string | undefined"
+    },
+    {
+      "kind": "option",
+      "title": "rowHeight",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=rowHeight",
+      "text": "The height of one chart row in CSS px, used for every row that no rows/height contribution overrides — and therefore also the defaultHeight those contributions receive.",
+      "keywords": "number"
+    },
+    {
+      "kind": "option",
+      "title": "taskFields",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=taskFields",
+      "text": "Enables the standard field columns, their bar decorations and their side-panel section.",
+      "keywords": "TaskFieldsConfig"
+    },
+    {
+      "kind": "option",
+      "title": "wbs",
+      "context": "tree-grid · config",
+      "path": "/reference/tree-grid/config?p=wbs",
+      "text": "Adds a read-only WBS column showing each task's work-breakdown code (1, 1.2, 1.2.3 …), computed from the tree in the store's sibling order, ahead of the other built-in columns.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "keys",
+      "context": "undo-redo · config",
+      "path": "/reference/undo-redo/config?p=keys",
+      "text": "The keyboard chords that trigger undo and redo.",
+      "keywords": "{ undo?: string[]; redo?: string[]; }"
+    },
+    {
+      "kind": "option",
+      "title": "limit",
+      "context": "undo-redo · config",
+      "path": "/reference/undo-redo/config?p=limit",
+      "text": "How many transactions the history keeps before the oldest one is dropped.",
+      "keywords": "number"
+    },
+    {
+      "kind": "option",
+      "title": "messages",
+      "context": "undo-redo · config",
+      "path": "/reference/undo-redo/config?p=messages",
+      "text": "Replacement announcements, one key at a time.",
+      "keywords": "Partial<UndoRedoMessages>"
+    },
+    {
+      "kind": "option",
+      "title": "direction",
+      "context": "view · config",
+      "path": "/reference/view/config?p=direction",
+      "text": "The chart's base text direction.",
+      "keywords": "\"ltr\" | \"rtl\""
+    },
+    {
+      "kind": "option",
+      "title": "dirtyRegions",
+      "context": "view · config",
+      "path": "/reference/view/config?p=dirtyRegions",
+      "text": "Enables dirty-region repaints: a layer invalidated only through rectangles repaints just the union of those rectangles instead of the full viewport.",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "gridLines",
+      "context": "view · config",
+      "path": "/reference/view/config?p=gridLines",
+      "text": "The background grid: lines, stripes, shading, zones and the hovered-row fill.",
+      "keywords": "GridLinesConfig"
+    },
+    {
+      "kind": "option",
+      "title": "panes",
+      "context": "view · config",
+      "path": "/reference/view/config?p=panes",
+      "text": "The pane row's own options.",
+      "keywords": "PanesConfig"
+    },
+    {
+      "kind": "option",
+      "title": "prefetch",
+      "context": "view · config",
+      "path": "/reference/view/config?p=prefetch",
+      "text": "Enables scroll prediction and off-screen prefetch: recent scroll velocity is extrapolated into the viewport about to become visible (ViewService.predictedViewport()), and after ea…",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "progressive",
+      "context": "view · config",
+      "path": "/reference/view/config?p=progressive",
+      "text": "Enables progressive rendering: frames painted while the chart is actively scrolling carry Viewport.detail === \"coarse\" so layer contributions may skip expensive detail, and a shor…",
+      "keywords": "boolean"
+    },
+    {
+      "kind": "option",
+      "title": "scroll",
+      "context": "view · config",
+      "path": "/reference/view/config?p=scroll",
+      "text": "Wheel speed and the synthetic scrollbars.",
+      "keywords": "ScrollConfig"
+    },
+    {
+      "kind": "option",
+      "title": "theme",
+      "context": "view · config",
+      "path": "/reference/view/config?p=theme",
+      "text": "Theme presets, the colour-scheme pin, forced colors and the setup diagnostics.",
+      "keywords": "ThemeConfig"
+    },
+    {
+      "kind": "option",
+      "title": "timeline",
+      "context": "view · config",
+      "path": "/reference/view/config?p=timeline",
+      "text": "The time axis: origin, zoom ladder, header layout, display calendar and zone.",
+      "keywords": "TimelineConfig"
+    },
+    {
+      "kind": "option",
+      "title": "todayLine",
+      "context": "view · config",
+      "path": "/reference/view/config?p=todayLine",
+      "text": "The today line and its optional dashed status line.",
+      "keywords": "TodayLineConfig | false"
+    },
+    {
+      "kind": "plugin",
+      "title": "a11y",
+      "context": "interaction plugin",
+      "path": "/reference/a11y",
+      "text": "Makes the chart operable from a keyboard and legible to a screen reader: a virtualized treegrid mirror, a roving focus, and every operation routed through a shortcut table other p…",
+      "keywords": "stargantt.a11y @stargantt/plugin-a11y"
+    },
+    {
+      "kind": "plugin",
+      "title": "data-store",
+      "context": "basic plugin",
+      "path": "/reference/data-store",
+      "text": "Holds every task, link, resource, assignment and custom field value, and is the only plugin that turns a change into a reversible transaction.",
+      "keywords": "stargantt.data-store @stargantt/plugin-data-store"
+    },
+    {
+      "kind": "plugin",
+      "title": "data-sync",
+      "context": "data plugin",
+      "path": "/reference/data-sync",
+      "text": "The complete external-data connectivity set: REST/GraphQL full snapshots with token-based delta sync and optimistic write-back, lazy paged loading, IndexedDB offline snapshots, an…",
+      "keywords": "stargantt.data-sync @stargantt/plugin-data-sync"
+    },
+    {
+      "kind": "plugin",
+      "title": "export",
+      "context": "export plugin",
+      "path": "/reference/export",
+      "text": "The chart's whole outbound and inbound surface in one facade: image and PDF export, CSV/JSON/iCal and MS-Project interchange, an .xlsx writer, and read-only/embed viewing with sel…",
+      "keywords": "stargantt.export @stargantt/plugin-export"
+    },
+    {
+      "kind": "plugin",
+      "title": "i18n",
+      "context": "dev plugin",
+      "path": "/reference/i18n",
+      "text": "A locale-keyed dictionary with a fallback chain, published as a service so other plugins' message catalogs can be built from one table instead of many.",
+      "keywords": "stargantt.i18n @stargantt/plugin-i18n"
+    },
+    {
+      "kind": "plugin",
+      "title": "interaction",
+      "context": "interaction plugin",
+      "path": "/reference/interaction",
+      "text": "Every pointer and keyboard interaction on the chart — selection, drag-edit, snapping, tooltips, context menu, zoom toolbar, clipboard, filter/search, the edit dialog and the side…",
+      "keywords": "stargantt.interaction @stargantt/plugin-interaction"
+    },
+    {
+      "kind": "plugin",
+      "title": "perf-tools",
+      "context": "dev plugin",
+      "path": "/reference/perf-tools",
+      "text": "A floating frame-time overlay and a start/stop trace recorder for diagnosing paint performance — opt-in, invisible to end users, and inert unless something is asking it to measure.",
+      "keywords": "stargantt.perf-tools @stargantt/plugin-perf-tools"
+    },
+    {
+      "kind": "plugin",
+      "title": "portfolio",
+      "context": "portfolio plugin",
+      "path": "/reference/portfolio",
+      "text": "The multi-project surface: a ranked initiative-program-project hierarchy over the task store, plus a headless KPI dashboard with an opt-in panel — two services from one plugin, no…",
+      "keywords": "stargantt.portfolio @stargantt/plugin-portfolio"
+    },
+    {
+      "kind": "plugin",
+      "title": "resource",
+      "context": "resource plugin",
+      "path": "/reference/resource",
+      "text": "The whole resourcing stack in one opt-in plugin: a resource ledger, an assignment column and editor, a resource-axis panel, over-allocation analysis, and a load chart with a heatm…",
+      "keywords": "stargantt.resource @stargantt/plugin-resource"
+    },
+    {
+      "kind": "plugin",
+      "title": "scheduling",
+      "context": "scheduling plugin",
+      "path": "/reference/scheduling",
+      "text": "The scheduling layer: dependency links and creation, the headless auto-schedule engine, working calendars, critical-path analysis, and a structural diagnostics panel — five indepe…",
+      "keywords": "stargantt.scheduling @stargantt/plugin-scheduling"
+    },
+    {
+      "kind": "plugin",
+      "title": "task-bars",
+      "context": "basic plugin",
+      "path": "/reference/task-bars",
+      "text": "Draws the bars themselves, and owns the bar geometry every other plugin measures against.",
+      "keywords": "stargantt.task-bars @stargantt/plugin-task-bars"
+    },
+    {
+      "kind": "plugin",
+      "title": "tracking",
+      "context": "scheduling plugin",
+      "path": "/reference/tracking",
+      "text": "The status-reporting layer over the schedule: baselines and slip, RAG progress tracking, resource-rate cost accounting, and earned-value management — four independent config nests…",
+      "keywords": "stargantt.tracking @stargantt/plugin-tracking"
+    },
+    {
+      "kind": "plugin",
+      "title": "tree-grid",
+      "context": "basic plugin",
+      "path": "/reference/tree-grid",
+      "text": "Owns the left-hand grid pane and the row model every other plugin measures rows against, plus the standard field columns and rule-driven bar colouring as two config nests on the s…",
+      "keywords": "stargantt.tree-grid @stargantt/plugin-tree-grid"
+    },
+    {
+      "kind": "plugin",
+      "title": "undo-redo",
+      "context": "interaction plugin",
+      "path": "/reference/undo-redo",
+      "text": "Records every applied transaction and replays it in reverse on undo, forward again on redo — no DOM, no canvas, pure logic behind three small config fields.",
+      "keywords": "stargantt.undo-redo @stargantt/plugin-undo-redo"
+    },
+    {
+      "kind": "plugin",
+      "title": "view",
+      "context": "basic plugin",
+      "path": "/reference/view",
+      "text": "Owns everything on screen except the bars themselves: the three-canvas renderer, pane layout and dividers, theming, the timeline axis and header, and the background grid and today…",
+      "keywords": "stargantt.view @stargantt/plugin-view"
+    },
+    {
+      "kind": "point",
+      "title": "keys/bindings",
+      "context": "a11y · extension point",
+      "path": "/reference/a11y?tab=points",
+      "text": "",
+      "keywords": "ExtensionPointDecl<KeyBinding, KeyBinding[]>"
+    },
+    {
+      "kind": "point",
+      "title": "storage/snapshot",
+      "context": "data-sync · extension point",
+      "path": "/reference/data-sync?tab=points",
+      "text": "",
+      "keywords": "ExtensionPointDecl<SnapshotContribution, SnapshotContribution[]>"
+    },
+    {
+      "kind": "point",
+      "title": "export/auxiliarySurfaces",
+      "context": "export · extension point",
+      "path": "/reference/export?tab=points",
+      "text": "",
+      "keywords": "ExtensionPointDecl<AuxiliarySurfaceContribution, AuxiliarySurfaceContribution[]>"
+    },
+    {
+      "kind": "point",
+      "title": "contextmenu/items",
+      "context": "interaction · extension point",
+      "path": "/reference/interaction?tab=points",
+      "text": "Contributed entries appear after the built-in (or config-replaced) entries.",
+      "keywords": "ExtensionPointDecl<ContextMenuItemProvider, ContextMenuItemProvider[]>"
+    },
+    {
+      "kind": "point",
+      "title": "drag/lanes",
+      "context": "interaction · extension point",
+      "path": "/reference/interaction?tab=points",
+      "text": "The resource-lane drag seam (first: the first usable contribution wins).",
+      "keywords": "ExtensionPointDecl<LaneDragProvider, LaneDragProvider | undefined>"
+    },
+    {
+      "kind": "point",
+      "title": "sidepanel/fields",
+      "context": "interaction · extension point",
+      "path": "/reference/interaction?tab=points",
+      "text": "Custom sections appended below the side panel's built-in content, in collect (registration) order.",
+      "keywords": "ExtensionPointDecl<SidePanelFieldContribution, SidePanelFieldContribution[]>"
+    },
+    {
+      "kind": "point",
+      "title": "snap/pushGuards",
+      "context": "interaction · extension point",
+      "path": "/reference/interaction?tab=points",
+      "text": "Stand-down predicates for the successor push-out pass (collect, OR-combined).",
+      "keywords": "ExtensionPointDecl<PushGuard, PushGuard[]>"
+    },
+    {
+      "kind": "point",
+      "title": "snap/workingTime",
+      "context": "interaction · extension point",
+      "path": "/reference/interaction?tab=points",
+      "text": "The working-time authority for snap.workingDays (first: the first usable contribution wins).",
+      "keywords": "ExtensionPointDecl<WorkingTimeProvider, WorkingTimeProvider | undefined>"
+    },
+    {
+      "kind": "point",
+      "title": "tooltip/content",
+      "context": "interaction · extension point",
+      "path": "/reference/interaction?tab=points",
+      "text": "First non-undefined answer wins; the config tooltip.content fallback is consulted only when the composed point declines.",
+      "keywords": "ExtensionPointDecl<TooltipContentProvider, TooltipContentProvider>"
+    },
+    {
+      "kind": "point",
+      "title": "schedule/constraintBounds",
+      "context": "scheduling · extension point",
+      "path": "/reference/scheduling?tab=points",
+      "text": "",
+      "keywords": "ExtensionPointDecl<ConstraintBoundsContribution, ConstraintBoundsContribution>"
+    },
+    {
+      "kind": "point",
+      "title": "schedule/propagationRule",
+      "context": "scheduling · extension point",
+      "path": "/reference/scheduling?tab=points",
+      "text": "",
+      "keywords": "ExtensionPointDecl<PropagationRuleContribution, PropagationRuleContribution>"
+    },
+    {
+      "kind": "point",
+      "title": "taskbars/endGutter",
+      "context": "task-bars · extension point",
+      "path": "/reference/task-bars?tab=points",
+      "text": "Clearance reserved outside bars' start and end edges, so connector ports and bar-end decorations stop competing for the same strip.",
+      "keywords": "ExtensionPointDecl<EndGutterContribution, ResolvedEndGutter>"
+    },
+    {
+      "kind": "point",
+      "title": "taskbars/overlays",
+      "context": "task-bars · extension point",
+      "path": "/reference/task-bars?tab=points",
+      "text": "Extra painting layered on top of each task bar.",
+      "keywords": "ExtensionPointDecl<BarOverlayRenderer, BarOverlayRenderer[]>"
+    },
+    {
+      "kind": "point",
+      "title": "taskbars/style",
+      "context": "task-bars · extension point",
+      "path": "/reference/task-bars?tab=points",
+      "text": "Per-task bar styling. Contributions are consulted in plugin startup order and the first one to return a style wins; the reduced value is a single provider that performs that searc…",
+      "keywords": "ExtensionPointDecl<BarStyleProvider, BarStyleProvider>"
+    },
+    {
+      "kind": "point",
+      "title": "grid/columns",
+      "context": "tree-grid · extension point",
+      "path": "/reference/tree-grid?tab=points",
+      "text": "",
+      "keywords": "ExtensionPointDecl<ColumnDef, ColumnDef[]>"
+    },
+    {
+      "kind": "point",
+      "title": "rows/height",
+      "context": "tree-grid · extension point",
+      "path": "/reference/tree-grid?tab=points",
+      "text": "",
+      "keywords": "ExtensionPointDecl<RowHeightContribution, ResolvedRowHeight>"
+    },
+    {
+      "kind": "point",
+      "title": "renderer/contentExtent",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "Content-size contributions that bound the scrollable range.",
+      "keywords": "ExtensionPointDecl<ContentExtentContribution, ContentExtentContribution[]>"
+    },
+    {
+      "kind": "point",
+      "title": "renderer/domOverlays",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "HTML placed inside the chart body and anchored in content coordinates.",
+      "keywords": "ExtensionPointDecl<DomOverlayContribution, DomOverlayContribution[]>"
+    },
+    {
+      "kind": "point",
+      "title": "renderer/hitTest",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "Hit testers, consulted in registration order until one answers.",
+      "keywords": "ExtensionPointDecl<HitTester, HitTester>"
+    },
+    {
+      "kind": "point",
+      "title": "renderer/insets",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "Horizontal strips reserved at the top and bottom edges of the chart pane for chrome drawn by other plugins — a timeline header, a load histogram, a minimap.",
+      "keywords": "ExtensionPointDecl<InsetContribution, ResolvedInsets>"
+    },
+    {
+      "kind": "point",
+      "title": "renderer/layers",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "Canvas drawing passes. zIndex orders the contributions and selects the canvas each paints into; draw receives that canvas's 2d context, already scaled to CSS pixels, together with…",
+      "keywords": "ExtensionPointDecl<LayerContribution, LayerContribution[]>"
+    },
+    {
+      "kind": "point",
+      "title": "renderer/rowGeometry",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "Row geometry for the row-dependent background passes: the horizontal separators, the row stripes and the hovered-row fill.",
+      "keywords": "ExtensionPointDecl<RowGeometryProvider, RowGeometryProvider | undefined>"
+    },
+    {
+      "kind": "point",
+      "title": "timeline/zoomLevels",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "Zoom levels added to the ladder.",
+      "keywords": "ExtensionPointDecl<ZoomLevel, ZoomLevel[]>"
+    },
+    {
+      "kind": "point",
+      "title": "view/bottomPanes",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "Full-width strips stacked below the pane row; each contribution is one strip.",
+      "keywords": "ExtensionPointDecl<BottomPaneContribution, BottomPaneContribution[]>"
+    },
+    {
+      "kind": "point",
+      "title": "view/panes",
+      "context": "view · extension point",
+      "path": "/reference/view?tab=points",
+      "text": "Side panes placed around the chart pane, mounted on lifecycle/ready.",
+      "keywords": "ExtensionPointDecl<PaneContribution, PaneContribution[]>"
+    },
+    {
+      "kind": "recipe",
+      "title": "Distinguish several embedded charts for screen-reader users",
+      "context": "a11y · recipe",
+      "path": "/reference/a11y?tab=recipes",
+      "text": "The default label is the same constant on every chart."
+    },
+    {
+      "kind": "recipe",
+      "title": "Let keyboard users browse without disturbing a live selection",
+      "context": "a11y · recipe",
+      "path": "/reference/a11y?tab=recipes",
+      "text": "A details panel or export that reacts to selection should not repaint on every arrow press."
+    },
+    {
+      "kind": "recipe",
+      "title": "Turn on the full accessibility feature set for a public release",
+      "context": "a11y · recipe",
+      "path": "/reference/a11y?tab=recipes",
+      "text": "Three of the four opt-in features — dependency descriptions, the shortcut-help dialog and the summary table — are off by default, so a composition opts in deliberately (the fourth…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Attach vendor, budget and risk tier to every task",
+      "context": "data-store · recipe",
+      "path": "/reference/data-store?tab=recipes",
+      "text": "The common case: a handful of business attributes that need to be visible in the grid and editable inline, no formula involved."
+    },
+    {
+      "kind": "recipe",
+      "title": "Derive a rollup instead of maintaining a second write path",
+      "context": "data-store · recipe",
+      "path": "/reference/data-store?tab=recipes",
+      "text": "A \"remaining budget\" column that is always correct because it is never stored — it is computed from budget and the task's own progress on every read."
+    },
+    {
+      "kind": "recipe",
+      "title": "Load a dataset once the chart exists",
+      "context": "data-store · recipe",
+      "path": "/reference/data-store?tab=recipes",
+      "text": "Initial data is not a constructor option — it goes through the service, after create() has returned."
+    },
+    {
+      "kind": "recipe",
+      "title": "Rename the undo labels for a non-English UI",
+      "context": "data-store · recipe",
+      "path": "/reference/data-store?tab=recipes",
+      "text": "Replace only the labels your undo panel actually shows; every key you omit keeps its English default."
+    },
+    {
+      "kind": "recipe",
+      "title": "Load once from a REST backend at startup",
+      "context": "data-sync · recipe",
+      "path": "/reference/data-sync?tab=recipes",
+      "text": "The common case: a JSON API under one base URL, following the plugin's default endpoint conventions, populated as soon as the chart mounts."
+    },
+    {
+      "kind": "recipe",
+      "title": "Offline-first, with a fallback source when the network drops",
+      "context": "data-sync · recipe",
+      "path": "/reference/data-sync?tab=recipes",
+      "text": "Persist every change locally and reload it on the next visit; register the same snapshot as a read-only source so a host can fall back to it explicitly when a live fetch fails."
+    },
+    {
+      "kind": "recipe",
+      "title": "Optimistic edits with rollback on rejection",
+      "context": "data-sync · recipe",
+      "path": "/reference/data-sync?tab=recipes",
+      "text": "Let a reader keep editing while a save is in flight, and have a rejected save reverse itself automatically instead of leaving the chart out of sync with the backend."
+    },
+    {
+      "kind": "recipe",
+      "title": "Page a REST backend behind a scrolling viewport",
+      "context": "data-sync · recipe",
+      "path": "/reference/data-sync?tab=recipes",
+      "text": "The common large-dataset shape: a paged endpoint, a startup page so the chart isn't blank on first paint, and viewport-following so scrolling keeps pulling data instead of hitting…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Reflect a WebSocket peer's edits as they arrive",
+      "context": "data-sync · recipe",
+      "path": "/reference/data-sync?tab=recipes",
+      "text": "A server pushes JSON frames over a WebSocket whenever any client edits the shared chart, and every other client should pick the change up without a manual refresh — pairing with r…"
+    },
+    {
+      "kind": "recipe",
+      "title": "A print button that downloads a PDF",
+      "context": "export · recipe",
+      "path": "/reference/export?tab=recipes",
+      "text": "The common case: one click, one file, no dialog the reader has to navigate first."
+    },
+    {
+      "kind": "recipe",
+      "title": "Let a reader review a dropped CSV or JSON file before it lands",
+      "context": "export · recipe",
+      "path": "/reference/export?tab=recipes",
+      "text": "importCsv / importJson do the parsing, cross-record validation, diffing and (with dialog: true) the column-mapping preview UI for you — wire a file input to it and the reader deci…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Ship a read-only public viewer with a share-link button",
+      "context": "export · recipe",
+      "path": "/reference/export?tab=recipes",
+      "text": "No backend, no id registry: the whole project rides inside the URL fragment."
+    },
+    {
+      "kind": "recipe",
+      "title": "Build every sibling's messages from one dictionary",
+      "context": "i18n · recipe",
+      "path": "/reference/i18n?tab=recipes",
+      "text": "The pattern the contract recommends: assemble the dictionary before Gantt.create() runs, since the sibling factories close over their config too early for the service to exist yet."
+    },
+    {
+      "kind": "recipe",
+      "title": "Diagnose a missing translation at runtime",
+      "context": "i18n · recipe",
+      "path": "/reference/i18n?tab=recipes",
+      "text": "state.get().resolutionOrder shows exactly which tables a lookup will try, in order — the fastest way to tell \"the key is missing everywhere\" from \"the key is in a table this local…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Let a partial translation degrade to English key by key",
+      "context": "i18n · recipe",
+      "path": "/reference/i18n?tab=recipes",
+      "text": "A table that only covers part of the UI is normal, not an error — missing keys fall through to the caller's own default rather than showing blank or throwing."
+    },
+    {
+      "kind": "recipe",
+      "title": "Add a menu entry and translate the built-in context menu",
+      "context": "interaction · recipe",
+      "path": "/reference/interaction?tab=recipes",
+      "text": "Contributed entries stack after the built-ins automatically — no need to replace items to add one action, and messages carries the translation independently of the contribution."
+    },
+    {
+      "kind": "recipe",
+      "title": "Add a search box, a filter panel, and a zoom toolbar together",
+      "context": "interaction · recipe",
+      "path": "/reference/interaction?tab=recipes",
+      "text": "Three opt-in groups turned on at once — a chart with enough tasks that a reader needs to narrow it, plus a toolbar for reorienting the viewport without a keyboard shortcut cheat s…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Turn on multi-select, the accessible click-move alternative, and group dragging",
+      "context": "interaction · recipe",
+      "path": "/reference/interaction?tab=recipes",
+      "text": "A chart where selecting several tasks at once to move or delete them together is a normal thing to want, with a WCAG 2.2 non-dragging alternative for readers who cannot perform a…"
+    },
+    {
+      "kind": "recipe",
+      "title": "A tighter budget for a chart you are holding to a higher frame rate",
+      "context": "perf-tools · recipe",
+      "path": "/reference/perf-tools?tab=recipes",
+      "text": "Default budgetMs assumes 60fps. Profiling against a stricter target (a kiosk display locked to 120fps, say) means lowering it so \"over budget\" actually means something for that ta…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Record a trace around a specific operation and download it",
+      "context": "perf-tools · recipe",
+      "path": "/reference/perf-tools?tab=recipes",
+      "text": "Capture exactly the frames and instants around one suspect operation — a bulk load, a big scroll — rather than eyeballing the live overlay, then hand the JSON to a colleague or a…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Wire the overlay into a debug toggle instead of always showing it",
+      "context": "perf-tools · recipe",
+      "path": "/reference/perf-tools?tab=recipes",
+      "text": "Ship the plugin (and its service) in every build, but keep the visible box off unless a developer explicitly asks for it — the loop performs no per-frame work while both the overl…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Add the dashboard with a toolbar button, not on load",
+      "context": "portfolio · recipe",
+      "path": "/reference/portfolio?tab=recipes",
+      "text": "The usual shape for a real application: the plugin is always composed (its services are cheap and headless), but the panel only appears when a reader asks for it."
+    },
+    {
+      "kind": "recipe",
+      "title": "Build a traffic-light health board",
+      "context": "portfolio · recipe",
+      "path": "/reference/portfolio?tab=recipes",
+      "text": "healthSummary() is the whole aggregation step — a host just maps the result onto whatever chips or rows its sidebar uses, with the status text always shown alongside any color."
+    },
+    {
+      "kind": "recipe",
+      "title": "Clone a project as a template for a new engagement",
+      "context": "portfolio · recipe",
+      "path": "/reference/portfolio?tab=recipes",
+      "text": "duplicateProject deep-copies a project's whole task subtree and its internal links as one undo step, optionally shifting every date to a new start."
+    },
+    {
+      "kind": "recipe",
+      "title": "Custom metrics and a custom widget body",
+      "context": "portfolio · recipe",
+      "path": "/reference/portfolio?tab=recipes",
+      "text": "formulas covers a project-specific number the standard nine widgets cannot name; renderWidget replaces one widget's card body wholesale — here, the overdue list becomes a one-line…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Group tasks into projects and let a reader narrow to one",
+      "context": "portfolio · recipe",
+      "path": "/reference/portfolio?tab=recipes",
+      "text": "The everyday shape: bind existing task subtrees to project nodes at setup, then let a picker built on the interaction plugin's filter service call applyPortfolioFilter with whiche…"
+    },
+    {
+      "kind": "recipe",
+      "title": "A read-only resource-axis view for a capacity review meeting",
+      "context": "resource · recipe",
+      "path": "/reference/resource?tab=recipes",
+      "text": "The resource view alone, grouped by team, with no assignment editor composed — a viewing surface a lead can scan without also being able to edit it."
+    },
+    {
+      "kind": "recipe",
+      "title": "A resource-load band with a policy capacity line",
+      "context": "resource · recipe",
+      "path": "/reference/resource?tab=recipes",
+      "text": "Show total demand against a fixed capacity ceiling rather than the built-in per-resource sum — useful when headcount for a phase has not been decided yet, or a known blackout peri…"
+    },
+    {
+      "kind": "recipe",
+      "title": "A staffing dashboard: pool, assignments and over-allocation together",
+      "context": "resource · recipe",
+      "path": "/reference/resource?tab=recipes",
+      "text": "The everyday combination: a named roster, the column and editor to assign it, and both read-only over-allocation surfaces on by their own defaults."
+    },
+    {
+      "kind": "recipe",
+      "title": "Run a CI-style structural check with no UI at all",
+      "context": "scheduling · recipe",
+      "path": "/reference/scheduling?tab=recipes",
+      "text": "The diagnostics service works headless — fail a build on unlinked tasks or negative-lag leads without ever mounting the panel."
+    },
+    {
+      "kind": "recipe",
+      "title": "Shade a working calendar and stop scheduling into holidays",
+      "context": "scheduling · recipe",
+      "path": "/reference/scheduling?tab=recipes",
+      "text": "The everyday calendars shape: one company calendar, its holidays visible on the chart, and automatic scheduling that already routes around them."
+    },
+    {
+      "kind": "recipe",
+      "title": "Show reviewers the chain that actually drives the finish date",
+      "context": "scheduling · recipe",
+      "path": "/reference/scheduling?tab=recipes",
+      "text": "No config beyond turning the nest on: classification, outlines and link emphasis are all default-on the moment criticalPath is present."
+    },
+    {
+      "kind": "recipe",
+      "title": "Turn dependency links into a schedule that keeps itself consistent",
+      "context": "scheduling · recipe",
+      "path": "/reference/scheduling?tab=recipes",
+      "text": "Links alone are just lines. Turning propagation on makes editing one task move everything the links say follows it, in a single undo step."
+    },
+    {
+      "kind": "recipe",
+      "title": "Decorate the default bar instead of replacing it",
+      "context": "task-bars · recipe",
+      "path": "/reference/task-bars?tab=recipes",
+      "text": "The usual mistake with renderBar is redrawing everything."
+    },
+    {
+      "kind": "recipe",
+      "title": "Distinguish task types without relying on colour",
+      "context": "task-bars · recipe",
+      "path": "/reference/task-bars?tab=recipes",
+      "text": "Required whenever fill colour carries meaning: a colour-blind reader, a greyscale print and a projector all lose hue before they lose texture or shape."
+    },
+    {
+      "kind": "recipe",
+      "title": "Make short bars grabbable on a tablet",
+      "context": "task-bars · recipe",
+      "path": "/reference/task-bars?tab=recipes",
+      "text": "A one-day task at month zoom is a two-pixel target."
+    },
+    {
+      "kind": "recipe",
+      "title": "Classify tasks and show it without relying on color alone",
+      "context": "tracking · recipe",
+      "path": "/reference/tracking?tab=recipes",
+      "text": "The badge's letter keeps RAG status readable in greyscale; the optional recolor is the fast, at-a-glance version for a status-focused view."
+    },
+    {
+      "kind": "recipe",
+      "title": "Compare the live schedule against the plan of record",
+      "context": "tracking · recipe",
+      "path": "/reference/tracking?tab=recipes",
+      "text": "The everyday baselines shape: capture the plan once, then let the underlay and slip triangles do the rest of the talking."
+    },
+    {
+      "kind": "recipe",
+      "title": "Cost a project from assignments alone",
+      "context": "tracking · recipe",
+      "path": "/reference/tracking?tab=recipes",
+      "text": "The minimum viable setup: seed rates for the resources already assigned in the data, and every task's labor cost computes itself."
+    },
+    {
+      "kind": "recipe",
+      "title": "Read EVM budgets from cost instead of duplicating them",
+      "context": "tracking · recipe",
+      "path": "/reference/tracking?tab=recipes",
+      "text": "Skip meta.evm.bac entirely and let evm fall back to cost's estimated cost per task, so a budget is entered once."
+    },
+    {
+      "kind": "recipe",
+      "title": "Flag late work and explain the colors",
+      "context": "tree-grid · recipe",
+      "path": "/reference/tree-grid?tab=recipes",
+      "text": "The everyday combination: turn on the overdue warning, add one custom rule for a status your team tracks, and let readers see what each color means instead of memorizing it."
+    },
+    {
+      "kind": "recipe",
+      "title": "Localize headers, dates and Name sorting together",
+      "context": "tree-grid · recipe",
+      "path": "/reference/tree-grid?tab=recipes",
+      "text": "The three pieces of a translated grid that have to move together: retitled headers, locale-formatted cells, and a Name column that sorts the way that locale expects."
+    },
+    {
+      "kind": "recipe",
+      "title": "Read-only status board with a WBS column",
+      "context": "tree-grid · recipe",
+      "path": "/reference/tree-grid?tab=recipes",
+      "text": "A chart meant for viewing, not editing — a reporting view or a shared dashboard — with the work-breakdown code visible and folded branches showing how much they hide."
+    },
+    {
+      "kind": "recipe",
+      "title": "The standard status/priority/deadline board, with avatars",
+      "context": "tree-grid · recipe",
+      "path": "/reference/tree-grid?tab=recipes",
+      "text": "The common case: enough columns to triage a schedule at a glance, status visible on the bars themselves, and ownership visible without opening a row."
+    },
+    {
+      "kind": "recipe",
+      "title": "A single undo/redo chord, no macOS alternates, with silent announcements",
+      "context": "undo-redo · recipe",
+      "path": "/reference/undo-redo?tab=recipes",
+      "text": "Replace the default chord list entirely for a chart embedded in a host that already owns Ctrl+Shift+Z for something else, and suppress the aria-live wording in favor of the host's…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Carry undo history across a locale change",
+      "context": "undo-redo · recipe",
+      "path": "/reference/undo-redo?tab=recipes",
+      "text": "locale is a create()-time option, so switching it means dispose and recreate."
+    },
+    {
+      "kind": "recipe",
+      "title": "Drive a toolbar's disabled state from the history store",
+      "context": "undo-redo · recipe",
+      "path": "/reference/undo-redo?tab=recipes",
+      "text": "No bindButtons() helper — subscribe to the store directly, which is one line and needs no extra API to learn."
+    },
+    {
+      "kind": "recipe",
+      "title": "Build a right-to-left chart base",
+      "context": "view · recipe",
+      "path": "/reference/view?tab=recipes",
+      "text": "Set the chart's reading direction once, so every plugin that consults ViewService.direction() can mirror consistently — remembering that today, only this plugin's own scrollbars a…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Highlight a release freeze without touching the calendar",
+      "context": "view · recipe",
+      "path": "/reference/view?tab=recipes",
+      "text": "A zone is the right tool when the span is a project fact, not a working-day fact — it needs no calendar data and no per-task field."
+    },
+    {
+      "kind": "recipe",
+      "title": "Ship an in-app high-contrast toggle",
+      "context": "view · recipe",
+      "path": "/reference/view?tab=recipes",
+      "text": "Give users an accessibility switch that swaps the whole palette at runtime, rather than shipping two builds or asking them to change their OS settings."
+    },
+    {
+      "kind": "recipe",
+      "title": "Show a fiscal calendar to a Tokyo-based team",
+      "context": "view · recipe",
+      "path": "/reference/view?tab=recipes",
+      "text": "Combines a fiscal year offset with wareki-era labels and a local display zone — three independently orthogonal timeline options that commonly travel together for this kind of audi…"
+    },
+    {
+      "kind": "recipe",
+      "title": "Show a status date alongside today, for a locked weekly report",
+      "context": "view · recipe",
+      "path": "/reference/view?tab=recipes",
+      "text": "The chart may be opened any day, but the progress figures on it are only ever correct as of the last status date."
+    },
+    {
+      "kind": "recipe",
+      "title": "Start a chart already in table view",
+      "context": "view · recipe",
+      "path": "/reference/view?tab=recipes",
+      "text": "An embed whose first job is letting the reader scan and edit fields, not read a timeline — skip the chart entirely on first paint instead of asking the reader to switch to it."
+    },
+    {
+      "kind": "recipe",
+      "title": "Tune the performance tier for very large datasets",
+      "context": "view · recipe",
+      "path": "/reference/view?tab=recipes",
+      "text": "At ten-thousand-plus rows, moving per-frame cost off the scrolling frame and clipping repaints to what actually changed is the difference between a smooth fling and a visible stut…"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.focus",
+      "context": "a11y · service",
+      "path": "/reference/a11y?tab=services",
+      "text": "",
+      "keywords": "FocusService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.data",
+      "context": "data-store · service",
+      "path": "/reference/data-store?tab=services",
+      "text": "",
+      "keywords": "DataService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.fields",
+      "context": "data-store · service",
+      "path": "/reference/data-store?tab=services",
+      "text": "",
+      "keywords": "FieldsService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.data-sync",
+      "context": "data-sync · service",
+      "path": "/reference/data-sync?tab=services",
+      "text": "",
+      "keywords": "DataSyncService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.export",
+      "context": "export · service",
+      "path": "/reference/export?tab=services",
+      "text": "",
+      "keywords": "ExportService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.i18n",
+      "context": "i18n · service",
+      "path": "/reference/i18n?tab=services",
+      "text": "The multilingual dictionary: locale tables, fallback chain, lookup, catalog builder.",
+      "keywords": "I18nService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.filter",
+      "context": "interaction · service",
+      "path": "/reference/interaction?tab=services",
+      "text": "",
+      "keywords": "FilterService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.selection",
+      "context": "interaction · service",
+      "path": "/reference/interaction?tab=services",
+      "text": "",
+      "keywords": "SelectionService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.snap",
+      "context": "interaction · service",
+      "path": "/reference/interaction?tab=services",
+      "text": "",
+      "keywords": "SnapService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.perf-tools",
+      "context": "perf-tools · service",
+      "path": "/reference/perf-tools?tab=services",
+      "text": "",
+      "keywords": "PerfToolsService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.dashboard",
+      "context": "portfolio · service",
+      "path": "/reference/portfolio?tab=services",
+      "text": "The dashboard service: the KPI panel, the widget aggregations and the report export.",
+      "keywords": "DashboardService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.portfolio",
+      "context": "portfolio · service",
+      "path": "/reference/portfolio?tab=services",
+      "text": "The portfolio service: node hierarchy, health, goals, templates, filtering and task moves.",
+      "keywords": "PortfolioService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.resource-pool",
+      "context": "resource · service",
+      "path": "/reference/resource?tab=services",
+      "text": "",
+      "keywords": "ResourcePoolService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.utilization",
+      "context": "resource · service",
+      "path": "/reference/resource?tab=services",
+      "text": "",
+      "keywords": "UtilizationService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.calendars",
+      "context": "scheduling · service",
+      "path": "/reference/scheduling?tab=services",
+      "text": "",
+      "keywords": "CalendarsService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.critical-path",
+      "context": "scheduling · service",
+      "path": "/reference/scheduling?tab=services",
+      "text": "",
+      "keywords": "CriticalPathService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.scheduler",
+      "context": "scheduling · service",
+      "path": "/reference/scheduling?tab=services",
+      "text": "",
+      "keywords": "SchedulerService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.task-bars",
+      "context": "task-bars · service",
+      "path": "/reference/task-bars?tab=services",
+      "text": "Bar geometry: where each of the bars currently on screen sits on the chart canvas.",
+      "keywords": "TaskBarsService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.baselines",
+      "context": "tracking · service",
+      "path": "/reference/tracking?tab=services",
+      "text": "",
+      "keywords": "BaselinesService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.cost",
+      "context": "tracking · service",
+      "path": "/reference/tracking?tab=services",
+      "text": "",
+      "keywords": "CostService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.evm",
+      "context": "tracking · service",
+      "path": "/reference/tracking?tab=services",
+      "text": "",
+      "keywords": "EvmService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.progress",
+      "context": "tracking · service",
+      "path": "/reference/tracking?tab=services",
+      "text": "",
+      "keywords": "ProgressService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.grid",
+      "context": "tree-grid · service",
+      "path": "/reference/tree-grid?tab=services",
+      "text": "",
+      "keywords": "GridService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.rows",
+      "context": "tree-grid · service",
+      "path": "/reference/tree-grid?tab=services",
+      "text": "",
+      "keywords": "RowsService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.history",
+      "context": "undo-redo · service",
+      "path": "/reference/undo-redo?tab=services",
+      "text": "",
+      "keywords": "HistoryService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.theme",
+      "context": "view · service",
+      "path": "/reference/view?tab=services",
+      "text": "",
+      "keywords": "ThemeService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.timeline",
+      "context": "view · service",
+      "path": "/reference/view?tab=services",
+      "text": "",
+      "keywords": "TimelineService"
+    },
+    {
+      "kind": "service",
+      "title": "stargantt.view",
+      "context": "view · service",
+      "path": "/reference/view?tab=services",
+      "text": "",
+      "keywords": "ViewService"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-actual-bar",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-actual-bar",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-fill",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-fill",
+      "text": "",
+      "keywords": "css custom property variable task-bars tree-grid view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-fill-bevel",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-fill-bevel",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-inside-label-fg",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-inside-label-fg",
+      "text": "",
+      "keywords": "css custom property variable task-bars view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-label-backdrop",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-label-backdrop",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-label-fg",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-label-fg",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-label-font",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-label-font",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-radius",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-radius",
+      "text": "",
+      "keywords": "css custom property variable task-bars tree-grid view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-stroke",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-stroke",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-stroke-width",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-stroke-width",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bar-track-alpha",
+      "context": "Task bars · css token",
+      "path": "/tokens?t=--sg-bar-track-alpha",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-baseline-bar",
+      "context": "Baselines and actuals · css token",
+      "path": "/tokens?t=--sg-baseline-bar",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-baseline-cp-added",
+      "context": "Baselines and actuals · css token",
+      "path": "/tokens?t=--sg-baseline-cp-added",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-baseline-cp-removed",
+      "context": "Baselines and actuals · css token",
+      "path": "/tokens?t=--sg-baseline-cp-removed",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-baseline-overlay-fill",
+      "context": "Baselines and actuals · css token",
+      "path": "/tokens?t=--sg-baseline-overlay-fill",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-baseline-overlay-stroke",
+      "context": "Baselines and actuals · css token",
+      "path": "/tokens?t=--sg-baseline-overlay-stroke",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-baseline-slip-early",
+      "context": "Baselines and actuals · css token",
+      "path": "/tokens?t=--sg-baseline-slip-early",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-baseline-slip-font",
+      "context": "Baselines and actuals · css token",
+      "path": "/tokens?t=--sg-baseline-slip-font",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-baseline-slip-late",
+      "context": "Baselines and actuals · css token",
+      "path": "/tokens?t=--sg-baseline-slip-late",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-bg",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-bg",
+      "text": "",
+      "keywords": "css custom property variable view interaction scheduling resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-border",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-border",
+      "text": "",
+      "keywords": "css custom property variable view interaction resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-calendar-nonworking",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-calendar-nonworking",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-canvas-font-family",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-canvas-font-family",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-chart-min-width",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-chart-min-width",
+      "text": "",
+      "keywords": "css custom property variable tree-grid view scheduling resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-cost-actual",
+      "context": "Cost curves · css token",
+      "path": "/tokens?t=--sg-cost-actual",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-cost-fixed",
+      "context": "Cost curves · css token",
+      "path": "/tokens?t=--sg-cost-fixed",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-cost-labor",
+      "context": "Cost curves · css token",
+      "path": "/tokens?t=--sg-cost-labor",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-cost-material",
+      "context": "Cost curves · css token",
+      "path": "/tokens?t=--sg-cost-material",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-cost-planned",
+      "context": "Cost curves · css token",
+      "path": "/tokens?t=--sg-cost-planned",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-cost-variable",
+      "context": "Cost curves · css token",
+      "path": "/tokens?t=--sg-cost-variable",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-critical-bar",
+      "context": "The critical path · css token",
+      "path": "/tokens?t=--sg-critical-bar",
+      "text": "",
+      "keywords": "css custom property variable tree-grid view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-critical-float",
+      "context": "The critical path · css token",
+      "path": "/tokens?t=--sg-critical-float",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-backdrop",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-backdrop",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-bg",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-bg",
+      "text": "",
+      "keywords": "css custom property variable interaction tracking export"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-border",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-border",
+      "text": "",
+      "keywords": "css custom property variable scheduling export"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-danger",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-danger",
+      "text": "",
+      "keywords": "css custom property variable interaction resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-danger-fg",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-danger-fg",
+      "text": "",
+      "keywords": "css custom property variable interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-fg",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-fg",
+      "text": "",
+      "keywords": "css custom property variable interaction tracking export"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-header-bg",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-header-bg",
+      "text": "",
+      "keywords": "css custom property variable scheduling export"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-muted-fg",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-muted-fg",
+      "text": "",
+      "keywords": "css custom property variable export"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-dialog-shadow",
+      "context": "Dialogs · css token",
+      "path": "/tokens?t=--sg-dialog-shadow",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-divider-bg",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-divider-bg",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-divider-hover-bg",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-divider-hover-bg",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-divider-width",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-divider-width",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-drag-ghost-fill",
+      "context": "Drag ghosts · css token",
+      "path": "/tokens?t=--sg-drag-ghost-fill",
+      "text": "",
+      "keywords": "css custom property variable view interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-drag-ghost-stroke",
+      "context": "Drag ghosts · css token",
+      "path": "/tokens?t=--sg-drag-ghost-stroke",
+      "text": "",
+      "keywords": "css custom property variable view interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-evm-ac",
+      "context": "Earned value curves · css token",
+      "path": "/tokens?t=--sg-evm-ac",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-evm-ev",
+      "context": "Earned value curves · css token",
+      "path": "/tokens?t=--sg-evm-ev",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-evm-pv",
+      "context": "Earned value curves · css token",
+      "path": "/tokens?t=--sg-evm-pv",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-fg",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-fg",
+      "text": "",
+      "keywords": "css custom property variable task-bars view interaction scheduling resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-focus-stroke",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-focus-stroke",
+      "text": "",
+      "keywords": "css custom property variable view a11y resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-font-family",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-font-family",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-font-size",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-font-size",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-grid-line",
+      "context": "Gridlines and calendar shading · css token",
+      "path": "/tokens?t=--sg-grid-line",
+      "text": "",
+      "keywords": "css custom property variable interaction scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-grid-line-major",
+      "context": "Gridlines and calendar shading · css token",
+      "path": "/tokens?t=--sg-grid-line-major",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-grid-line-minor",
+      "context": "Gridlines and calendar shading · css token",
+      "path": "/tokens?t=--sg-grid-line-minor",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-grid-nonworking",
+      "context": "Gridlines and calendar shading · css token",
+      "path": "/tokens?t=--sg-grid-nonworking",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-grid-offhours",
+      "context": "Gridlines and calendar shading · css token",
+      "path": "/tokens?t=--sg-grid-offhours",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-grid-zone",
+      "context": "Gridlines and calendar shading · css token",
+      "path": "/tokens?t=--sg-grid-zone",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-header-bg",
+      "context": "The timeline header · css token",
+      "path": "/tokens?t=--sg-header-bg",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-header-fg",
+      "context": "The timeline header · css token",
+      "path": "/tokens?t=--sg-header-fg",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-header-font",
+      "context": "The timeline header · css token",
+      "path": "/tokens?t=--sg-header-font",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-header-height",
+      "context": "The timeline header · css token",
+      "path": "/tokens?t=--sg-header-height",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-header-major-font",
+      "context": "The timeline header · css token",
+      "path": "/tokens?t=--sg-header-major-font",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-header-tick",
+      "context": "The timeline header · css token",
+      "path": "/tokens?t=--sg-header-tick",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-invalid-stroke",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-invalid-stroke",
+      "text": "",
+      "keywords": "css custom property variable view interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-line-height",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-line-height",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-link-band",
+      "context": "Dependency links · css token",
+      "path": "/tokens?t=--sg-link-band",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-link-driving",
+      "context": "Dependency links · css token",
+      "path": "/tokens?t=--sg-link-driving",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-link-emphasis",
+      "context": "Dependency links · css token",
+      "path": "/tokens?t=--sg-link-emphasis",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-link-line",
+      "context": "Dependency links · css token",
+      "path": "/tokens?t=--sg-link-line",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-link-port",
+      "context": "Dependency links · css token",
+      "path": "/tokens?t=--sg-link-port",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-bg",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-bg",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-capacity-line",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-capacity-line",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-chart-height",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-chart-height",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-fill",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-fill",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-gridline",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-gridline",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-heatmap-bg",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-heatmap-bg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-heatmap-border",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-heatmap-border",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-heatmap-fg",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-heatmap-fg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-lane-height",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-lane-height",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-lane-label-width",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-lane-label-width",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-lane-reference",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-lane-reference",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-lane-separator",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-lane-separator",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-lane-zebra",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-lane-zebra",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-lanes-height",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-lanes-height",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-load-over-fill",
+      "context": "The load chart · css token",
+      "path": "/tokens?t=--sg-load-over-fill",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-menu-bg",
+      "context": "The context menu and zoom toolbar · css token",
+      "path": "/tokens?t=--sg-menu-bg",
+      "text": "",
+      "keywords": "css custom property variable interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-menu-border",
+      "context": "The context menu and zoom toolbar · css token",
+      "path": "/tokens?t=--sg-menu-border",
+      "text": "",
+      "keywords": "css custom property variable interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-menu-fg",
+      "context": "The context menu and zoom toolbar · css token",
+      "path": "/tokens?t=--sg-menu-fg",
+      "text": "",
+      "keywords": "css custom property variable interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-milestone-fill",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-milestone-fill",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-muted-fg",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-muted-fg",
+      "text": "",
+      "keywords": "css custom property variable view interaction scheduling resource export"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-near-critical-bar",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-near-critical-bar",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-negative-float",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-negative-float",
+      "text": "",
+      "keywords": "css custom property variable view scheduling"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-pane-row-min-height",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-pane-row-min-height",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-panel-bg",
+      "context": "Docked panels · css token",
+      "path": "/tokens?t=--sg-panel-bg",
+      "text": "",
+      "keywords": "css custom property variable portfolio"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-panel-border",
+      "context": "Docked panels · css token",
+      "path": "/tokens?t=--sg-panel-border",
+      "text": "",
+      "keywords": "css custom property variable tracking portfolio"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-panel-fg",
+      "context": "Docked panels · css token",
+      "path": "/tokens?t=--sg-panel-fg",
+      "text": "",
+      "keywords": "css custom property variable "
+    },
+    {
+      "kind": "token",
+      "title": "--sg-perf-tools-bg",
+      "context": "The perf overlay · css token",
+      "path": "/tokens?t=--sg-perf-tools-bg",
+      "text": "",
+      "keywords": "css custom property variable perf-tools"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-perf-tools-fg",
+      "context": "The perf overlay · css token",
+      "path": "/tokens?t=--sg-perf-tools-fg",
+      "text": "",
+      "keywords": "css custom property variable perf-tools"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-progress-line",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-progress-line",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-ra-chip-bg",
+      "context": "The assignment editor · css token",
+      "path": "/tokens?t=--sg-ra-chip-bg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-ra-drop-outline",
+      "context": "The assignment editor · css token",
+      "path": "/tokens?t=--sg-ra-drop-outline",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-ra-editor-bg",
+      "context": "The assignment editor · css token",
+      "path": "/tokens?t=--sg-ra-editor-bg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-ra-editor-border",
+      "context": "The assignment editor · css token",
+      "path": "/tokens?t=--sg-ra-editor-border",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-ra-editor-fg",
+      "context": "The assignment editor · css token",
+      "path": "/tokens?t=--sg-ra-editor-fg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rag-amber",
+      "context": "RAG status · css token",
+      "path": "/tokens?t=--sg-rag-amber",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rag-badge-fg",
+      "context": "RAG status · css token",
+      "path": "/tokens?t=--sg-rag-badge-fg",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rag-green",
+      "context": "RAG status · css token",
+      "path": "/tokens?t=--sg-rag-green",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rag-red",
+      "context": "RAG status · css token",
+      "path": "/tokens?t=--sg-rag-red",
+      "text": "",
+      "keywords": "css custom property variable view tracking"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-row-hover-bg",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-row-hover-bg",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-row-selected-bg",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-row-selected-bg",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-row-stripe-bg",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-row-stripe-bg",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-ru-demand",
+      "context": "Utilization overlays · css token",
+      "path": "/tokens?t=--sg-ru-demand",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-ru-supply",
+      "context": "Utilization overlays · css token",
+      "path": "/tokens?t=--sg-ru-supply",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-ru-warning",
+      "context": "Utilization overlays · css token",
+      "path": "/tokens?t=--sg-ru-warning",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rubber-band-fill",
+      "context": "Rubber-band selection · css token",
+      "path": "/tokens?t=--sg-rubber-band-fill",
+      "text": "",
+      "keywords": "css custom property variable view interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rubber-band-stroke",
+      "context": "Rubber-band selection · css token",
+      "path": "/tokens?t=--sg-rubber-band-stroke",
+      "text": "",
+      "keywords": "css custom property variable view interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-accent",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-accent",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-bg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-bg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-border",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-border",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-fg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-fg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-font",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-font",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-height",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-height",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-label-width",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-label-width",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-lane-bg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-lane-bg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-row-border",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-row-border",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-row-height",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-row-height",
+      "text": "",
+      "keywords": "css custom property variable view resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-seg-bg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-seg-bg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-seg-fg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-seg-fg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-seg-over-bg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-seg-over-bg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-seg-over-fg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-seg-over-fg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-team-bg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-team-bg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-rv-team-fg",
+      "context": "The resource pane · css token",
+      "path": "/tokens?t=--sg-rv-team-fg",
+      "text": "",
+      "keywords": "css custom property variable resource"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-scrollbar-thumb",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-scrollbar-thumb",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-scrollbar-thumb-active",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-scrollbar-thumb-active",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-selection-line-width",
+      "context": "Selection marks · css token",
+      "path": "/tokens?t=--sg-selection-line-width",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-selection-outset",
+      "context": "Selection marks · css token",
+      "path": "/tokens?t=--sg-selection-outset",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-selection-stroke",
+      "context": "Selection marks · css token",
+      "path": "/tokens?t=--sg-selection-stroke",
+      "text": "",
+      "keywords": "css custom property variable view interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-status-line",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-status-line",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-summary-fill",
+      "context": "The chart surface · css token",
+      "path": "/tokens?t=--sg-summary-fill",
+      "text": "",
+      "keywords": "css custom property variable task-bars view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-taskfields-avatar",
+      "context": "Row field marks · css token",
+      "path": "/tokens?t=--sg-taskfields-avatar",
+      "text": "",
+      "keywords": "css custom property variable tree-grid view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-taskfields-warning",
+      "context": "Row field marks · css token",
+      "path": "/tokens?t=--sg-taskfields-warning",
+      "text": "",
+      "keywords": "css custom property variable tree-grid view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-today-line",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-today-line",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-tooltip-bg",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-tooltip-bg",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-tooltip-fg",
+      "context": "Rows, scrollbars and the tooltip · css token",
+      "path": "/tokens?t=--sg-tooltip-fg",
+      "text": "",
+      "keywords": "css custom property variable view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-treegrid-cell-padding",
+      "context": "The grid pane · css token",
+      "path": "/tokens?t=--sg-treegrid-cell-padding",
+      "text": "",
+      "keywords": "css custom property variable tree-grid view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-treegrid-toggle-width",
+      "context": "The grid pane · css token",
+      "path": "/tokens?t=--sg-treegrid-toggle-width",
+      "text": "",
+      "keywords": "css custom property variable tree-grid view"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-zoom-controls-bg",
+      "context": "The context menu and zoom toolbar · css token",
+      "path": "/tokens?t=--sg-zoom-controls-bg",
+      "text": "",
+      "keywords": "css custom property variable interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-zoom-controls-border",
+      "context": "The context menu and zoom toolbar · css token",
+      "path": "/tokens?t=--sg-zoom-controls-border",
+      "text": "",
+      "keywords": "css custom property variable interaction"
+    },
+    {
+      "kind": "token",
+      "title": "--sg-zoom-controls-fg",
+      "context": "The context menu and zoom toolbar · css token",
+      "path": "/tokens?t=--sg-zoom-controls-fg",
+      "text": "",
+      "keywords": "css custom property variable interaction"
+    }
+  ]
+}

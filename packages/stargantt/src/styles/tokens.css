@@ -1,0 +1,809 @@
+/*
+ * Part 1/3 of the StarGantt default stylesheet: theme tokens + minimal structural styles.
+ *
+ * This file (plus layout.css and plugins.css) is
+ * inlined into the JS bundle as a string at build time (three `./styles/*.css?inline` imports in
+ * index.ts, concatenated there) and injected by `create()`.
+ *
+ * Everything here is deliberately low-specificity so a host page can override any rule without
+ * `!important`. Custom properties are declared on the document root because they inherit: a chart
+ * root anywhere in the document resolves them, and a host overrides them by re-declaring them on
+ * `:root` or on its own container. The selector is `:where(:root)`, not `:root`:
+ * this file is injected into <head>
+ * *after* the host's own <style>, so at equal specificity the library would win every cascade tie
+ * and silently ignore the documented override path. `:where()` drops it to (0,0,0) so a host
+ * declaration wins regardless of injection order.
+ */
+/* ------------------------------------------------------------------ *
+ * Theme tokens
+ *
+ * The normative registry of every token below — its light value, its dark value and the plugin
+ * that reads it — is documented in docs/specs/plugins/view.md's theme section. Two invariants
+ * hold for every row: a token's light value is byte-identical to the reading plugin's built-in
+ * fallback, so a page without this stylesheet paints the default light theme; and a token is
+ * written with light-dark() only when its dark value differs. Painted tokens are read at paint
+ * time through the `stargantt.theme` service; --sg-today-line is the token named by the spec's
+ * own theming example. The remainder style the DOM parts
+ * of the chart from this stylesheet.
+ *
+ * Every light-dark() token below is ALSO registered with @property, and that registration is
+ * load-bearing rather than cosmetic (theme.md §4.1): ThemeService reads a token as *text*
+ * via getComputedStyle, and an unregistered custom property is substituted verbatim — it would
+ * hand the Canvas the literal string "light-dark(#1c1917, #e7e5e4)", which no Canvas API accepts.
+ * Registration is what makes the computed value a single resolved colour. Adding a light-dark()
+ * token without its @property rule is therefore a bug, not a style nit.
+ * ------------------------------------------------------------------ */
+
+@property --sg-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+@property --sg-muted-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #78716c;
+}
+
+@property --sg-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e7e5e4;
+}
+
+@property --sg-header-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-header-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+@property --sg-header-tick {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #8a8580;
+}
+
+@property --sg-row-hover-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f2f0ec;
+}
+
+@property --sg-row-selected-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d6ebe8;
+}
+
+/* The alternating row background. light-dark(), so it joins the registered set. */
+@property --sg-row-stripe-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #faf9f7;
+}
+
+/* The plain bar fill became light-dark() when it turned teal (the shared blue it replaced
+   needed no dark value), so it joins the registered set. */
+@property --sg-bar-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f766e;
+}
+
+@property --sg-summary-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #44403c;
+}
+
+@property --sg-milestone-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #292524;
+}
+
+@property --sg-bar-label-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+/* The halo behind a label drawn outside its bar (task-bars, §1.6). Registered like the other
+   colour tokens so a light-dark() value reaches the painter resolved rather than as text. */
+@property --sg-bar-label-backdrop {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.82);
+}
+
+/* The uncompleted part of a bar is its own fill at this alpha. Registered for the same
+   reason the colour tokens are — ThemeService reads tokens as text, and an unregistered
+   light-dark() would reach the painter as the literal string rather than as a number. The syntax
+   is "<number>", so `parseFloat` on the computed value always sees a resolved figure. */
+@property --sg-bar-track-alpha {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.22;
+}
+
+@property --sg-today-line {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ea580c;
+}
+
+/* The chart body's grid. Both schemes differ, so both join the registered set. */
+@property --sg-grid-line-minor {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f5f4f1;
+}
+
+@property --sg-grid-line-major {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e7e5e4;
+}
+
+/* Retuned off scheme-shared amber (which failed 3:1 against both the blue bar fill and
+   the white background) to a token that flips with the scheme, so it joins the registered set. */
+@property --sg-selection-stroke {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+@property --sg-drag-ghost-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(15, 118, 110, 0.28);
+}
+
+@property --sg-drag-ghost-stroke {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(15, 118, 110, 0.9);
+}
+
+@property --sg-link-line {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #78716c;
+}
+
+@property --sg-link-port {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #78716c;
+}
+
+@property --sg-link-band {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f766e;
+}
+
+/* Dependencies path-emphasis and driving-link
+   colors, registered per theme.md §4.1 (light value = the initial-value invariant). */
+@property --sg-link-emphasis {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1d4ed8;
+}
+
+@property --sg-link-driving {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #44403c;
+}
+
+@property --sg-tooltip-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+@property --sg-tooltip-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-divider-hover-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c4beb8;
+}
+
+@property --sg-load-fill {
+  syntax: "<color>";
+  inherits: true;
+  /* Darkened from #9db8dd so the load bar clears 3:1 against --sg-load-bg. */
+  initial-value: #6f90c0;
+}
+
+@property --sg-load-capacity-line {
+  syntax: "<color>";
+  inherits: true;
+  /* >=3:1 where the line crosses the bars, not only the band background. */
+  initial-value: #2b3240;
+}
+
+@property --sg-load-over-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d9534f;
+}
+
+@property --sg-load-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #faf9f7;
+}
+
+/* Resource-lane furniture and the aggregate
+   band's y-axis gridlines. All four are light-dark(), so they join the registered set. */
+@property --sg-load-lane-separator {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.12);
+}
+
+@property --sg-load-gridline {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.10);
+}
+
+@property --sg-load-lane-zebra {
+  syntax: "<color>";
+  inherits: true;
+  /* Light enough that a bar drawn over it still clears 3:1 (see the token declaration). */
+  initial-value: #f7f6f4;
+}
+
+@property --sg-load-lane-reference {
+  syntax: "<color>";
+  inherits: true;
+  /* The same value as --sg-load-capacity-line. The reference line is judged against where
+     it crosses a bar, so the same crossing-contrast rule applies to it too, not only its contrast
+     against the lane background. */
+  initial-value: #2b3240;
+}
+
+@property --sg-rubber-band-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(15, 118, 110, 0.12);
+}
+
+@property --sg-rubber-band-stroke {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f766e;
+}
+
+@property --sg-focus-stroke {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f766e;
+}
+
+/* The side-panel's rejected-edit field mark, CSS-only (no plugin-side fallback). */
+@property --sg-invalid-stroke {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c0392b;
+}
+
+/* Danger text in dialog surfaces: the side-panel dialog's rejected-edit cause line (inline
+   `var(--sg-dialog-danger, #b3261e)`) and the pane's `.sg-side-panel-error` mirror of it. */
+@property --sg-dialog-danger {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b3261e;
+}
+
+/* The rest of the modal dialog family, read inline by the side-panel's task-edit dialog and
+   the selection plugin's delete confirmation. Each `initial-value` is the literal those plugins
+   already carry as their own `var()` fallback, so a plugin used without this stylesheet is
+   unchanged. */
+@property --sg-dialog-backdrop {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(16, 22, 29, 0.4);
+}
+
+@property --sg-dialog-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-dialog-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+@property --sg-dialog-danger-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+/* The three the shared `createDialog` chrome adds to the family — a hairline, a header
+   band and the drop shadow. Same shape as the four above: each `initial-value` is the literal the
+   toolkit carries as its own `var()` fallback, so a dialog built without this stylesheet renders
+   exactly as it does with it in the light scheme. */
+@property --sg-dialog-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d6d3d1;
+}
+
+@property --sg-dialog-header-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f4f6f8;
+}
+
+@property --sg-dialog-shadow {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.25);
+}
+
+/* Read by the export format dialog's secondary text via
+   `var(--sg-dialog-muted-fg, #78716c)` but previously never centrally declared, so a host
+   overriding the rest of the dialog family could not reach it. */
+@property --sg-dialog-muted-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #78716c;
+}
+
+/* The floating editor of `resource-assign`, that plugin's chip wash and drop mark, and the
+   control-border literal `filter-search` / `import-export` / `schedule-diagnostics` share. Same
+   shape as the dialog family above — each `initial-value` is the fallback the plugin already
+   carries. (The `--sg-ru-panel-*` trio that used to head this block was retired:
+   `resource-utilization`'s two panels are shared-chrome dialogs now and read `--sg-dialog-*`.) */
+@property --sg-ra-editor-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-ra-editor-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1f2937;
+}
+
+@property --sg-ra-editor-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.25);
+}
+
+@property --sg-ra-chip-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(15, 118, 110, 0.12);
+}
+
+@property --sg-ra-drop-outline {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f766e;
+}
+
+@property --sg-grid-line {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d0d0d0;
+}
+
+/* The renderer's synthetic overlay scrollbar, idle and scroll-in-progress thumbs. */
+@property --sg-scrollbar-thumb {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.25);
+}
+
+@property --sg-scrollbar-thumb-active {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.5);
+}
+
+/* Inside-placement bar labels, bar icons and avatar initials sit on the bar's own fill, not on
+   the chart background, so the token flips the opposite way from --sg-bar-label-fg. */
+@property --sg-bar-inside-label-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+/* The dashed status-date line (today-line plugin, opt-in). */
+@property --sg-status-line {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2f6fd6;
+}
+
+/* Grid-lines ground shading and marks: non-working day columns, off-hours hatch, zone bands.
+   The two non-working surfaces are a translucent red — the wash says "not available"
+   rather than reading as one more neutral texture — at an alpha that keeps them ground. */
+@property --sg-grid-nonworking {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(220, 38, 38, 0.08);
+}
+
+@property --sg-grid-offhours {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(220, 38, 38, 0.08);
+}
+
+@property --sg-grid-zone {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(15, 118, 110, 0.1);
+}
+
+/* The calendars plugin's shade-calendar non-working columns (the same translucent red as --sg-grid-nonworking). */
+@property --sg-calendar-nonworking {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(220, 38, 38, 0.08);
+}
+
+/* task-fields overdue-deadline warning glyph. */
+@property --sg-taskfields-warning {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d32f2f;
+}
+
+/* zoom-controls DOM toolbar surface and text (consumed via var() fallbacks, not ThemeService). */
+@property --sg-zoom-controls-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-zoom-controls-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+/* Baselines plugin: ghost bars, overlays, actual bars, slip labels and CP-change rings. */
+@property --sg-baseline-bar {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9aa5b1;
+}
+
+@property --sg-baseline-overlay-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(154, 165, 177, 0.28);
+}
+
+@property --sg-baseline-overlay-stroke {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7b8794;
+}
+
+@property --sg-actual-bar {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #334e68;
+}
+
+@property --sg-baseline-slip-late {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b3261e;
+}
+
+@property --sg-baseline-slip-early {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1b6e53;
+}
+
+@property --sg-baseline-cp-added {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b3261e;
+}
+
+@property --sg-baseline-cp-removed {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #52606d;
+}
+
+/* critical-path (packages/plugins/scheduling/
+   critical-path, out of this file's owning package's scope): light values are byte-identical to
+   the plugin's built-in fallbacks per §4 invariant 1. */
+@property --sg-critical-bar {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c62828;
+}
+
+@property --sg-near-critical-bar {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ef6c00;
+}
+
+@property --sg-negative-float {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7f1d1d;
+}
+
+@property --sg-critical-float {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(96, 125, 139, 0.3);
+}
+
+/* The remaining canvas-read families registered in
+   the same pass (each reading plugin is out of this file's owning package's scope; light values
+   are byte-identical to that plugin's own built-in fallback). */
+@property --sg-ru-warning {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c62828;
+}
+
+@property --sg-progress-line {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d81b60;
+}
+
+@property --sg-evm-pv {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1565c0;
+}
+
+@property --sg-evm-ev {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2e7d32;
+}
+
+@property --sg-evm-ac {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c62828;
+}
+
+/* Cost-tracking's curve/breakdown strokes and
+   resource-utilization's trend strokes (each reading plugin is out of this file's owning
+   package's scope; light values are byte-identical to that plugin's own built-in fallback).
+   The RAG tokens are scheme-shared (no light-dark()), so they need no @property registration. */
+@property --sg-cost-planned {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1565c0;
+}
+
+@property --sg-cost-actual {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c62828;
+}
+
+@property --sg-cost-labor {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1565c0;
+}
+
+@property --sg-cost-fixed {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #6a1b9a;
+}
+
+@property --sg-cost-variable {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b45309;
+}
+
+@property --sg-cost-material {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2e7d32;
+}
+
+@property --sg-ru-demand {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1d4ed8;
+}
+
+@property --sg-ru-supply {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2e7d32;
+}
+
+/* Resource-view (out of this file's owning
+   package's scope). Light values equal what the plugin's own two-level `var()` fallback chain
+   already resolved to (the matching core token's light value), so declaring these changes no
+   rendered pixel; dark values likewise equal that chain's existing dark resolution. */
+@property --sg-rv-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-rv-lane-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-rv-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+@property --sg-rv-team-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f2f0ec;
+}
+
+@property --sg-rv-team-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+@property --sg-rv-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e7e5e4;
+}
+
+@property --sg-rv-row-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e7e5e4;
+}
+
+@property --sg-rv-seg-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+/* The assignment-segment fill chains through --sg-bar-fill, which became light-dark() when
+   it turned teal, so this token follows it into both the light-dark() and the registered set. */
+@property --sg-rv-seg-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f766e;
+}
+
+@property --sg-rv-seg-over-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b3261e;
+}
+@property --sg-rv-seg-over-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+/* Resource-view panel accent (header band edge
+   mark, container top border), chains through --sg-focus-stroke's pair. */
+@property --sg-rv-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f766e;
+}
+
+/* Context-menu's `--sg-menu-*` family. */
+@property --sg-menu-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-menu-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1f2328;
+}
+
+@property --sg-menu-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ddd9d5;
+}
+
+/* The `--sg-panel-*` family shared by several
+   opt-in plugins' floating panels (calendars' exception-day editor is the one in this package's
+   scope; dashboard/cost-tracking/progress-tracking/evm read the same three tokens out of scope). */
+@property --sg-panel-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-panel-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1d2733;
+}
+
+@property --sg-panel-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d6d3d1;
+}
+
+/* Load-chart's heatmap panel (out of this file's
+   owning package's scope). */
+@property --sg-load-heatmap-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
+@property --sg-load-heatmap-fg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1c1917;
+}
+
+@property --sg-load-heatmap-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.25);
+}
+
+/* The scheme selectors.
+   On a page that declares nothing the OS drives the scheme by default; a host pins it
+   page-wide with `:root { color-scheme: light }` (or `dark`), which wins because this declaration
+   has zero specificity, and pins it for **one chart** with the two classes below. */
+:where(:root) {
+  color-scheme: light dark;
+}
+
+:where(.sg-scheme-light) {
+  color-scheme: light;
+}
+
+:where(.sg-scheme-dark) {
+  color-scheme: dark;
+}

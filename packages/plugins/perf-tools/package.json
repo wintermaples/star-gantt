@@ -1,0 +1,53 @@
+{
+  "name": "@stargantt/plugin-perf-tools",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "Official StarGantt plugin (opt-in): a floating frame-time overlay and a start/stop trace recorder for diagnosing paint performance.",
+  "keywords": [
+    "gantt",
+    "gantt-chart",
+    "project-management",
+    "timeline",
+    "scheduling",
+    "typescript",
+    "plugin-architecture",
+    "zero-dependencies"
+  ],
+  "author": "wintermaples",
+  "homepage": "https://wintermaples.github.io/star-gantt/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wintermaples/star-gantt.git",
+    "directory": "packages/plugins/perf-tools"
+  },
+  "bugs": "https://github.com/wintermaples/star-gantt/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@stargantt/core": "workspace:*",
+    "@stargantt/sdk": "workspace:*"
+  },
+  "main": "./dist/perf-tools.umd.js",
+  "module": "./dist/perf-tools.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/perf-tools.js",
+      "default": "./dist/perf-tools.umd.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@stargantt/plugin-view": "workspace:*"
+  }
+}

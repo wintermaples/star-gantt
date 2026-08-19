@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Drag editing and undo/redo example</title>
+    <!--
+      One HTML file + one script tag. Demonstrates drag/resize/progress editing, the undo/redo
+      toolbar and its keyboard chords, keyboard-only editing chords, and an opt-in "task-edge
+      magnet" (the snap plugin's `alignToTasks` rule) toggled by the toolbar. Since plugin config
+      is fixed at `create()` time, toggling the magnet needs a fresh instance: a small local
+      `runDemo()` disposes the previous instance (`gantt.dispose()`) and creates a new one.
+      `HistoryService` does not provide a `bindButtons()` helper (docs/specs/plugins/undo-redo.md
+      "Service" resolution note) — button state is kept in sync with
+      `history.state.subscribe(...)`, one line, per the note there. `snap` config lives under
+      `interaction: { snap: {...} }`, and the timeline scale lives under
+      `view: { timeline: {...} }`.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 6px;
+        font-size: 11px;
+        color: #333;
+      }
+      details > summary {
+        cursor: pointer;
+        color: #555;
+      }
+      details ul {
+        margin: 4px 0 0;
+        padding-left: 18px;
+      }
+      kbd {
+        font: 11px ui-monospace, monospace;
+        border: 1px solid #bbb;
+        border-radius: 3px;
+        padding: 0 4px;
+        background: #f5f5f5;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 16px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      button,
+      select {
+        font: inherit;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .label {
+        color: #555;
+        font-size: 11px;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+      #alignStatus {
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — drag editing and undo/redo</h1>
+    <details open>
+      <summary>How to use</summary>
+      <ul>
+        <li><strong>Move a bar:</strong> drag a bar to change the task's start and end dates.</li>
+        <li><strong>Resize:</strong> drag the handles at either end of a bar to stretch or shrink its duration.</li>
+        <li><strong>Adjust progress:</strong> drag the progress handle inside a bar to change the completion ratio.</li>
+        <li><strong>Undo:</strong> use the toolbar button or <kbd>Ctrl+Z</kbd> to revert the last change.</li>
+        <li><strong>Redo:</strong> use the toolbar button, <kbd>Ctrl+Shift+Z</kbd> or <kbd>Ctrl+Y</kbd> to reapply a reverted change.</li>
+        <li>
+          <strong>Keyboard editing:</strong> every drag above has a keyboard equivalent. Focus a
+          row in the grid (click it, or Tab in), then: <kbd>Ctrl+&larr;</kbd> / <kbd>Ctrl+&rarr;</kbd>
+          move the task by one unit of the current zoom scale; <kbd>Ctrl+Shift+&larr;</kbd> /
+          <kbd>Ctrl+Shift+&rarr;</kbd> resize its end; <kbd>Ctrl+Shift+&uarr;</kbd> /
+          <kbd>Ctrl+Shift+&darr;</kbd> step its progress by 10%.
+        </li>
+        <li>
+          <strong>Task-edge magnet:</strong> turn <em>Magnet</em> on in the toolbar to enable the
+          snap plugin's opt-in <code>alignToTasks</code> rule. An edited date that lands within
+          the chosen pixel tolerance of another task's start or end sticks to that instant exactly,
+          skipping the usual day rounding — drag a bar next to <em>Vendor review</em>, whose dates
+          sit deliberately off the day grid, and watch the readout report the match. Switching the
+          magnet or its tolerance re-creates the chart (the chart and its history start over),
+          because plugin options are chosen when the chart is created.
+        </li>
+      </ul>
+    </details>
+
+    <div class="toolbar">
+      <span class="label">History</span>
+      <button type="button" id="undoBtn" title="Ctrl+Z">&#8630; Undo</button>
+      <button type="button" id="redoBtn" title="Ctrl+Shift+Z">&#8631; Redo</button>
+      <span class="label" id="historyStatus"></span>
+      <span class="label" id="alignLabel">Task-edge magnet</span>
+      <button
+        type="button"
+        id="alignToggle"
+        aria-pressed="false"
+        aria-describedby="alignStatus"
+        title="Enable the snap plugin's alignToTasks rule (re-creates the chart)"
+      >
+        Magnet: Off
+      </button>
+      <label class="label" for="alignTolerance">Tolerance</label>
+      <select id="alignTolerance" title="Pixel tolerance of the magnet (re-creates the chart)">
+        <option value="8" selected>8 px</option>
+        <option value="16">16 px</option>
+        <option value="32">32 px</option>
+      </select>
+      <span id="alignStatus" role="status"></span>
+    </div>
+    <div id="chart"></div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      function dataset() {
+        return {
+          tasks: [
+            { id: 1, parentId: null, name: "Project A", start: new Date(2026, 7, 1).getTime(), end: new Date(2026, 9, 31).getTime(), type: "summary" },
+            { id: 2, parentId: 1, name: "Requirements", start: new Date(2026, 7, 1).getTime(), end: new Date(2026, 7, 15).getTime(), progress: 1, type: "task" },
+            { id: 3, parentId: 1, name: "Basic design", start: new Date(2026, 7, 16).getTime(), end: new Date(2026, 7, 31).getTime(), progress: 0.7, type: "task" },
+            { id: 4, parentId: 1, name: "Detailed design", start: new Date(2026, 8, 1).getTime(), end: new Date(2026, 8, 15).getTime(), progress: 0.3, type: "task" },
+            { id: 5, parentId: 1, name: "Implementation - Frontend", start: new Date(2026, 8, 10).getTime(), end: new Date(2026, 8, 31).getTime(), progress: 0.1, type: "task" },
+            { id: 6, parentId: 1, name: "Implementation - Backend", start: new Date(2026, 8, 10).getTime(), end: new Date(2026, 9, 15).getTime(), progress: 0, type: "task" },
+            { id: 7, parentId: 1, name: "Integration testing", start: new Date(2026, 9, 16).getTime(), end: new Date(2026, 9, 25).getTime(), progress: 0, type: "task" },
+            { id: 8, parentId: 1, name: "Production deployment", start: new Date(2026, 9, 26).getTime(), end: new Date(2026, 9, 31).getTime(), progress: 0, type: "milestone" },
+            {
+              // Deliberately off the day grid (10:00 to 15:00), placed next to "Basic design" so
+              // the magnet has a reachable target: with the task-edge magnet on, a bar dragged
+              // near these edges sticks to 10:00 / 15:00 exactly (interaction.md §6.3
+              // `alignToTasks` — an aligned date matches the other task's edge exactly even when
+              // that task is itself off-grid).
+              id: 9,
+              parentId: 1,
+              name: "Vendor review (off-grid dates)",
+              start: new Date(2026, 7, 18, 10, 0).getTime(),
+              end: new Date(2026, 7, 24, 15, 0).getTime(),
+              progress: 0.5,
+              type: "task",
+            },
+          ],
+        };
+      }
+
+      const HISTORY_LIMIT = 200; // default of the undo-redo plugin, mirrored here for the readout
+
+      const undoBtn = document.getElementById("undoBtn");
+      const redoBtn = document.getElementById("redoBtn");
+      const historyStatus = document.getElementById("historyStatus");
+      const alignToggle = document.getElementById("alignToggle");
+      const alignTolerance = document.getElementById("alignTolerance");
+      const alignStatus = document.getElementById("alignStatus");
+
+      function magnetPressed() {
+        return alignToggle.getAttribute("aria-pressed") === "true";
+      }
+
+      /** Idle text: states the magnet's mode in words, never by the button's fill colour alone. */
+      function describeMagnet() {
+        return magnetPressed()
+          ? `Magnet on (${Number(alignTolerance.value) || 8} px): edited dates stick to other tasks' edges.`
+          : "Magnet off: edited dates round to the timeline's current unit.";
+      }
+
+      /** Derives the ids of tasks a settled transaction actually touched, from its patch list
+       *  (see docs/specs/plugins/data-store.md "Apply flow" `data/didApplyTransaction`). */
+      function touchedTaskIds(patches) {
+        const ids = [];
+        for (const p of patches) {
+          if (p.op === "task/add" || p.op === "task/remove") ids.push(p.task.id);
+          else if (p.op === "task/update") ids.push(p.id);
+        }
+        return ids;
+      }
+
+      /**
+       * Reports whether the tasks just committed ended up exactly on another task's edge — the
+       * page's stand-in for the alignment guide the snap plugin does not draw (interaction.md §3
+       * "Contributed by this plugin": the plugin's only `renderer/layers` contributions are the
+       * selection box and the drag preview — `stargantt.snap` claims no layer of its own).
+       * Summary rows are skipped on both sides: their dates are rolled up from their children, so
+       * they always "match".
+       */
+      function describeAlignment(data, ids) {
+        const leaves = data.toJSON().tasks.filter((t) => t.type !== "summary");
+        for (const id of ids) {
+          const task = leaves.find((t) => t.id === id);
+          if (!task) continue;
+          for (const other of leaves) {
+            if (other.id === task.id) continue;
+            for (const edge of ["start", "end"]) {
+              if (task[edge] === other.start) return `${task.name} ${edge} = ${other.name} start`;
+              if (task[edge] === other.end) return `${task.name} ${edge} = ${other.name} end`;
+            }
+          }
+        }
+        return "";
+      }
+
+      let gantt;
+
+      /** (Re)creates the chart from the toolbar's current settings. Plugin options are fixed at
+       *  `create()` time, so changing the magnet or its tolerance calls this again. */
+      function runDemo() {
+        if (gantt) gantt.dispose();
+
+        const magnetOn = magnetPressed();
+        const tolerancePx = Number(alignTolerance.value) || 8;
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          // This page is about dragging bars, so the chart pane gets the width: the grid is
+          // narrowed from its 580px default to keep every fixture bar reachable.
+          plugins: StarGantt.presetStandard({
+            treeGrid: { paneWidth: 420 },
+            interaction: {
+              // Off unless the toolbar's Magnet button is pressed.
+              snap: magnetOn ? { alignToTasks: { tolerancePx } } : {},
+            },
+            // The fixture is pinned to August 2026 (task 1 "Project A" starts Aug 1), not
+            // anchored to "today" — without this, the default today-anchored origin sits after
+            // the earliest bar and it cannot be scrolled to.
+            view: { timeline: { origin: new Date(2026, 7, 1).getTime() } },
+          }),
+        });
+        window.gantt = gantt;
+
+        const data = gantt.service("stargantt.data");
+        data.load(dataset());
+
+        // History toolbar. `HistoryService.bindButtons()` is removed in v2 — the plugin's
+        // `state` store is subscribed instead (undo-redo.md "Service" resolution note).
+        const history = gantt.service("stargantt.history");
+
+        function updateHistoryUI() {
+          const state = history.state.get();
+          undoBtn.disabled = !state.canUndo;
+          redoBtn.disabled = !state.canRedo;
+          const next = history.peekUndo();
+          const undoPart = state.canUndo ? ` — undo: ${next === undefined ? "available" : next}` : "";
+          const redoPart = state.canRedo ? " (redo available)" : "";
+          historyStatus.textContent = `Limit: ${HISTORY_LIMIT} entries${undoPart}${redoPart}`;
+        }
+
+        undoBtn.onclick = () => gantt.dispatch("history/undo", undefined);
+        redoBtn.onclick = () => gantt.dispatch("history/redo", undefined);
+        history.state.subscribe(updateHistoryUI);
+
+        // No page-level keydown listener is needed: `keys/bindings` is DEFINED by the a11y
+        // plugin, which owns the single document-level dispatcher (a11y.md "Defined:
+        // `keys/bindings`"); undo-redo only CONTRIBUTES its default undo/redo chords to it
+        // (undo-redo.md "Config" `keys` — configurable, defaults Ctrl+Z / Ctrl+Shift+Z etc.).
+
+        // Task-edge magnet readout, driven by the settle signal of every applied transaction:
+        // `data/didApplyTransaction` fires only for real transactions, never for `load()`
+        // (docs/specs/plugins/undo-redo.md "Recording").
+        gantt.on("data/didApplyTransaction", (ev) => {
+          const ids = touchedTaskIds(ev.transaction.patches);
+          const match = describeAlignment(data, ids);
+          alignStatus.textContent = match
+            ? `Edge match: ${match}${magnetPressed() ? "" : " (coincidence — the magnet is off)"}`
+            : `No task-edge match. ${describeMagnet()}`;
+        });
+
+        updateHistoryUI();
+        alignStatus.textContent = describeMagnet();
+
+        // Debugging aid: print API usage examples to the console, using the public
+        // command/service/event surface, including `data/didApplyTransaction` used above.
+        console.log(
+          "StarGantt API usage (this example uses only the public API):",
+          "\n1. gantt.dispatch('history/undo', undefined)  — run Undo",
+          "\n2. gantt.dispatch('history/redo', undefined)  — run Redo",
+          "\n3. gantt.dispatch('task/move', { id: 'a1', start: ..., end: ... }) — move a task",
+          "\n4. gantt.service('stargantt.history') — obtain the history service",
+          "\n5. gantt.service('stargantt.data') — obtain the data service",
+          "\n6. gantt.on('data/didApplyTransaction', ...) — subscribe to applied transactions",
+        );
+      }
+
+      alignToggle.addEventListener("click", () => {
+        alignToggle.setAttribute("aria-pressed", magnetPressed() ? "false" : "true");
+        alignToggle.textContent = magnetPressed() ? "Magnet: On" : "Magnet: Off";
+        runDemo();
+      });
+      alignTolerance.addEventListener("change", () => runDemo());
+
+      runDemo();
+    </script>
+  </body>
+</html>

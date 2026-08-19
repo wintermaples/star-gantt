@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Basic Gantt Chart example</title>
+    <!--
+      A read-only chart (hierarchy + dependencies) with three setup-time display toggles. This
+      page is self-contained (see also examples/basic.html, examples/interaction.html); each
+      toggle disposes the current chart and calls create() again, which is the honest
+      v2-idiomatic shape for "this option is read once at setup()" — these are setup-time-only
+      options.
+
+      The grid-lines highlight zones (`zones`) and row hover fill (`rowHover`) live under
+      `view({ gridLines: {...} })`; the renderer's base text direction lives under
+      `view({ direction: ... })`, exposed via `stargantt.view`'s `direction()` / `bidiIsolate()`.
+      Also notable: a WCAG 1.4.1 note about the "!" icon not being color alone.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 16px 24px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p.lede {
+        max-width: 78ch;
+        color: #444;
+        font-size: 13px;
+      }
+      #chart {
+        height: 440px;
+        border: 1px solid #ccc;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin: 12px 0;
+      }
+      .group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .group-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #333;
+        margin-right: 2px;
+      }
+      button {
+        font: inherit;
+        font-size: 13px;
+        padding: 4px 10px;
+        border: 1px solid #999;
+        border-radius: 4px;
+        background: #f5f5f5;
+        cursor: pointer;
+      }
+      button[aria-pressed="true"] {
+        background: #1f4e79;
+        color: #fff;
+        border-color: #1f4e79;
+      }
+      #status {
+        font-size: 12px;
+        color: #333;
+        max-width: 90ch;
+      }
+      #bidi-input {
+        font: inherit;
+        font-size: 13px;
+        padding: 3px 6px;
+        min-width: 26ch;
+      }
+      #bidi-sample {
+        font-family: ui-monospace, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — basic Gantt chart</h1>
+    <p class="lede">
+      A read-only project plan (hierarchy + finish-to-start dependencies), plus three
+      setup-time-only rendering switches: the grid-lines highlight zones and row hover fill
+      (<code>view({ gridLines: {...} })</code>), and the view's base text direction
+      (<code>view({ direction: "rtl" })</code>). Because these are read once when the chart is
+      created, each toggle below tears the chart down and creates a fresh one — it does not mutate
+      a live instance.
+    </p>
+
+    <div class="toolbar">
+      <div class="group" role="group" aria-labelledby="grid-label">
+        <span class="group-label" id="grid-label">Grid decoration (view.gridLines)</span>
+        <button id="zones-btn" type="button" aria-pressed="false">Highlight zones</button>
+        <button id="hover-btn" type="button" aria-pressed="false">Row hover fill</button>
+      </div>
+      <div class="group" role="group" aria-labelledby="dir-label">
+        <span class="group-label" id="dir-label">Base text direction (view.direction)</span>
+        <button id="rtl-btn" type="button" aria-pressed="false">RTL base direction</button>
+      </div>
+    </div>
+
+    <div id="chart"></div>
+
+    <p id="status" role="status"></p>
+
+    <div class="toolbar">
+      <div class="group">
+        <label class="group-label" for="bidi-input">
+          Mixed-direction label (<code>ViewService.bidiIsolate</code>)
+        </label>
+        <input id="bidi-input" type="text" dir="auto" value="שלב 2 Beta release" />
+      </div>
+    </div>
+
+    <p id="bidi-out"></p>
+    <p id="bidi-sample" dir="auto"></p>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "start of the current UTC day" (docs/specs/plugins/
+      // view.md, `timeline.origin`). The fixed authoring dates below are shifted onto today at
+      // load.
+      const SHIFT = Math.floor(Date.now() / DAY) * DAY - new Date("2026-09-01").getTime();
+      const d = (iso) => new Date(iso).getTime() + SHIFT;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: 1, parentId: null, name: "Project planning", type: "summary", start: d("2026-09-01"), end: d("2026-12-31") },
+            { id: 2, parentId: 1, name: "Requirements", type: "task", start: d("2026-09-01"), end: d("2026-09-15"), progress: 1.0 },
+            { id: 3, parentId: 1, name: "UI design", type: "task", start: d("2026-09-10"), end: d("2026-10-05"), progress: 0.8 },
+            { id: 4, parentId: 1, name: "Implementation", type: "summary", start: d("2026-09-15"), end: d("2026-11-30") },
+            { id: 5, parentId: 4, name: "Backend implementation", type: "task", start: d("2026-09-15"), end: d("2026-10-31"), progress: 0.6 },
+            { id: 6, parentId: 4, name: "Frontend implementation", type: "task", start: d("2026-10-01"), end: d("2026-11-15"), progress: 0.4 },
+            { id: 7, parentId: 4, name: "API integration", type: "task", start: d("2026-11-01"), end: d("2026-11-30"), progress: 0 },
+            { id: 8, parentId: 1, name: "Testing", type: "task", start: d("2026-11-20"), end: d("2026-12-15"), progress: 0 },
+            { id: 9, parentId: 1, name: "Beta release", type: "milestone", start: d("2026-12-01"), end: d("2026-12-01") },
+            { id: 10, parentId: null, name: "Deployment & operations", type: "summary", start: d("2026-12-01"), end: d("2026-12-31") },
+            { id: 11, parentId: 10, name: "Production setup", type: "task", start: d("2026-12-01"), end: d("2026-12-10"), progress: 0 },
+            { id: 12, parentId: 10, name: "Production release", type: "milestone", start: d("2026-12-15"), end: d("2026-12-15") },
+          ],
+          links: [
+            { id: "l1", sourceId: 2, targetId: 3, type: "FS" },
+            { id: "l2", sourceId: 2, targetId: 5, type: "FS" },
+            { id: "l3", sourceId: 3, targetId: 6, type: "FS" },
+            { id: "l4", sourceId: 5, targetId: 7, type: "FS" },
+            { id: "l5", sourceId: 6, targetId: 7, type: "FS" },
+            { id: "l6", sourceId: 7, targetId: 8, type: "FS" },
+            { id: "l7", sourceId: 8, targetId: 9, type: "FS" },
+            { id: "l8", sourceId: 9, targetId: 11, type: "FS" },
+            { id: "l9", sourceId: 11, targetId: 12, type: "FS" },
+          ],
+        };
+      }
+
+      // Two highlight bands over the first weeks of the plan. The first names a theme custom
+      // property, so it follows light/dark and preset switches; the second is a verbatim canvas
+      // color, which bypasses the theme registry and is not painted under forced colors.
+      const ZONES = [
+        { start: d("2026-09-07"), end: d("2026-09-14"), color: "--sg-grid-zone" },
+        { start: d("2026-09-21"), end: d("2026-09-25"), color: "rgba(214, 92, 60, 0.18)" },
+      ];
+
+      const zonesBtn = document.getElementById("zones-btn");
+      const hoverBtn = document.getElementById("hover-btn");
+      const rtlBtn = document.getElementById("rtl-btn");
+      const status = document.getElementById("status");
+      const bidiInput = document.getElementById("bidi-input");
+      const bidiOut = document.getElementById("bidi-out");
+      const bidiSample = document.getElementById("bidi-sample");
+
+      const pressed = (btn) => btn.getAttribute("aria-pressed") === "true";
+
+      /** Text prefix, not colour alone (WCAG 1.4.1); re-derived from aria-pressed every rebuild. */
+      function label(btn, text) {
+        btn.textContent = (pressed(btn) ? "✓ " : "") + text;
+      }
+
+      /** Renders control characters so the invisible isolate pair is visible in the readout. */
+      function reveal(text) {
+        return text.replace(/[‎‏‪-‮⁦-⁩]/g, (c) => "<U+" + c.codePointAt(0).toString(16).toUpperCase() + ">");
+      }
+
+      let gantt;
+
+      function rebuild() {
+        if (gantt) gantt.dispose();
+
+        // This chart is read-only: rather than hand-picking a plugin list, the standard preset is
+        // composed with every editing switch turned off.
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: StarGantt.presetStandard({
+            treeGrid: { readOnly: true },
+            interaction: { dragEdit: { enabled: false } },
+            scheduling: {
+              autoSchedule: { enabled: false },
+              dependencies: { allowLinkCreate: false },
+            },
+            view: {
+              gridLines: { zones: pressed(zonesBtn) ? ZONES : undefined, rowHover: pressed(hoverBtn) },
+              direction: pressed(rtlBtn) ? "rtl" : "ltr",
+            },
+          }),
+        });
+        gantt.service("stargantt.data").load(dataset());
+        window.gantt = gantt;
+
+        const view = gantt.service("stargantt.view");
+
+        label(zonesBtn, "Highlight zones");
+        label(hoverBtn, "Row hover fill");
+        label(rtlBtn, "RTL base direction");
+
+        status.textContent =
+          "Zones: " +
+          (pressed(zonesBtn)
+            ? "two bands painted over the first weeks - the themed one follows --sg-grid-zone, the verbatim one stays unpainted under forced colors"
+            : "off (the chart draws plain gridlines)") +
+          ". Row hover fill: " +
+          (pressed(hoverBtn)
+            ? "on - move the pointer over the chart body and the row under it fills with --sg-row-hover-bg, matching the grid pane's own hover"
+            : "off") +
+          '. ViewService.direction() reports "' +
+          view.direction() +
+          '" - RTL sets dir="rtl" on the chart pane (scrollbars, DOM overlays) and the canvas text direction; bar and column geometry stays LTR-defined, so the plan itself does not mirror.';
+
+        updateBidi();
+      }
+
+      function updateBidi() {
+        const view = gantt.service("stargantt.view");
+        const raw = bidiInput.value;
+        const isolated = view.bidiIsolate(raw, view.direction());
+        bidiSample.textContent = isolated;
+        bidiOut.textContent =
+          isolated === raw
+            ? "One-directional text is returned unchanged - nothing to isolate."
+            : 'Direction-mixed text wrapped for base "' +
+              view.direction() +
+              '": ' +
+              reveal(isolated) +
+              " - the isolate pair pins the paragraph direction so canvas fillText paints the parts in the right visual order.";
+      }
+
+      function toggle(btn) {
+        btn.setAttribute("aria-pressed", pressed(btn) ? "false" : "true");
+        rebuild();
+      }
+
+      zonesBtn.addEventListener("click", () => toggle(zonesBtn));
+      hoverBtn.addEventListener("click", () => toggle(hoverBtn));
+      rtlBtn.addEventListener("click", () => toggle(rtlBtn));
+      bidiInput.addEventListener("input", updateBidi);
+
+      rebuild();
+    </script>
+  </body>
+</html>

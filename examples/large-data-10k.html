@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — 10,000-Task Performance Test example</title>
+    <!--
+      A performance harness — generate-and-load 10k/100k tasks, undo/redo, deferred-hierarchy
+      loading + on-demand materialization, the view plugin's progressive/dirty-regions/prefetch
+      switches and the scheduling plugin's dependency-line culling, a third-party repaint probe
+      plugin (renderer/layers contribution reading `Viewport.detail` and, for the tint control,
+      painting an overlay wash clipped by dirty-region invalidation), and the opt-in perf-tools
+      plugin (FPS overlay + trace recorder).
+
+      This page is self-contained (see examples/basic.html): the renderer/dependency switches are
+      setup-time-only options, so changing them tears the chart down and recreates it via a local
+      `rebuild()` helper.
+
+      Services: `stargantt.view` (config under `view: {...}`); dependency-line culling is
+      `scheduling({ dependencies: { cullLines } })`; rows are `stargantt.rows`. Data/history
+      changes are observed through store subscriptions (`data.tasks`, `history.state`);
+      `history.state.get().canUndo`/`.canRedo` read undo/redo availability; `data.links` is a
+      store (`.get().size`); `data.taskIds()`, `data.hasDeferredChildren(id)` and
+      `data.materializeChildren(id)` round out the data API. `renderer/layers` is the extension
+      point the demo repaint probe contributes to, declared by the view plugin, with
+      `Viewport.detail` semantics.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 16px 24px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      #chart {
+        height: 460px;
+        border: 1px solid #ccc;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+        margin: 10px 0;
+      }
+      .group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .group-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #333;
+      }
+      button {
+        font: inherit;
+        font-size: 13px;
+        padding: 4px 10px;
+        border: 1px solid #999;
+        border-radius: 4px;
+        background: #f5f5f5;
+        cursor: pointer;
+      }
+      button[aria-pressed="true"] {
+        background: #1f4e79;
+        color: #fff;
+        border-color: #1f4e79;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .readout {
+        font-size: 12px;
+        color: #333;
+      }
+      section.panel {
+        margin: 16px 0;
+        padding-top: 8px;
+        border-top: 1px solid #ddd;
+      }
+      section.panel h2 {
+        font-size: 15px;
+        margin: 0 0 4px;
+      }
+      section.panel p {
+        max-width: 90ch;
+        font-size: 13px;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — 10,000-task performance test</h1>
+
+    <div class="toolbar">
+      <div class="group">
+        <button id="load10k-btn" type="button">Load 10,000 tasks</button>
+        <button id="load100k-btn" type="button">Load 100,000 tasks (optional)</button>
+      </div>
+      <div class="group">
+        <span class="group-label">History</span>
+        <button id="undoBtn" type="button" title="Ctrl+Z">&#8630; Undo</button>
+        <button id="redoBtn" type="button" title="Ctrl+Shift+Z">&#8631; Redo</button>
+      </div>
+      <span class="readout" id="status" role="status">Initial state</span>
+      <span class="readout" id="statusDetail"></span>
+      <span class="readout" id="scrollReadout"></span>
+    </div>
+
+    <div id="chart"></div>
+
+    <section class="panel" aria-labelledby="perf-panel-heading">
+      <h2 id="perf-panel-heading">Performance features</h2>
+      <p>
+        The opt-in switches the library ships for large charts. The renderer switches and the
+        dependency-line culling are resolved once when a plugin is created, so toggling one
+        re-creates the chart — the loaded tasks are cleared and have to be loaded again, which is
+        exactly the trade-off a host makes when it picks these options at composition time.
+      </p>
+
+      <div class="group" role="group" aria-labelledby="perf-deferred-label">
+        <span class="group-label" id="perf-deferred-label">Deferred data</span>
+        <button id="deferredLoadBtn" type="button">Load 20 projects with deferred children</button>
+        <button id="materializeBtn" type="button" disabled>Expand next subtree</button>
+      </div>
+      <p class="readout" id="deferredReadout">
+        Deferred subtrees: none loaded. The load parks 4,000 child rows and 3,980 links as raw
+        data — they exist nowhere in the store until a subtree is materialized.
+      </p>
+
+      <div class="group" role="group" aria-labelledby="perf-switches-label">
+        <span class="group-label" id="perf-switches-label">Composition</span>
+        <button id="progressiveBtn" type="button" aria-pressed="true">Progressive: on</button>
+        <button id="dirtyRegionsBtn" type="button" aria-pressed="true">Dirty regions: on</button>
+        <button id="prefetchBtn" type="button" aria-pressed="true">Prefetch: on</button>
+        <button id="cullLinesBtn" type="button" aria-pressed="true">Cull dependency lines: on</button>
+      </div>
+
+      <div class="group" role="group" aria-labelledby="perf-probe-label">
+        <span class="group-label" id="perf-probe-label">Repaint probe</span>
+        <button id="tintBtn" type="button" aria-pressed="false">Tint repainted area: off</button>
+        <button id="invalidateBtn" type="button">Repaint a 240&times;160 region</button>
+      </div>
+      <p class="readout" id="renderMetrics">Renderer metrics: waiting for the first paint&hellip;</p>
+
+      <div class="group" role="group" aria-labelledby="perf-tools-label">
+        <span class="group-label" id="perf-tools-label">perf-tools</span>
+        <button id="perfOverlayBtn" type="button" aria-pressed="true">FPS overlay: on</button>
+        <button id="recordBtn" type="button">Start trace recording</button>
+        <button id="downloadTraceBtn" type="button" disabled>Download trace JSON</button>
+      </div>
+      <p class="readout" id="perfReadout">
+        Trace recorder idle. The frame-rate overlay floats in the chart pane's top-right corner;
+        it is inert (<code>pointer-events: none</code>) and hidden from assistive technology, as a
+        dev overlay must be.
+      </p>
+    </section>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY_MS = 86400000;
+
+      // The perf switches this page toggles. Read once per rebuild.
+      let perfOpts = { progressive: true, dirtyRegions: true, prefetch: true, cullLines: true };
+
+      // Ids of the deferred-hierarchy projects whose child rows are parked in the store.
+      let deferredParents = [];
+      let lastMaterializeMs = null;
+      let currentTaskCount = 0;
+      let gantt;
+
+      function serviceOrNull(id) {
+        if (!gantt) return null;
+        try {
+          return gantt.service(id);
+        } catch {
+          return null;
+        }
+      }
+
+      /** The opt-in dev plugin's service, or undefined while the page has no chart. */
+      function perfTools() {
+        return serviceOrNull("stargantt.perf-tools") ?? undefined;
+      }
+
+      function updateStatus(message) {
+        document.getElementById("status").textContent = message;
+      }
+      function updateProgress(message) {
+        document.getElementById("statusDetail").textContent = message;
+      }
+
+      // The renderer's own overlay scrollbar is a visual-only indicator with no accessible name
+      // and no numeric readout precise enough to say "where am I". This adds a "row n-m of N"
+      // readout next to it, kept current on every `view/scrolled`.
+      function updateScrollReadout() {
+        const el = document.getElementById("scrollReadout");
+        const rows = serviceOrNull("stargantt.rows");
+        const view = serviceOrNull("stargantt.view");
+        if (!rows || !view) {
+          el.textContent = "";
+          return;
+        }
+        const total = rows.rowCount();
+        if (total === 0) {
+          el.textContent = "";
+          return;
+        }
+        const vp = view.viewport.get();
+        const first = rows.rowAtY(vp.scrollTop) + 1;
+        const last = Math.min(total, rows.rowAtY(vp.scrollTop + vp.height) + 1);
+        el.textContent = `row ${first}–${last} of ${total.toLocaleString()}`;
+      }
+
+      // Task generator.
+      function generateTasks(count) {
+        const tasks = [];
+        // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+        // §6.2). Starting the first project there makes bars visible right after generation.
+        const baseDate = Math.floor(Date.now() / DAY_MS) * DAY_MS;
+
+        const projectCount = Math.max(10, Math.floor(Math.sqrt(count / 10)));
+        const tasksPerProject = Math.max(10, Math.floor(count / projectCount));
+
+        updateProgress(`Generating tasks: 0/${count}`);
+
+        let taskId = 0;
+        for (let p = 0; p < projectCount && taskId < count; p++) {
+          const projectStart = baseDate + p * 30 * DAY_MS;
+          const projectEnd = projectStart + (tasksPerProject / 2) * DAY_MS;
+          const projectId = `proj-${p}`;
+
+          tasks.push({ id: projectId, parentId: null, name: `Project ${p + 1}`, start: projectStart, end: projectEnd, type: "summary" });
+
+          for (let t = 0; t < tasksPerProject && taskId < count; t++, taskId++) {
+            const taskStart = projectStart + (t / tasksPerProject) * (projectEnd - projectStart);
+            const taskEnd = taskStart + (4 + Math.random() * 10) * DAY_MS;
+            const progress = Math.random() * 0.8; // 0-80% progress
+
+            tasks.push({
+              id: `task-${taskId}`,
+              parentId: projectId,
+              name: `Task ${taskId + 1}`,
+              start: Math.round(taskStart),
+              end: Math.round(taskEnd),
+              progress: progress,
+              type: "task",
+            });
+
+            if ((taskId + 1) % 1000 === 0) updateProgress(`Generating tasks: ${taskId + 1}/${count}`);
+          }
+        }
+
+        return tasks.slice(0, count);
+      }
+
+      function updateHistoryUI() {
+        const history = serviceOrNull("stargantt.history");
+        const state = history ? history.state.get() : null;
+        document.getElementById("undoBtn").disabled = !state || !state.canUndo;
+        document.getElementById("redoBtn").disabled = !state || !state.canRedo;
+      }
+
+      function loadData(count) {
+        if (!gantt) {
+          updateStatus("Chart not available.");
+          return;
+        }
+        updateStatus(`Generating ${count.toLocaleString()} tasks...`);
+
+        setTimeout(() => {
+          const startTime = performance.now();
+          const tasks = generateTasks(count);
+          const genTime = performance.now() - startTime;
+
+          updateStatus(`Loading ${count.toLocaleString()} tasks...`);
+
+          setTimeout(() => {
+            const dataService = serviceOrNull("stargantt.data");
+            if (!dataService) {
+              updateStatus("Chart not available.");
+              return;
+            }
+            const loadStart = performance.now();
+            perfTools()?.mark("load:start");
+            dataService.load({ tasks });
+            perfTools()?.mark("load:end");
+            perfTools()?.count("tasksLoaded", count);
+            const loadTime = performance.now() - loadStart;
+
+            currentTaskCount = count;
+            updateProgress("");
+            updateStatus(`Done: ${count.toLocaleString()} tasks | generate: ${genTime.toFixed(0)}ms | load: ${loadTime.toFixed(0)}ms`);
+            updateButtons();
+          }, 0);
+        }, 0);
+      }
+
+      function updateButtons() {
+        const load10kBtn = document.getElementById("load10k-btn");
+        const load100kBtn = document.getElementById("load100k-btn");
+
+        if (currentTaskCount === 0) {
+          load10kBtn.disabled = false;
+          load100kBtn.disabled = false;
+        } else if (currentTaskCount !== 10000 && currentTaskCount !== 100000) {
+          load10kBtn.disabled = false;
+          load100kBtn.disabled = false;
+        } else if (currentTaskCount === 10000) {
+          load10kBtn.disabled = true;
+          load100kBtn.disabled = false;
+        } else if (currentTaskCount === 100000) {
+          load10kBtn.disabled = true;
+          load100kBtn.disabled = true;
+        }
+      }
+
+      document.getElementById("load10k-btn").addEventListener("click", () => loadData(10000));
+      document.getElementById("load100k-btn").addEventListener("click", () => loadData(100000));
+
+      // After clicking page chrome the chart can lose its keyboard-chord scope and Ctrl+Z goes
+      // dead silently. The toolbar buttons hand focus back to the chart pane so the most likely
+      // next gesture — reaching for the keyboard — keeps working.
+      function focusChart() {
+        const pane = document.querySelector("#chart .sg-pane--grid");
+        if (pane && typeof pane.focus === "function") pane.focus();
+      }
+
+      document.getElementById("undoBtn").addEventListener("click", () => {
+        if (gantt) {
+          gantt.dispatch("history/undo", undefined);
+          focusChart();
+        }
+      });
+      document.getElementById("redoBtn").addEventListener("click", () => {
+        if (gantt) {
+          gantt.dispatch("history/redo", undefined);
+          focusChart();
+        }
+      });
+
+      // --- Deferred subtree loading -------------------------------------------------------------
+      const DEFERRED_PROJECTS = 20;
+      const DEFERRED_CHILDREN = 200;
+
+      // Deterministic by construction: every date is a fixed offset from the day-floored anchor,
+      // no Math.random() anywhere.
+      function buildDeferredDataset() {
+        const anchor = Math.floor(Date.now() / DAY_MS) * DAY_MS;
+        const tasks = [];
+        const links = [];
+        const deferredTasks = [];
+
+        for (let p = 0; p < DEFERRED_PROJECTS; p++) {
+          const projectId = `dproj-${p}`;
+          const projectStart = anchor + p * 14 * DAY_MS;
+          const rows = [];
+
+          for (let c = 0; c < DEFERRED_CHILDREN; c++) {
+            const start = projectStart + c * DAY_MS;
+            rows.push({
+              id: `${projectId}-t${c}`,
+              name: `Project ${p + 1} · step ${c + 1}`,
+              start: start,
+              end: start + 3 * DAY_MS,
+              progress: (c % 5) / 5,
+              type: "task",
+            });
+            if (c > 0) {
+              // The links are declared up front even though their endpoints do not exist yet;
+              // they become drawable as soon as the subtree is materialized. With very many of
+              // them on screen, `scheduling({ dependencies: { cullLines: true } })` skips the
+              // drawing calls for every line whose horizontal extent is outside the viewport.
+              links.push({ id: `${projectId}-l${c}`, sourceId: `${projectId}-t${c - 1}`, targetId: `${projectId}-t${c}`, type: "FS" });
+            }
+          }
+
+          tasks.push({
+            id: projectId,
+            parentId: null,
+            name: `Deferred project ${p + 1}`,
+            start: projectStart,
+            end: projectStart + (DEFERRED_CHILDREN + 3) * DAY_MS,
+            type: "summary",
+          });
+          // One bucket per project: raw rows, parked — not normalized, not indexed, invisible to
+          // getTask() / taskIds() / query() until materializeChildren() is called for the parent.
+          deferredTasks.push({ parentId: projectId, rows: rows });
+        }
+
+        return { tasks: tasks, links: links, deferredTasks: deferredTasks };
+      }
+
+      function pendingDeferredCount() {
+        const data = serviceOrNull("stargantt.data");
+        if (!data) return 0;
+        return deferredParents.filter((id) => data.hasDeferredChildren(id)).length;
+      }
+
+      function updateDeferredUI() {
+        const pending = pendingDeferredCount();
+        document.getElementById("materializeBtn").disabled = pending === 0;
+
+        const readout = document.getElementById("deferredReadout");
+        if (deferredParents.length === 0) {
+          readout.textContent =
+            "Deferred subtrees: none loaded. The load parks 4,000 child rows and 3,980 links as " +
+            "raw data — they exist nowhere in the store until a subtree is materialized.";
+          return;
+        }
+        const data = serviceOrNull("stargantt.data");
+        if (!data) {
+          readout.textContent = "Deferred subtrees: data store not present in this composition.";
+          return;
+        }
+        const taskCount = [...data.taskIds()].length;
+        const linkCount = data.links.get().size;
+        readout.textContent =
+          `Deferred subtrees: ${pending} of ${deferredParents.length} still parked · ` +
+          `tasks in the store: ${taskCount.toLocaleString()} · links: ${linkCount.toLocaleString()}` +
+          (lastMaterializeMs === null ? "" : ` · last materialization: ${lastMaterializeMs.toFixed(1)} ms for ${DEFERRED_CHILDREN} rows`);
+      }
+
+      document.getElementById("deferredLoadBtn").addEventListener("click", () => {
+        const store = serviceOrNull("stargantt.data");
+        if (!store) {
+          updateStatus("Chart not available.");
+          return;
+        }
+        const data = buildDeferredDataset();
+        const t0 = performance.now();
+        store.load(data);
+        const ms = performance.now() - t0;
+        deferredParents = data.tasks.map((t) => t.id);
+        lastMaterializeMs = null;
+        currentTaskCount = data.tasks.length;
+        updateProgress("");
+        updateStatus(`Done: ${data.tasks.length} project rows loaded in ${ms.toFixed(0)}ms; ${(DEFERRED_PROJECTS * DEFERRED_CHILDREN).toLocaleString()} child rows parked.`);
+        updateButtons();
+        updateDeferredUI();
+        updateScrollReadout();
+      });
+
+      // Materializing is the load path's continuation, not a transaction: it is not undoable.
+      function materializeSubtree(id) {
+        const data = serviceOrNull("stargantt.data");
+        if (!data || !data.hasDeferredChildren(id)) return;
+        perfTools()?.mark(`materialize:${id}`);
+        const t0 = performance.now();
+        data.materializeChildren(id);
+        lastMaterializeMs = performance.now() - t0;
+        perfTools()?.count("subtreesMaterialized");
+      }
+
+      document.getElementById("materializeBtn").addEventListener("click", () => {
+        const data = serviceOrNull("stargantt.data");
+        if (!gantt || !data) {
+          updateStatus("Chart not available.");
+          return;
+        }
+        const next = deferredParents.find((id) => data.hasDeferredChildren(id));
+        if (next === undefined) {
+          updateStatus("Every deferred subtree has been materialized.");
+          updateDeferredUI();
+          return;
+        }
+        materializeSubtree(next);
+        // Building the rows is only half the gesture: expanding the parent is what puts them on
+        // screen. Wiring the expand gesture to materialization is the host's job.
+        gantt.dispatch("view/rowToggle", { id: next, expanded: true });
+        updateStatus(`Materialized ${DEFERRED_CHILDREN} rows of "${next}" in ${lastMaterializeMs.toFixed(0)}ms.`);
+        updateDeferredUI();
+        updateScrollReadout();
+      });
+
+      // --- Renderer / dependencies switches -----------------------------------------------------
+      // Each of these is resolved once at plugin setup, so flipping one calls rebuild(): a new
+      // chart, and therefore an empty store.
+      function bindPerfSwitch(buttonId, key, switchLabel) {
+        const btn = document.getElementById(buttonId);
+        function sync() {
+          const on = perfOpts[key] === true;
+          btn.setAttribute("aria-pressed", String(on));
+          btn.textContent = `${switchLabel}: ${on ? "on" : "off"}`;
+        }
+        btn.addEventListener("click", () => {
+          perfOpts[key] = perfOpts[key] !== true;
+          sync();
+          deferredParents = [];
+          lastMaterializeMs = null;
+          rebuild();
+          updateStatus(`Chart re-created with ${switchLabel.toLowerCase()} ${perfOpts[key] ? "on" : "off"} — the store starts empty again.`);
+        });
+        sync();
+      }
+
+      // --- Repaint probe ---------------------------------------------------------------------
+      // A third-party probe plugin (public API only) that makes two renderer options observable:
+      // it counts the paint passes by their `Viewport.detail` hint (progressive rendering marks
+      // frames painted during a scroll "coarse" and schedules one "fine" repaint when the scroll
+      // settles) and, when tinting is switched on, floods the overlay layer with an alternating
+      // wash. With dirty regions enabled, an `invalidate()` carrying a rectangle clips that
+      // repaint — so the newly washed rectangle is literally the region that was repainted.
+      function makeRepaintProbe() {
+        const probe = { coarse: 0, fine: 0, plain: 0, tint: false, flip: false };
+        window.__perfProbe = probe;
+        return StarGantt.definePlugin({
+          meta: { id: "demo.repaint-probe", dependsOn: ["stargantt.view"] },
+          setup(ctx) {
+            ctx.contribute("renderer/layers", {
+              id: "demo-repaint-probe",
+              zIndex: 1200, // >= 100 puts the contribution on the overlay canvas
+              draw(g, vp) {
+                if (vp.detail === "coarse") probe.coarse++;
+                else if (vp.detail === "fine") probe.fine++;
+                else probe.plain++;
+
+                if (!probe.tint) return;
+                probe.flip = !probe.flip;
+                // Two washes of equal lightness: the point is "this area was repainted", and the
+                // alternation itself carries it — no hue-only meaning is being asserted.
+                g.fillStyle = probe.flip ? "rgba(56, 132, 255, 0.16)" : "rgba(255, 176, 32, 0.16)";
+                g.fillRect(0, 0, vp.width, vp.height);
+              },
+            });
+          },
+        });
+      }
+
+      document.getElementById("tintBtn").addEventListener("click", (e) => {
+        const probe = window.__perfProbe;
+        const view = serviceOrNull("stargantt.view");
+        if (!probe || !view) return;
+        probe.tint = !probe.tint;
+        e.currentTarget.setAttribute("aria-pressed", String(probe.tint));
+        e.currentTarget.textContent = `Tint repainted area: ${probe.tint ? "on" : "off"}`;
+        // A rect-less invalidation always repaints the whole layer, so switching the wash off
+        // clears it everywhere.
+        view.invalidate("overlay");
+      });
+
+      document.getElementById("invalidateBtn").addEventListener("click", () => {
+        const view = serviceOrNull("stargantt.view");
+        if (!view) return;
+        const vp = view.viewport.get();
+        perfTools()?.mark("invalidate:region");
+        view.invalidate("overlay", {
+          x: Math.min(40, Math.max(0, vp.width - 240)),
+          y: Math.min(40, Math.max(0, vp.height - 160)),
+          width: 240,
+          height: 160,
+        });
+        updateStatus(
+          perfOpts.dirtyRegions
+            ? "Invalidated a 240×160 rectangle of the overlay layer — with dirty regions on, only that rectangle repaints."
+            : "Invalidated a 240×160 rectangle, but dirty regions are off: the whole overlay layer repaints."
+        );
+      });
+
+      // --- perf-tools --------------------------------------------------------------------------
+      document.getElementById("perfOverlayBtn").addEventListener("click", (e) => {
+        const tools = perfTools();
+        if (!tools) return;
+        const on = e.currentTarget.getAttribute("aria-pressed") !== "true";
+        tools.setOverlayVisible(on);
+        e.currentTarget.setAttribute("aria-pressed", String(on));
+        e.currentTarget.textContent = `FPS overlay: ${on ? "on" : "off"}`;
+      });
+
+      document.getElementById("recordBtn").addEventListener("click", (e) => {
+        const tools = perfTools();
+        if (!tools) return;
+        const btn = e.currentTarget;
+        const readout = document.getElementById("perfReadout");
+        if (tools.isRecording()) {
+          const trace = tools.stopRecording();
+          btn.textContent = "Start trace recording";
+          document.getElementById("downloadTraceBtn").disabled = !tools.exportJson();
+          readout.textContent = trace
+            ? `Trace: ${trace.frames.length} frames · avg ${trace.stats.avgMs.toFixed(1)} ms · ` +
+              `max ${trace.stats.maxMs.toFixed(1)} ms · ${trace.stats.overBudget} over the ` +
+              `${trace.budgetMs} ms budget · marks ${trace.marks.length} · counters ` +
+              JSON.stringify(trace.counters)
+            : "Trace recorder idle.";
+        } else {
+          tools.startRecording();
+          btn.textContent = "Stop trace recording";
+          readout.textContent = "Recording… scroll the chart or load a dataset, then stop to see the summary.";
+        }
+      });
+
+      document.getElementById("downloadTraceBtn").addEventListener("click", () => {
+        const json = perfTools()?.exportJson();
+        if (!json) return;
+        StarGantt.downloadFile(document, json, "stargantt-trace.json", "application/json");
+      });
+
+      // --- Renderer metrics readout -------------------------------------------------------------
+      // Deliberately outside the `role="status"` line: these numbers change several times a
+      // second and would flood a screen reader if they were announced.
+      function updateRenderMetrics() {
+        const el = document.getElementById("renderMetrics");
+        if (!gantt) {
+          el.textContent = "Renderer metrics: no chart.";
+          return;
+        }
+        const view = serviceOrNull("stargantt.view");
+        if (!view) {
+          el.textContent = "Renderer metrics: view plugin not present in this composition.";
+          return;
+        }
+        const firstPaint = view.firstPaintMs();
+        const probe = window.__perfProbe;
+        const vp = view.viewport.get();
+        const predicted = view.predictedViewport();
+        const stats = perfTools()?.stats();
+
+        const parts = [
+          `first paint: ${firstPaint === undefined ? "pending" : firstPaint.toFixed(1) + " ms"}`,
+          `paint passes: ${probe ? probe.coarse : 0} coarse / ${probe ? probe.fine : 0} fine` + (perfOpts.progressive ? "" : " (progressive off — no detail hint)"),
+          `prefetch: ${predicted ? `${Math.round(predicted.scrollTop - vp.scrollTop)} px ahead vertically` : perfOpts.prefetch ? "at rest" : "off"}`,
+          stats ? `${Math.round(stats.fps)} fps · ${stats.avgMs.toFixed(1)} ms avg` : "",
+        ];
+        el.textContent = "Renderer metrics — " + parts.filter(Boolean).join(" · ");
+      }
+
+      // 4 Hz is enough for a human to read and far below anything that competes with the frame
+      // budget.
+      setInterval(updateRenderMetrics, 250);
+
+      // --- Chart (re)construction ---------------------------------------------------------------
+      function rebuild() {
+        if (gantt) gantt.dispose();
+
+        window.__perfProbe = undefined;
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: [
+            ...StarGantt.presetStandard({
+              view: {
+                progressive: perfOpts.progressive === true,
+                dirtyRegions: perfOpts.dirtyRegions === true,
+                prefetch: perfOpts.prefetch === true,
+              },
+              scheduling: { dependencies: { cullLines: perfOpts.cullLines === true } },
+            }),
+            // Opt-in dev plugin (not part of the standard preset): the frame-time overlay and the
+            // trace recorder, floating in the chart pane's top-right corner.
+            StarGantt.perfTools({ position: "top-right" }),
+            makeRepaintProbe(),
+          ],
+          locale: "en",
+        });
+
+        // Bare `gantt` global stays a stable handle for manual/automated inspection.
+        window.gantt = gantt;
+
+        // This page is a performance harness, not a data-variety demo: it starts empty and the
+        // "Load 10,000/100,000 tasks" buttons above generate and load data on demand.
+        currentTaskCount = 0;
+        deferredParents = [];
+        lastMaterializeMs = null;
+
+        gantt.on("view/scrolled", updateScrollReadout);
+        gantt.on("view/scrolled", updateRenderMetrics);
+        gantt.service("stargantt.history").state.subscribe(updateHistoryUI);
+        gantt.service("stargantt.data").tasks.subscribe(updateScrollReadout);
+
+        updateStatus("Chart initialized. Load some tasks.");
+        updateProgress("");
+        updateHistoryUI();
+        updateScrollReadout();
+        updateButtons();
+        updateDeferredUI();
+        updateRenderMetrics();
+
+        // The recorder and the overlay belong to the new instance: reset their chrome.
+        document.getElementById("recordBtn").textContent = "Start trace recording";
+        document.getElementById("downloadTraceBtn").disabled = true;
+        const overlayBtn = document.getElementById("perfOverlayBtn");
+        overlayBtn.setAttribute("aria-pressed", "true");
+        overlayBtn.textContent = "FPS overlay: on";
+        const tintBtn = document.getElementById("tintBtn");
+        tintBtn.setAttribute("aria-pressed", "false");
+        tintBtn.textContent = "Tint repainted area: off";
+      }
+
+      bindPerfSwitch("progressiveBtn", "progressive", "Progressive");
+      bindPerfSwitch("dirtyRegionsBtn", "dirtyRegions", "Dirty regions");
+      bindPerfSwitch("prefetchBtn", "prefetch", "Prefetch");
+      bindPerfSwitch("cullLinesBtn", "cullLines", "Cull dependency lines");
+
+      window.addEventListener("beforeunload", () => {
+        if (gantt) gantt.dispose();
+      });
+
+      rebuild();
+    </script>
+  </body>
+</html>

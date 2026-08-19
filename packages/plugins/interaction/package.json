@@ -1,0 +1,56 @@
+{
+  "name": "@stargantt/plugin-interaction",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "Official StarGantt plugin: pointer and keyboard interaction — selection, drag-edit, snapping, tooltips, context menu, zoom toolbar, clipboard, filter/search, edit dialog and side panel.",
+  "keywords": [
+    "gantt",
+    "gantt-chart",
+    "project-management",
+    "timeline",
+    "scheduling",
+    "typescript",
+    "plugin-architecture",
+    "zero-dependencies"
+  ],
+  "author": "wintermaples",
+  "homepage": "https://wintermaples.github.io/star-gantt/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wintermaples/star-gantt.git",
+    "directory": "packages/plugins/interaction"
+  },
+  "bugs": "https://github.com/wintermaples/star-gantt/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@stargantt/core": "workspace:*",
+    "@stargantt/plugin-data-store": "workspace:*",
+    "@stargantt/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@stargantt/plugin-task-bars": "workspace:*",
+    "@stargantt/plugin-tree-grid": "workspace:*",
+    "@stargantt/plugin-view": "workspace:*"
+  },
+  "main": "./dist/interaction.umd.js",
+  "module": "./dist/interaction.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/interaction.js",
+      "default": "./dist/interaction.umd.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

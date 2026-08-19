@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "src",
+    "test",
+    "vite.config.ts"
+  ],
+  // `test/type-probe.ts` imports `../dist/index` (the BUILT declaration output, not source — see
+  // its own header comment) and is checked separately by `tsconfig.typecheck-dist.json`, wired
+  // into this package's `build` script right after the declaration step it depends on. Excluding it
+  // here keeps this package's own `typecheck` script (`tsc --noEmit`, part of the root
+  // `pnpm run typecheck` fan-out) independent of build order, like every other package's.
+  "exclude": [
+    "test/type-probe.ts"
+  ]
+}

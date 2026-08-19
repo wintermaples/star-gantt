@@ -1,0 +1,99 @@
+# CI — runs for pull requests targeting main.
+# Mirrors the repository verification gate:
+# build → unit tests (incl. lint:arch) → typecheck → e2e typecheck → Playwright E2E.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from packageManager in package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (E2E runs against the built bundle)
+        run: pnpm run build
+
+      - name: Unit tests (lint:arch + vitest)
+        run: pnpm run test
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Typecheck E2E sources
+        run: pnpm exec tsc -p e2e --noEmit
+
+      - name: Install Playwright browser (chromium only)
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: E2E tests (Playwright)
+        run: pnpm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # user-docs is a separate pnpm root (its own lockfile), so it gets its own job.
+  # E2E for the docs site is intentionally skipped in CI (it visits every page and is slow);
+  # unit tests + typecheck + a production build catch the regressions that matter for deploys.
+  user-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            user-docs/pnpm-lock.yaml
+
+      - name: Install library dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the library (the docs site consumes the shipped bundle)
+        run: pnpm run build
+
+      - name: Install user-docs dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: user-docs
+
+      - name: Typecheck user-docs
+        run: pnpm run typecheck
+        working-directory: user-docs
+
+      - name: Unit tests (vitest)
+        run: pnpm run test
+        working-directory: user-docs
+
+      - name: Build the docs site
+        run: pnpm run build
+        working-directory: user-docs

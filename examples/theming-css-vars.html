@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StarGantt v2 — Theming with CSS Variables example</title>
+  <!--
+    CSS custom properties control every painted color/font/bar-geometry token; the page-local
+    `.sg-root.<name>-theme` blocks below (this page's SUBJECT is that CSS) demonstrate
+    class-driven theming, and the "Theme presets" panel drives the ThemeService API
+    (setPreset/preset/presets/get/audit) reached through `gantt.service("stargantt.theme")`.
+
+    This page is self-contained (see examples/basic.html), wiring the theme-class buttons and the
+    preset panel directly against one persistent chart instance rather than a
+    dispose/recreate-on-toggle pattern — plausible here because none of this page's controls are
+    setup-time-only (theme classes are read live via getComputedStyle + a MutationObserver, and
+    setPreset/setColorScheme are ordinary runtime calls).
+
+    ThemeConfig is a nested group of `view({ theme: {...} })` (docs/specs/plugins/view.md); theme
+    changes are observed through the `theme.tokens` store (subscribe). Token names come from
+    `Object.keys(theme.tokens.get())` and values from `theme.tokens.get()`; every other
+    ThemeService member (`get`, `audit`, `setPreset`, `preset`, `presets`, `setColorScheme`,
+    `colorScheme`, `refresh`) is available. `HIGH_CONTRAST_DARK` is exported off the global
+    `StarGantt` object.
+  -->
+  <style>
+    body {
+      margin: 0;
+      padding: 16px 24px;
+      font-family: system-ui, sans-serif;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 4px;
+    }
+    #chart {
+      height: 440px;
+      border: 1px solid #ccc;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0;
+    }
+    button {
+      font: inherit;
+      font-size: 13px;
+      padding: 5px 10px;
+      border: 1px solid #999;
+      border-radius: 4px;
+      background: #f5f5f5;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button[aria-pressed="true"] {
+      background: #1f4e79;
+      color: #fff;
+      border-color: #1f4e79;
+    }
+    .readout {
+      max-width: 82ch;
+      font-size: 13px;
+      color: #333;
+    }
+    section.panel {
+      margin: 18px 0;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
+    }
+    section.panel h2 {
+      font-size: 15px;
+      margin: 0 0 4px;
+    }
+    .check {
+      display: inline-block;
+      width: 1em;
+    }
+
+    /*
+     * This page's subject *is* the CSS: the `--sg-*` theme palettes it demonstrates plus the two
+     * swatch/audit helpers those panels need.
+     */
+    .sg-root.dark-theme {
+      --sg-bg: #14181d;
+      --sg-fg: #e6eaef;
+      --sg-muted-fg: #9aa4b1;
+      --sg-border: #2c333c;
+      --sg-header-bg: #1b2027;
+      --sg-header-fg: #c3cbd5;
+      --sg-header-tick: #7d8794; /* 4.5:1 on the header band — audit()-measured, not eyeballed */
+      --sg-row-hover-bg: #1e252d;
+      --sg-row-selected-bg: #2a3b52;
+      --sg-row-stripe-bg: #191e24;
+      --sg-grid-nonworking: #191e24;
+      --sg-grid-line-minor: #1b2027;
+      --sg-grid-line-major: #262d36;
+      --sg-rubber-band-fill: rgba(96, 165, 250, 0.15);
+      --sg-rubber-band-stroke: #60a5fa;
+      --sg-invalid-stroke: #e06c68;
+      --sg-scrollbar-thumb: rgba(255, 255, 255, 0.25);
+      --sg-scrollbar-thumb-active: rgba(255, 255, 255, 0.5);
+      --sg-bar-fill: #4a7ebb;
+      --sg-bar-track-alpha: 0.26;
+      --sg-summary-fill: #aeb9c8;
+      --sg-milestone-fill: #c5cedb;
+      --sg-bar-label-fg: #e6eaef;
+      --sg-bar-inside-label-fg: #0b0e11;
+      --sg-link-line: #9aa4b1;
+      --sg-link-port: #9aa4b1;
+      --sg-link-band: #60a5fa;
+      --sg-today-line: #ff6b6b;
+      --sg-status-line: #60a5fa;
+      --sg-selection-stroke: #ffffff;
+      --sg-focus-stroke: #60a5fa;
+      --sg-drag-ghost-fill: rgba(122, 168, 224, 0.3);
+      --sg-drag-ghost-stroke: rgba(122, 168, 224, 0.95);
+      --sg-tooltip-bg: #e6eaef;
+      --sg-tooltip-fg: #14181d;
+      --sg-divider-hover-bg: #3c454f;
+    }
+
+    .sg-root.ocean-theme {
+      --sg-bg: #f5fafc;
+      --sg-fg: #003d5c;
+      --sg-muted-fg: #0277bd;
+      --sg-border: #0088cc;
+      --sg-header-bg: #b3e5fc;
+      --sg-header-fg: #00695c;
+      --sg-header-tick: #3d6b85;
+      --sg-row-hover-bg: #e0f7fa;
+      --sg-row-selected-bg: #cfe9f7;
+      --sg-row-stripe-bg: #eaf6fb;
+      --sg-grid-nonworking: #e8f4f9;
+      --sg-grid-line-minor: #e3f2f8;
+      --sg-grid-line-major: #cbe6f2;
+      --sg-rubber-band-fill: rgba(2, 136, 209, 0.15);
+      --sg-rubber-band-stroke: #0277bd;
+      --sg-invalid-stroke: #c0392b;
+      --sg-scrollbar-thumb: rgba(0, 61, 92, 0.3);
+      --sg-scrollbar-thumb-active: rgba(0, 61, 92, 0.55);
+      --sg-bar-fill: #0277bd;
+      --sg-bar-track-alpha: 0.22;
+      --sg-summary-fill: #00695c;
+      --sg-milestone-fill: #003d5c;
+      --sg-bar-label-fg: #003d5c;
+      --sg-bar-inside-label-fg: #ffffff;
+      --sg-link-line: #0277bd;
+      --sg-link-port: #0277bd;
+      --sg-link-band: #0288d1;
+      --sg-today-line: #e53935;
+      --sg-status-line: #0277bd;
+      --sg-selection-stroke: #1f2933;
+      --sg-focus-stroke: #0088cc;
+      --sg-drag-ghost-fill: rgba(0, 136, 204, 0.2);
+      --sg-drag-ghost-stroke: rgba(0, 136, 204, 0.85);
+      --sg-scrollbar-thumb: rgba(0, 61, 92, 0.3);
+      --sg-tooltip-bg: #003d5c;
+      --sg-tooltip-fg: #e8f4f8;
+      --sg-divider-hover-bg: #0088cc;
+    }
+
+    .sg-root.classic-theme {
+      --sg-canvas-font-family: Tahoma, Verdana, "MS PGothic", "Hiragino Kaku Gothic ProN", sans-serif;
+      --sg-font-family: Tahoma, Verdana, "MS PGothic", "Hiragino Kaku Gothic ProN", sans-serif;
+      --sg-font-size: 12px;
+      --sg-bg: #ffffff;
+      --sg-fg: #000000;
+      --sg-muted-fg: #4d4d4d;
+      --sg-border: #aca899;
+      --sg-header-bg: #ece9d8;
+      --sg-header-fg: #000000;
+      --sg-header-tick: #7a7666;
+      --sg-row-hover-bg: #e8e8e8;
+      --sg-row-selected-bg: #cce0f5;
+      --sg-row-stripe-bg: #f4f2e9;
+      --sg-grid-nonworking: #efeee6;
+      --sg-grid-line-minor: #e4e2d8;
+      --sg-grid-line-major: #c9c6b8;
+      --sg-bar-radius: 0px;
+      --sg-bar-stroke: #1f3f63;
+      --sg-bar-stroke-width: 1px;
+      --sg-bar-fill-bevel: 0.18;
+      --sg-bar-fill: #3a6ea5;
+      --sg-bar-track-alpha: 0.25;
+      --sg-summary-fill: #000080;
+      --sg-milestone-fill: #000000;
+      --sg-bar-label-fg: #000000;
+      --sg-bar-inside-label-fg: #ffffff;
+      --sg-link-line: #5a5a5a;
+      --sg-link-port: #5a5a5a;
+      --sg-link-band: #316ac5;
+      --sg-today-line: #c00000;
+      --sg-status-line: #316ac5;
+      --sg-selection-stroke: #000000;
+      --sg-focus-stroke: #316ac5;
+      --sg-invalid-stroke: #a50000;
+      --sg-rubber-band-fill: rgba(49, 106, 197, 0.14);
+      --sg-rubber-band-stroke: #316ac5;
+      --sg-drag-ghost-fill: rgba(58, 110, 165, 0.28);
+      --sg-drag-ghost-stroke: rgba(58, 110, 165, 0.9);
+      --sg-scrollbar-thumb: rgba(0, 0, 0, 0.3);
+      --sg-scrollbar-thumb-active: rgba(0, 0, 0, 0.55);
+      --sg-tooltip-bg: #ffffe1;
+      --sg-tooltip-fg: #000000;
+      --sg-menu-bg: #ffffff;
+      --sg-menu-fg: #000000;
+      --sg-menu-border: #aca899;
+      --sg-panel-bg: #f1efe2;
+      --sg-panel-fg: #000000;
+      --sg-panel-border: #aca899;
+      --sg-divider-hover-bg: #b6b2a2;
+    }
+
+    .sg-root.glass-theme {
+      --sg-canvas-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      --sg-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      --sg-bg: rgba(255, 255, 255, 0.55);
+      --sg-fg: #1d1d1f;
+      --sg-muted-fg: #4b4b50;
+      --sg-border: rgba(60, 60, 67, 0.22);
+      --sg-header-bg: rgba(255, 255, 255, 0.38);
+      --sg-header-fg: #1d1d1f;
+      --sg-header-tick: rgba(60, 60, 67, 0.55);
+      --sg-row-stripe-bg: rgba(255, 255, 255, 0.42);
+      --sg-row-hover-bg: rgba(255, 255, 255, 0.68);
+      --sg-row-selected-bg: rgba(0, 122, 255, 0.2);
+      --sg-grid-nonworking: rgba(120, 120, 128, 0.12);
+      --sg-grid-line-minor: rgba(255, 255, 255, 0.5);
+      --sg-grid-line-major: rgba(60, 60, 67, 0.14);
+      --sg-bar-radius: 8px;
+      --sg-bar-fill: #0069d9;
+      --sg-bar-track-alpha: 0.24;
+      --sg-summary-fill: #3a3a3c;
+      --sg-milestone-fill: #5856d6;
+      --sg-bar-label-fg: #1d1d1f;
+      --sg-bar-inside-label-fg: #ffffff;
+      --sg-link-line: rgba(60, 60, 67, 0.65);
+      --sg-link-port: rgba(60, 60, 67, 0.65);
+      --sg-link-band: #007aff;
+      --sg-today-line: #ff3b30;
+      --sg-status-line: #007aff;
+      --sg-selection-stroke: #1d1d1f;
+      --sg-focus-stroke: #0064d2;
+      --sg-invalid-stroke: #d70015;
+      --sg-rubber-band-fill: rgba(0, 122, 255, 0.14);
+      --sg-rubber-band-stroke: #007aff;
+      --sg-drag-ghost-fill: rgba(0, 105, 217, 0.22);
+      --sg-drag-ghost-stroke: rgba(0, 105, 217, 0.9);
+      --sg-scrollbar-thumb: rgba(60, 60, 67, 0.35);
+      --sg-scrollbar-thumb-active: rgba(60, 60, 67, 0.6);
+      --sg-tooltip-bg: rgba(28, 28, 30, 0.86);
+      --sg-tooltip-fg: #ffffff;
+      --sg-menu-bg: rgba(255, 255, 255, 0.82);
+      --sg-menu-fg: #1d1d1f;
+      --sg-menu-border: rgba(255, 255, 255, 0.7);
+      --sg-panel-bg: rgba(255, 255, 255, 0.7);
+      --sg-panel-fg: #1d1d1f;
+      --sg-panel-border: rgba(255, 255, 255, 0.7);
+      --sg-divider-hover-bg: rgba(60, 60, 67, 0.25);
+    }
+
+    .color-swatch {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border-radius: 2px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+
+    .audit-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 2px 16px;
+      font-size: 13px;
+    }
+
+    .audit-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-family: ui-monospace, "Courier New", monospace;
+      font-size: 12px;
+    }
+
+    /* The verdict is carried by the ✓ / ✗ glyph and by the measured number, never by colour
+       alone — the same rule the chart itself follows. */
+    .audit-list .bad {
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <h1>StarGantt v2 — theming with CSS variables</h1>
+  <p class="readout">
+    CSS custom properties (CSS variables) control every painted colour, the canvas fonts and the
+    bar geometry. Click the theme buttons to change the chart element's class, and watch the new
+    look apply through CSS inheritance: the view plugin's theme module reads the
+    <code>--sg-*</code> variables via <code>getComputedStyle</code>, invalidates the renderer and
+    forces a repaint. Each theme also pins the chart's colour scheme through
+    <code>ThemeService.setColorScheme()</code>, so the tokens it chooses <em>not</em> to override
+    resolve on the matching half of the library's <code>light-dark()</code> defaults instead of
+    following the OS into a mixed palette. <strong>System default</strong> overrides nothing at all
+    and follows the OS.
+  </p>
+  <div class="toolbar" id="themeButtons">
+    <button data-theme="light" type="button" aria-pressed="true">
+      <span class="color-swatch" style="background: #f2f4f7; border-color: #999;"></span>
+      System default
+    </button>
+    <button data-theme="dark" type="button" aria-pressed="false">
+      <span class="color-swatch" style="background: #1b2027; border-color: #666;"></span>
+      Dark
+    </button>
+    <button data-theme="ocean" type="button" aria-pressed="false">
+      <span class="color-swatch" style="background: #b3e5fc; border-color: #0088cc;"></span>
+      Custom (Ocean)
+    </button>
+    <button data-theme="classic" type="button" aria-pressed="false">
+      <span class="color-swatch" style="background: #ece9d8; border-color: #aca899;"></span>
+      Classic (XP era)
+    </button>
+    <button data-theme="glass" type="button" aria-pressed="false">
+      <span class="color-swatch" style="background: linear-gradient(135deg, #ffd5e2, #a8d8ff); border-color: rgba(60,60,67,0.25);"></span>
+      Glass
+    </button>
+  </div>
+
+  <div id="chart" class="sg-root"></div>
+
+  <section class="panel" aria-labelledby="presetHeading">
+    <h2 id="presetHeading">Theme presets (runtime switching)</h2>
+    <p class="readout">
+      The buttons above swap CSS classes; these buttons call <code>ThemeService.setPreset(name)</code>
+      instead. The list comes from <code>presets()</code> — the two bundled high-contrast palettes
+      plus the <em>Blueprint</em> palette this page supplies through <code>ThemeConfig.presets</code>.
+      An applied preset writes its tokens as inline custom properties on the chart element, so it
+      deliberately wins over the page's own CSS blocks; <strong>None</strong> removes them again and
+      hands control back to the theme buttons above.
+    </p>
+    <div class="toolbar" id="presetButtons" role="group" aria-label="Theme preset"></div>
+    <p class="readout" id="presetStatus" role="status" aria-live="polite">Waiting for the chart to boot&hellip;</p>
+    <p class="readout" id="tokenReadout">
+      <span class="color-swatch" id="tokenSwatch"></span>
+      <code>theme.get('--sg-bar-fill')</code> &rarr; <code id="tokenValue">&mdash;</code>
+      (re-read on every <code>theme.tokens</code> store update)
+    </p>
+    <p class="readout" id="forcedStatus"></p>
+  </section>
+
+  <section class="panel" aria-labelledby="auditHeading">
+    <h2 id="auditHeading">Palette audit</h2>
+    <p class="readout">
+      <code>ThemeService.audit()</code> measures the palette actually in force — page CSS, scheme
+      pin and any applied preset together — against the contrast floors this project audits its own
+      defaults to: 4.5:1 for text, 3:1 for non-text UI marks, plus the row-state ordering
+      (plain &lt; stripe &lt; hover &lt; selected). A pair whose tokens cannot be read as colours is
+      left out rather than reported as passing. <code>theme.tokens</code> lists what a
+      self-contained palette has to cover.
+    </p>
+    <p class="readout" id="auditSummary">Waiting for the chart to boot&hellip;</p>
+    <ul class="audit-list" id="auditList"></ul>
+  </section>
+
+  <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+  <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+  <script>
+    function dataset() {
+      return {
+        tasks: [
+          { id: "1", parentId: null, name: "📋 Project planning", start: Date.parse("2026-08-06"), end: Date.parse("2026-08-15"), type: "summary" },
+          { id: "1-1", parentId: "1", name: "Requirements", start: Date.parse("2026-08-06"), end: Date.parse("2026-08-08"), type: "task" },
+          { id: "1-2", parentId: "1", name: "Design", start: Date.parse("2026-08-08"), end: Date.parse("2026-08-12"), type: "task" },
+          { id: "1-3", parentId: "1", name: "Testing", start: Date.parse("2026-08-12"), end: Date.parse("2026-08-15"), type: "task" },
+          { id: "2", parentId: null, name: "🔧 Core implementation", start: Date.parse("2026-08-08"), end: Date.parse("2026-08-20"), type: "summary" },
+          { id: "2-1", parentId: "2", name: "Frontend", start: Date.parse("2026-08-08"), end: Date.parse("2026-08-18"), type: "task", progress: 0.6 },
+          { id: "2-2", parentId: "2", name: "Backend", start: Date.parse("2026-08-10"), end: Date.parse("2026-08-20"), type: "task", progress: 0.3 },
+          { id: "3", parentId: null, name: "📦 Release prep", start: Date.parse("2026-08-25"), end: Date.parse("2026-08-25"), type: "milestone" },
+        ],
+      };
+    }
+
+    // A config-supplied preset (ThemeConfig.presets): a flat map of --sg-* tokens registered under
+    // a name, selectable at runtime next to the bundled ones. The bundled palettes are exported,
+    // so a variant is a spread plus the few tokens that differ — no copied values.
+    const blueprint = Object.assign({}, StarGantt.HIGH_CONTRAST_DARK, {
+      "--sg-bg": "#0d1b2a",
+      "--sg-header-bg": "#12283d",
+      "--sg-row-hover-bg": "#16324b",
+      "--sg-grid-nonworking": "#12212e",
+      "--sg-milestone-fill": "#ffd166", // amber diamonds against the navy ground
+      "--sg-link-band": "#ffd166",
+    });
+
+    const chartEl = document.getElementById("chart");
+
+    const gantt = StarGantt.create({
+      element: chartEl,
+      plugins: StarGantt.presetStandard({
+        view: {
+          // The fixture is pinned to August 2026 ("Requirements" starts Aug 6), not anchored to
+          // "today" — without this, the default today-anchored origin sits after the earliest bar
+          // and it cannot be scrolled to.
+          timeline: { origin: Date.parse("2026-08-06") },
+          theme: {
+            // Add `preset: "high-contrast"` here to boot straight into a bundled palette. This
+            // page leaves it out so the first paint shows the CSS-variable theming it is about,
+            // and lets the buttons below the chart apply presets instead.
+            presets: { blueprint },
+            // Opt in to forced-colors (Windows High Contrast): while the OS forces colours, the
+            // canvas-painted tokens resolve to CSS system colours instead of the ones above, so
+            // the chart follows the system palette like the surrounding DOM already does.
+            forcedColors: true,
+          },
+        },
+      }),
+      locale: "en",
+    });
+
+    gantt.service("stargantt.data").load(dataset());
+    window.gantt = gantt;
+
+    const theme = gantt.service("stargantt.theme");
+
+    // Theme switcher wiring. "light" is the no-class case: it overrides nothing, so the chart
+    // wears the library's own palette and follows the OS / the top bar's colour-scheme toggle.
+    const THEME_CLASSES = ["dark-theme", "ocean-theme", "classic-theme", "glass-theme"];
+
+    // Which half of the library's light-dark() defaults each theme's *un-overridden* tokens should
+    // land on. Without this the page palettes below would mix schemes.
+    const THEME_SCHEME = {
+      light: "auto",
+      dark: "dark",
+      ocean: "light",
+      classic: "light",
+      glass: "light",
+    };
+
+    document.querySelectorAll("#themeButtons button[data-theme]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const themeName = btn.dataset.theme;
+
+        document.querySelectorAll("#themeButtons button[data-theme]").forEach((b) => {
+          b.setAttribute("aria-pressed", "false");
+        });
+        btn.setAttribute("aria-pressed", "true");
+
+        chartEl.classList.remove(...THEME_CLASSES);
+        if (themeName !== "light") chartEl.classList.add(themeName + "-theme");
+
+        // Pin the scheme the palette was written for. This is what puts the library's own
+        // `sg-scheme-*` class on the chart element, which re-declares the default palette there
+        // in that scheme — the tokens the block above does not set then resolve to the matching
+        // half.
+        theme.setColorScheme(THEME_SCHEME[themeName] ?? "auto");
+
+        // The theme module watches the chart element for class changes and automatically
+        // invalidates every layer (a MutationObserver on the class attribute).
+        syncPresetPanel();
+      });
+    });
+
+    // ---- Theme presets: ThemeService.setPreset() / preset() / presets() -----------------------
+    const presetRow = document.getElementById("presetButtons");
+    const presetStatus = document.getElementById("presetStatus");
+    const tokenValue = document.getElementById("tokenValue");
+    const tokenSwatch = document.getElementById("tokenSwatch");
+    const forcedStatus = document.getElementById("forcedStatus");
+
+    const PRESET_LABELS = {
+      "high-contrast": "High contrast (light)",
+      "high-contrast-dark": "High contrast (dark)",
+      blueprint: "Blueprint (from config)",
+    };
+
+    const auditSummary = document.getElementById("auditSummary");
+    const auditList = document.getElementById("auditList");
+
+    const forcedQuery = typeof window.matchMedia === "function" ? window.matchMedia("(forced-colors: active)") : null;
+
+    function makePresetButton(name, presetLabel) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.preset = name; // "" means "no preset" → setPreset(null)
+      const check = document.createElement("span");
+      check.className = "check";
+      check.setAttribute("aria-hidden", "true");
+      btn.append(check, document.createTextNode(presetLabel));
+      btn.addEventListener("click", () => {
+        theme.setPreset(name === "" ? null : name);
+        syncPresetPanel();
+      });
+      return btn;
+    }
+
+    function buildPresetButtons() {
+      presetRow.replaceChildren();
+      presetRow.append(makePresetButton("", "None (page CSS)"));
+      for (const name of theme.presets()) {
+        presetRow.append(makePresetButton(name, PRESET_LABELS[name] || name));
+      }
+    }
+
+    // Reflects the service's own state back into the panel — the applied preset is announced as
+    // text (and marked with a tick), never by the button's fill colour alone.
+    function syncPresetPanel() {
+      const active = theme.preset();
+      for (const btn of presetRow.querySelectorAll("button")) {
+        const on = (btn.dataset.preset || null) === active;
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+        btn.querySelector(".check").textContent = on ? "✓" : "";
+      }
+      presetStatus.textContent =
+        active === null
+          ? "Active preset: none — the chart is painted from this page's CSS variables."
+          : "Active preset: " + active + " — its tokens are inline on the chart element and override the CSS blocks above.";
+      const value = theme.get("--sg-bar-fill");
+      tokenValue.textContent = value || "(unset)";
+      tokenSwatch.style.background = value || "transparent";
+      forcedStatus.textContent =
+        "forcedColors: true is set in the theme config; the system forced-colors mode is currently " +
+        (forcedQuery && forcedQuery.matches ? "active, so canvas tokens resolve to CSS system colours." : "inactive.");
+      renderAudit();
+    }
+
+    function renderAudit() {
+      auditList.replaceChildren();
+      const entries = theme.audit();
+      const failed = entries.filter((e) => !e.ok);
+      auditSummary.textContent =
+        entries.length +
+        " relationships measured across " +
+        Object.keys(theme.tokens.get()).length +
+        " canvas-read tokens — " +
+        (failed.length === 0 ? "all of them clear their floor." : failed.length + " below the floor: " + failed.map((e) => e.id).join(", ") + ".");
+      for (const entry of entries) {
+        const li = document.createElement("li");
+        const name = document.createElement("span");
+        name.textContent = entry.id;
+        const value = document.createElement("span");
+        value.className = entry.ok ? "" : "bad";
+        value.textContent =
+          entry.kind === "contrast"
+            ? (entry.ok ? "✓ " : "✗ ") + entry.measured.toFixed(2) + ":1 (min " + entry.min + ")"
+            : (entry.ok ? "✓ ordered" : "✗ " + entry.measured + " out of order");
+        li.append(name, value);
+        auditList.append(li);
+      }
+    }
+
+    buildPresetButtons();
+    syncPresetPanel();
+
+    // The theme store's own repaint signal: it fires for preset switches, for the page theme
+    // classes above and for colour-scheme / forced-colors changes, which is exactly when the
+    // token readout can go stale. Replaces the abolished `theme/changed` event.
+    theme.tokens.subscribe(() => syncPresetPanel());
+  </script>
+</body>
+</html>

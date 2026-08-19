@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Print &amp; PDF export example</title>
+    <!--
+      Print is one facet of the single `stargantt.export` facade that presetStandard() always
+      includes — there is no separate print plugin, and no separate service id. Configuration is
+      `presetStandard({ export: { print: { paper, orientation, header } } })`.
+
+      The facade exposes `printPreview()` (returns whether a preview is now open;
+      `printPreview(false)` closes it — this page doesn't need to close it itself, since the
+      preview dialog's own Close button and Escape handle that) and `toPdf()` (`Promise<Blob>`).
+      The facade returns bytes/strings (export.md §1.9); the host saves them with the SDK's
+      public `downloadFile` (`sdk/dom`), which `stargantt` re-exports on the IIFE global —
+      `StarGantt.downloadFile(document, data, filename, mimeType?)`, void return, and it revokes
+      the object URL synchronously after the click.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 6px;
+      }
+      button {
+        font: inherit;
+        padding: 4px 10px;
+      }
+      #pdfStatus {
+        font-size: 12px;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — print &amp; PDF export</h1>
+    <details>
+      <summary>What's on this page</summary>
+      "Open preview" opens the print-preview dialog (paper size, header/footer bands, the
+      built-in table and legend) with the paper/orientation/header configured on the export
+      plugin's <code>print</code> nest. "Download PDF" calls <code>toPdf()</code> to get a
+      <code>Blob</code>, then saves it through <code>StarGantt.downloadFile()</code> (see the
+      comment at the top of this file).
+    </details>
+    <div class="toolbar">
+      <button id="previewBtn" type="button">Open preview</button>
+      <button id="pdfBtn" type="button">Download PDF</button>
+      <span id="pdfStatus" role="status"></span>
+    </div>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // Anchor the data at today 0:00 UTC — the default time-axis origin — so the chart opens on
+      // the data.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "root", parentId: null, name: "Release", type: "summary", start: T0 - 6 * DAY, end: T0 + 13 * DAY },
+            { id: "spec", parentId: "root", name: "Design review", start: T0 - 6 * DAY, end: T0 - 2 * DAY, progress: 1 },
+            { id: "impl", parentId: "root", name: "Implementation", start: T0 - 4 * DAY, end: T0 + 6 * DAY, progress: 0.5 },
+            { id: "qa", parentId: "root", name: "Integration tests", start: T0 + 5 * DAY, end: T0 + 10 * DAY },
+            { id: "docs", parentId: "root", name: "Docs", start: T0 - 6 * DAY, end: T0 - 3 * DAY, progress: 1 },
+            { id: "ship", parentId: "root", name: "Ship", type: "milestone", start: T0 + 13 * DAY, end: T0 + 13 * DAY },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          // "spec" and "docs" both start at T0 - 6*DAY, before the default today-anchored origin
+          // — without this, that content sits left of content x = 0 and no scroll gesture can
+          // reach it.
+          view: { timeline: { origin: T0 - 6 * DAY } },
+          export: {
+            print: {
+              paper: "a4",
+              orientation: "landscape",
+              header: { left: "StarGantt release plan" },
+            },
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset());
+      window.gantt = gantt;
+
+      const exportSvc = gantt.service("stargantt.export");
+      const status = document.getElementById("pdfStatus");
+
+      document.getElementById("previewBtn").addEventListener("click", () => {
+        exportSvc.printPreview();
+      });
+
+      document.getElementById("pdfBtn").addEventListener("click", async () => {
+        status.textContent = "Rendering…";
+        try {
+          const blob = await exportSvc.toPdf();
+          window.lastPdf = { size: blob.size, type: blob.type };
+          StarGantt.downloadFile(document, blob, "stargantt.pdf", "application/pdf");
+          status.textContent = "PDF ready (" + Math.round(blob.size / 1024) + " kB)";
+        } catch (error) {
+          status.textContent = "PDF failed";
+          throw error;
+        }
+      });
+    </script>
+  </body>
+</html>

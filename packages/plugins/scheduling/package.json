@@ -1,0 +1,59 @@
+{
+  "name": "@stargantt/plugin-scheduling",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "Official StarGantt plugin: dependency links, the auto-schedule engine, working calendars, critical-path analysis, and schedule diagnostics.",
+  "keywords": [
+    "gantt",
+    "gantt-chart",
+    "project-management",
+    "timeline",
+    "scheduling",
+    "typescript",
+    "plugin-architecture",
+    "zero-dependencies"
+  ],
+  "author": "wintermaples",
+  "homepage": "https://wintermaples.github.io/star-gantt/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wintermaples/star-gantt.git",
+    "directory": "packages/plugins/scheduling"
+  },
+  "bugs": "https://github.com/wintermaples/star-gantt/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@stargantt/core": "workspace:*",
+    "@stargantt/plugin-data-store": "workspace:*",
+    "@stargantt/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@stargantt/plugin-a11y": "workspace:*",
+    "@stargantt/plugin-interaction": "workspace:*",
+    "@stargantt/plugin-task-bars": "workspace:*",
+    "@stargantt/plugin-tree-grid": "workspace:*",
+    "@stargantt/plugin-undo-redo": "workspace:*",
+    "@stargantt/plugin-view": "workspace:*"
+  },
+  "main": "./dist/scheduling.umd.js",
+  "module": "./dist/scheduling.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/scheduling.js",
+      "default": "./dist/scheduling.umd.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

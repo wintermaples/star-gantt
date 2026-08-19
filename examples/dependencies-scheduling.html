@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Dependencies and scheduling example</title>
+    <!--
+      Demonstrates `dependencies` and `autoSchedule`, nested groups of the merged `scheduling`
+      plugin (scheduling.md §11), one of the nine plugins `presetStandard()` composes. The side
+      panel is `interaction.sidePanel` (disabled when its nest is omitted, per interaction.md
+      §"Presence semantics"); snap's push-successors behavior is
+      `interaction.snap.pushSuccessors`.
+
+      This page uses a two-tier update model: `boot()` disposes the previous `StarGantt` instance
+      (`GanttInstance.dispose()`, architecture.md §1.4) and creates a fresh one whenever a
+      link-rendering/reconciler option toggles, while the scheduling row (mode switch, constraint,
+      preview/reschedule) dispatches commands against the current instance with no reboot.
+
+      Demonstrates: the FS-chained 4-task dataset, the SS/FF link-type demo buttons, cycle
+      rejection, undo/redo, and every scheduling control (manual/auto mode, the four extra
+      constraint types — SNLT/FNET/MSO/MFO, all part of the built-in eight per scheduling.md
+      §2.3, so no custom `schedule/constraintBounds` contribution is needed — preview reschedule,
+      reschedule).
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 6px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 12px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      .group {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .group label,
+      .group span.label {
+        color: #444;
+      }
+      button,
+      select {
+        font: inherit;
+        font-size: 12px;
+      }
+      button[aria-pressed="true"] {
+        background: #e0f2f1;
+        border-color: #0f766e;
+      }
+      #statusPanel {
+        margin: 0 0 6px;
+        padding: 4px 6px;
+        font-size: 12px;
+        color: #333;
+        background: #f4f4f4;
+        border-radius: 3px;
+        min-height: 1.2em;
+      }
+      #statusPanel.error {
+        background: #fee2e2;
+        color: #7f1d1d;
+      }
+      #chart {
+        height: 440px;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — dependencies and scheduling</h1>
+    <details open>
+      <summary>What's on this page</summary>
+      <ul>
+        <li><strong>Move a task</strong>: drag a task bar to change its start time.</li>
+        <li><strong>Dependencies</strong>: move an upstream task and its dependents slide with it.</li>
+        <li><strong>Cycle rejection</strong>: attempting a circular dependency is refused and reported.</li>
+        <li><strong>Reconciler</strong>: choose between auto-schedule propagation (moves the whole
+          downstream closure) and snap's <code>pushSuccessors</code> (propagation off; snap pushes
+          violated successors forward by exactly their deficit — snap stands down automatically
+          whenever propagation is on, so exactly one of the two ever runs).</li>
+        <li><strong>Undo / redo</strong>: toolbar buttons or <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Shift+Z</kbd>.</li>
+        <li><strong>Scheduling row</strong> acts on the live chart — no rebuild, no reload.</li>
+      </ul>
+    </details>
+
+    <div class="toolbar">
+      <button id="undoBtn" type="button" title="Ctrl+Z">↶ Undo</button>
+      <button id="redoBtn" type="button" title="Ctrl+Shift+Z">↷ Redo</button>
+      <button id="addSsLinkBtn" type="button">+ SS link demo</button>
+      <button id="addFfLinkBtn" type="button">+ FF link demo</button>
+    </div>
+
+    <div class="toolbar" role="group" aria-label="Link rendering (plugin construction options)">
+      <span class="label">Link rendering:</span>
+      <button class="opt" type="button" data-opt="showLinks" data-label="Links" aria-pressed="true">● Links</button>
+      <button class="opt" type="button" data-opt="typeColors" data-label="Type colours" aria-pressed="true">● Type colours</button>
+      <button class="opt" type="button" data-opt="highlightPaths" data-label="Path emphasis" aria-pressed="true">● Path emphasis</button>
+      <button class="opt" type="button" data-opt="highlightConflicts" data-label="Conflicts" aria-pressed="true">● Conflicts</button>
+      <button class="opt" type="button" data-opt="highlightDriving" data-label="Driving" aria-pressed="true">● Driving</button>
+      <button class="opt" type="button" data-opt="highlightDropTargets" data-label="Drop targets" aria-pressed="true">● Drop targets</button>
+      <button class="opt" type="button" data-opt="avoidBars" data-label="Avoid bars" aria-pressed="true">● Avoid bars</button>
+      <button class="opt" type="button" data-opt="linkEditing" data-label="Link editing" aria-pressed="true">● Link editing</button>
+      <button class="opt" type="button" data-opt="inspector" data-label="Inspector panel" aria-pressed="false">○ Inspector panel</button>
+      <div class="group">
+        <label for="optLineStyle">Line style</label>
+        <select id="optLineStyle">
+          <option value="default">Default (1.5px, solid, filled head)</option>
+          <option value="bold-dashed">Bold dashed (2.5px, 6-3 dash)</option>
+          <option value="hairline-open">Hairline (1px, open head)</option>
+        </select>
+      </div>
+      <div class="group">
+        <label for="optReconciler">Reconciler</label>
+        <select id="optReconciler">
+          <option value="auto-schedule">auto-schedule propagation</option>
+          <option value="snap-push">snap pushSuccessors (propagation off)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="toolbar" role="group" aria-label="Scheduling (acts on the live chart)">
+      <span class="label" id="schedLabel">Scheduling:</span>
+      <div class="group">
+        <label for="schedTask">Task</label>
+        <select id="schedTask" aria-describedby="schedLabel"></select>
+      </div>
+      <button id="schedModeBtn" type="button" title="schedule/setTaskMode">Switch to manual</button>
+      <div class="group">
+        <label for="schedConstraint">Constraint</label>
+        <select id="schedConstraint" title="task.constraint">
+          <option value="">None</option>
+          <option value="SNLT">SNLT — start no later than</option>
+          <option value="FNET">FNET — finish no earlier than</option>
+          <option value="MSO">MSO — must start on</option>
+          <option value="MFO">MFO — must finish on</option>
+        </select>
+      </div>
+      <button id="previewRescheduleBtn" type="button" title="SchedulerService.previewReschedule() — a dry run">Preview reschedule</button>
+      <button id="rescheduleBtn" type="button" title="schedule/reschedule — one transaction, one undo step">Reschedule</button>
+      <span id="schedDatesHint"></span>
+    </div>
+
+    <div id="statusPanel" role="status" aria-live="polite" aria-atomic="true">Status: initializing...</div>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2), so anchoring the data there opens the chart on the data with zero configuration.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+      // Fixed offsets from T0, used by the scheduling row.
+      const statusDate = T0 + 5 * DAY;
+      const constraintDate = T0 + 8 * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            // Progress makes the status-date reschedule legible: a complete task never moves, an
+            // in-progress one keeps its start and pushes its end out, an unstarted one moves bodily.
+            { id: "task-1", name: "Requirements", start: T0, end: T0 + 3 * DAY, type: "task", progress: 1 },
+            { id: "task-2", name: "Detailed design", start: T0 + 3 * DAY, end: T0 + 6 * DAY, type: "task", progress: 0.4 },
+            { id: "task-3", name: "Implementation", start: T0 + 6 * DAY, end: T0 + 10 * DAY, type: "task", progress: 0 },
+            { id: "task-4", name: "Testing", start: T0 + 10 * DAY, end: T0 + 12 * DAY, type: "task", progress: 0 },
+          ],
+          links: [
+            { id: "link-1", sourceId: "task-1", targetId: "task-2", type: "FS", lag: 0 },
+            { id: "link-2", sourceId: "task-2", targetId: "task-3", type: "FS", lag: 0 },
+            { id: "link-3", sourceId: "task-3", targetId: "task-4", type: "FS", lag: 0 },
+          ],
+        };
+      }
+
+      function formatDate(timestamp) {
+        const d = new Date(timestamp);
+        return (
+          d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") +
+          " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+        );
+      }
+
+      function isoDay(timestamp) {
+        return new Date(timestamp).toISOString().slice(0, 10);
+      }
+
+      /** Day plus wall-clock minutes: the reschedule works in working time, so a moved end often
+       *  lands mid-day and the day alone can show two identical-looking dates for a real move. */
+      function isoMinute(timestamp) {
+        return new Date(timestamp).toISOString().slice(0, 16).replace("T", " ");
+      }
+
+      const statusPanel = document.getElementById("statusPanel");
+      function setStatus(message, isError) {
+        statusPanel.textContent = message;
+        statusPanel.className = isError ? "error" : "";
+      }
+
+      // Demo options: every one of these is a plugin *construction* option, so flipping it
+      // rebuilds the chart (see boot() below) rather than mutating the live instance.
+      const options = {
+        showLinks: true,
+        typeColors: true,
+        lineStyle: "default",
+        highlightPaths: true,
+        highlightConflicts: true,
+        highlightDriving: true,
+        highlightDropTargets: true,
+        avoidBars: true,
+        linkEditing: true,
+        inspector: false,
+        reconciler: "auto-schedule",
+      };
+
+      // `linkStyle` presets: each field falls back to its own default when omitted.
+      const LINE_STYLES = {
+        default: { width: 1.5, arrowHead: "filled" },
+        "bold-dashed": { width: 2.5, dash: [6, 3], arrowHead: "filled" },
+        "hairline-open": { width: 1, arrowHead: "open" },
+      };
+
+      // `typeColors` is configuration, not theme. All four clear 3:1 against light and dark chart
+      // backgrounds. FS keeps the library's own default line colour either way.
+      const TYPE_COLORS = { FS: "#6b7280", SS: "#3b82f6", FF: "#a855f7", SF: "#0d9488" };
+
+      let gantt = null;
+
+      function boot() {
+        if (gantt) {
+          gantt.dispose();
+          gantt = null;
+        }
+
+        const dependenciesConfig = {
+          showLinks: options.showLinks,
+          linkStyle: LINE_STYLES[options.lineStyle] ?? LINE_STYLES.default,
+          linkEditing: options.linkEditing,
+          highlightPaths: options.highlightPaths,
+          highlightConflicts: options.highlightConflicts,
+          highlightDriving: options.highlightDriving,
+          highlightDropTargets: options.highlightDropTargets,
+          avoidBars: options.avoidBars,
+          // The inspector contributes a `sidepanel/fields` section (scheduling.md §5.7). Without
+          // `interaction.sidePanel` composed, the contribution simply has no consumer, so it can
+          // stay on unconditionally — the "Inspector panel" toggle below is what mounts the panel
+          // that shows it.
+          inspector: true,
+        };
+        if (options.typeColors) dependenciesConfig.typeColors = TYPE_COLORS;
+
+        // Two reconcilers, one at a time. Snap's `pushSuccessors` stands itself down while a
+        // resolved scheduler reports `propagationEnabled() === true` (scheduling.md §4.2), so the
+        // only way to see it work is to compose auto-schedule with propagation off.
+        const autoScheduleConfig = { modeColumn: true, enabled: options.reconciler !== "snap-push" };
+
+        const presetConfig = {
+          scheduling: { dependencies: dependenciesConfig, autoSchedule: autoScheduleConfig },
+          // The Mode column adds 64px to the column track, so the pane is widened to match.
+          treeGrid: { paneWidth: 644 },
+          interaction: {
+            // A date drag outlines where each direct successor would land.
+            dragEdit: { dependencyPreview: true },
+            snap: { pushSuccessors: true },
+          },
+        };
+        if (options.inspector) presetConfig.interaction.sidePanel = {};
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: StarGantt.presetStandard(presetConfig),
+        });
+
+        setStatus("Gantt chart initialized");
+
+        const dataService = gantt.service("stargantt.data");
+        const seed = dataset();
+        dataService.load(seed);
+        setStatus(`Created ${seed.tasks.length} tasks and ${seed.links.length} dependency links`);
+
+        // Cycle rejection. `event.chain` is a sequence of existing link ids that, together with
+        // the just-refused candidate, would close a cycle (scheduling.md §2.7) — the candidate
+        // itself never reaches the store and cannot be resolved back to a task pair, so only the
+        // ids that resolve to a real stored link are named.
+        gantt.on("schedule/cycleRejected", (event) => {
+          const linkById = new Map();
+          for (const link of dataService.links.get().values()) linkById.set(link.id, link);
+          const named = [];
+          for (const linkId of event.chain) {
+            const link = linkById.get(linkId);
+            if (!link) continue;
+            const source = dataService.getTask(link.sourceId);
+            const target = dataService.getTask(link.targetId);
+            if (source && target) named.push(`${source.name} → ${target.name}`);
+          }
+          const via = named.length > 0 ? ` It would run through: ${named.join(", ")}.` : "";
+          setStatus(`⚠️ Cycle rejected: the new link would create a circular dependency.${via}`, true);
+          console.log("Cycle detected:", event.chain);
+        });
+
+        // The tasks store carries no per-change id set, so the status line reports the current
+        // task dates on every change.
+        dataService.tasks.subscribe(() => {
+          const summaries = [];
+          for (const id of dataService.taskIds()) {
+            const task = dataService.getTask(id);
+            summaries.push(`${task.name} (${formatDate(task.start)} - ${formatDate(task.end)})`);
+          }
+          setStatus(`Tasks updated: ${summaries.join(", ")}`);
+        });
+
+        // Undo / redo. `presetStandard()` always includes `stargantt.undo-redo`, so history and
+        // its default Ctrl+Z / Ctrl+Shift+Z chords need no extra configuration.
+        const historyService = gantt.service("stargantt.history");
+        const undoBtn = document.getElementById("undoBtn");
+        const redoBtn = document.getElementById("redoBtn");
+        function updateHistoryUI() {
+          undoBtn.disabled = !historyService.state.get().canUndo;
+          redoBtn.disabled = !historyService.state.get().canRedo;
+        }
+        historyService.state.subscribe(updateHistoryUI);
+        updateHistoryUI();
+        undoBtn.onclick = () => gantt.dispatch("history/undo", undefined);
+        redoBtn.onclick = () => gantt.dispatch("history/redo", undefined);
+
+        // Link-type demo: StarGantt paints every link type the same way by default, so an SS or
+        // FF link is otherwise indistinguishable from the seeded FS chain. Each button adds one
+        // between tasks not already directly linked, and toggles to a remove action. The button
+        // never remembers "its" link id — Undo/Redo can add or remove that exact link behind its
+        // back — so the label re-derives from the store on every change.
+        function wireLinkDemo(buttonId, sourceId, targetId, type, description) {
+          const button = document.getElementById(buttonId);
+          function findLink() {
+            for (const link of dataService.links.get().values()) {
+              if (link.sourceId === sourceId && link.targetId === targetId && link.type === type) return link;
+            }
+            return null;
+          }
+          function sync() {
+            const existing = findLink();
+            button.setAttribute("aria-pressed", String(existing !== null));
+            button.textContent = existing ? `− Remove ${type} link demo` : `+ ${type} link demo`;
+          }
+          dataService.links.subscribe(sync);
+          sync();
+          button.onclick = () => {
+            const existing = findLink();
+            if (existing === null) {
+              gantt.dispatch("link/add", { sourceId, targetId, type, lag: 0 });
+              setStatus(`Added ${type} link: ${description}`);
+            } else {
+              gantt.dispatch("link/remove", { ids: [existing.id] });
+              setStatus(`Removed ${type} link demo`);
+            }
+          };
+        }
+        wireLinkDemo("addSsLinkBtn", "task-1", "task-3", "SS", "Requirements → Implementation (Start-to-Start)");
+        wireLinkDemo("addFfLinkBtn", "task-2", "task-4", "FF", "Detailed design → Testing (Finish-to-Finish)");
+
+        // --- Scheduling controls (act on the live instance — no reboot) ---------------------
+        const taskSelect = document.getElementById("schedTask");
+        const modeButton = document.getElementById("schedModeBtn");
+        const constraintSelect = document.getElementById("schedConstraint");
+        const previewButton = document.getElementById("previewRescheduleBtn");
+        const rescheduleButton = document.getElementById("rescheduleBtn");
+        const datesHint = document.getElementById("schedDatesHint");
+        const schedulerService = gantt.service("stargantt.scheduler");
+
+        function taskName(id) {
+          const task = dataService.getTask(id);
+          return task ? task.name : String(id);
+        }
+
+        function syncScheduleControls() {
+          const ids = [...dataService.taskIds()].map(String);
+          const signature = ids.join("|");
+          if (taskSelect.dataset.signature !== signature) {
+            const previous = taskSelect.value;
+            taskSelect.textContent = "";
+            for (const id of ids) {
+              const option = document.createElement("option");
+              option.value = id;
+              option.textContent = taskName(id);
+              taskSelect.appendChild(option);
+            }
+            taskSelect.dataset.signature = signature;
+            if (ids.indexOf(previous) !== -1) taskSelect.value = previous;
+          }
+
+          const id = taskSelect.value;
+          const known = id !== "" && dataService.getTask(id) !== undefined;
+          modeButton.disabled = !known;
+          constraintSelect.disabled = !known;
+
+          if (known) {
+            const manual = schedulerService.taskScheduleMode(id) === "manual";
+            modeButton.textContent = manual ? "Switch to auto" : "Switch to manual";
+            const task = dataService.getTask(id);
+            constraintSelect.value = task && task.constraint ? task.constraint.type : "";
+          } else {
+            modeButton.textContent = "Switch to manual";
+            constraintSelect.value = "";
+          }
+
+          datesHint.textContent = `status date ${isoDay(statusDate)} · constraint date ${isoDay(constraintDate)}`;
+        }
+
+        taskSelect.onchange = syncScheduleControls;
+        dataService.tasks.subscribe(syncScheduleControls);
+
+        modeButton.onclick = () => {
+          const id = taskSelect.value;
+          if (id === "") return;
+          const mode = schedulerService.taskScheduleMode(id) === "manual" ? "auto" : "manual";
+          gantt.dispatch("schedule/setTaskMode", { id, mode });
+          syncScheduleControls();
+          setStatus(
+            `${taskName(id)} is now ${mode === "manual" ? "manually" : "automatically"} scheduled` +
+              (mode === "manual" ? " — no scheduling pass will move it again" : ""),
+          );
+        };
+
+        constraintSelect.onchange = () => {
+          const id = taskSelect.value;
+          if (id === "") return;
+          const type = constraintSelect.value;
+          if (type === "") {
+            gantt.dispatch("task/update", { id, after: {}, clears: ["constraint"] });
+            setStatus(`Constraint cleared on ${taskName(id)}`);
+          } else {
+            gantt.dispatch("task/update", { id, after: { constraint: { type, date: constraintDate } } });
+            setStatus(`${type} constraint set on ${taskName(id)} at ${isoDay(constraintDate)}`);
+          }
+          syncScheduleControls();
+        };
+
+        previewButton.onclick = () => {
+          const patches = schedulerService.previewReschedule(statusDate);
+          if (patches.length === 0) {
+            setStatus(`Reschedule preview: nothing would move against ${isoDay(statusDate)}`);
+            return;
+          }
+          const moves = patches
+            .filter((patch) => patch.op === "task/update")
+            .map((patch) => {
+              const after = patch.after ?? {};
+              const start = after.start !== undefined ? isoMinute(after.start) : "·";
+              const end = after.end !== undefined ? isoMinute(after.end) : "·";
+              return `${taskName(patch.id)} → ${start}…${end}`;
+            });
+          setStatus(`Reschedule preview (nothing applied): ${patches.length} patch(es) — ${moves.join(", ")}`);
+        };
+
+        rescheduleButton.onclick = () => {
+          gantt.dispatch("schedule/reschedule", { statusDate });
+          syncScheduleControls();
+          setStatus(`Rescheduled the incomplete work against ${isoDay(statusDate)} — one undo step`);
+        };
+
+        syncScheduleControls();
+
+        window.gantt = gantt;
+        console.log("StarGantt demo initialized", { gantt });
+      }
+
+      // --- Link-rendering option controls (each is a construction option: rebuild on change) ---
+      const optionButtons = Array.prototype.slice.call(document.querySelectorAll("[data-opt]"));
+      const lineStyleSelect = document.getElementById("optLineStyle");
+      const reconcilerSelect = document.getElementById("optReconciler");
+
+      function syncOptionControls() {
+        for (const button of optionButtons) {
+          const on = options[button.dataset.opt] === true;
+          button.setAttribute("aria-pressed", String(on));
+          // The glyph repeats the pressed state outside the colour channel (WCAG 1.4.1).
+          button.textContent = (on ? "● " : "○ ") + button.dataset.label;
+        }
+        lineStyleSelect.value = options.lineStyle;
+        reconcilerSelect.value = options.reconciler;
+      }
+
+      function rebootWithOptions(message) {
+        boot();
+        // boot() writes its own status line, so ours is set afterwards to stay on top.
+        setStatus(message);
+      }
+
+      for (const button of optionButtons) {
+        button.addEventListener("click", () => {
+          const key = button.dataset.opt;
+          options[key] = options[key] !== true;
+          syncOptionControls();
+          rebootWithOptions(`${button.dataset.label}: ${options[key] ? "on" : "off"} — chart rebuilt with the new plugin options`);
+        });
+      }
+
+      lineStyleSelect.addEventListener("change", () => {
+        options.lineStyle = lineStyleSelect.value;
+        rebootWithOptions(`Line style: ${lineStyleSelect.value} — chart rebuilt with the new plugin options`);
+      });
+
+      reconcilerSelect.addEventListener("change", () => {
+        options.reconciler = reconcilerSelect.value;
+        rebootWithOptions(
+          options.reconciler === "snap-push"
+            ? "Reconciler: snap pushSuccessors (auto-schedule propagation off) — chart rebuilt"
+            : "Reconciler: auto-schedule propagation — chart rebuilt",
+        );
+      });
+
+      syncOptionControls();
+      boot();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Critical path example</title>
+    <!--
+      Demonstrates critical-path analysis via the `criticalPath` nested group inside `scheduling`
+      (scheduling.md §11.4), one of the nine plugins `presetStandard()` composes — so this page
+      needs no `plugins` array at all, just a config object. Uses the `nearCriticalDays` field to
+      widen the near-critical band.
+
+      Design note: `scheduling.dependencies` is enabled with its defaults whenever `scheduling`
+      is composed and the nest is omitted (scheduling.md §11 "Presence semantics"), and
+      `scheduling` is always part of `presetStandard()`. So this page's dependency lines and
+      connector ports render by default even though only `criticalPath` is configured, alongside
+      the critical-path bar/link highlighting.
+
+      A critical chain Design -> Build -> Test -> Ship (zero float), one near-critical branch (1
+      day of float, inside the 2-day near-critical band) via Docs, and one clearly slack task
+      (Logo refresh, unlinked).
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — critical path</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Critical-path highlighting (`scheduling.criticalPath`): critical bars/links in red, a
+      near-critical branch in orange (within the 2-day near-critical band), and one slack task left
+      unhighlighted.
+    </details>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2), so anchoring the data there opens the chart on the data with zero configuration.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "design", parentId: null, name: "Design", start: T0, end: T0 + 3 * DAY },
+            { id: "build", parentId: null, name: "Build", start: T0 + 3 * DAY, end: T0 + 8 * DAY },
+            { id: "test", parentId: null, name: "Test", start: T0 + 8 * DAY, end: T0 + 11 * DAY },
+            { id: "docs", parentId: null, name: "Docs", start: T0 + 3 * DAY, end: T0 + 10 * DAY },
+            { id: "logo", parentId: null, name: "Logo refresh", start: T0, end: T0 + 2 * DAY },
+            { id: "ship", parentId: null, name: "Ship", type: "milestone", start: T0 + 11 * DAY, end: T0 + 11 * DAY },
+          ],
+          links: [
+            { sourceId: "design", targetId: "build", type: "FS" },
+            { sourceId: "build", targetId: "test", type: "FS" },
+            { sourceId: "test", targetId: "ship", type: "FS" },
+            { sourceId: "docs", targetId: "ship", type: "FS" },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          scheduling: {
+            criticalPath: { nearCriticalDays: 2 },
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset());
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Data-sync example</title>
+    <!--
+      One HTML file + one script tag, composed with `presetStandard()` plus the OPT-IN data-sync
+      plugin (ships in the bundle, not preset-composed, following the tracking/resource
+      precedent). This page exercises two of data-sync's four areas: the source area (a
+      `localAdapter` seeded with a tiny in-memory project, so `load()` works with no server) and
+      the offline area (a REAL browser IndexedDB snapshot — `offline: {}`, `autoSave` left at its
+      default `false` so persistence only happens on an explicit button, per the plugin's own
+      "everything is service-driven and default-off" rule). Lazy loading and realtime are not
+      wired here — out of scope for this page.
+
+      Every control below drives the public facade directly (`gantt.service("stargantt.data-sync")`)
+      or the public command path (`gantt.dispatch("task/add", …)`), never a private/internal
+      shortcut:
+        - "Load from source"  → `dataSync.load()` (§2.1 — full snapshot from the active adapter,
+          replacing the store; this is also what proves the local adapter and the source registry
+          work with zero network).
+        - "Add task"           → `gantt.dispatch("task/add", …)` — an ordinary, undoable, USER-
+          origin command, so the pending-change tracker (§2.3) records it as one local create.
+        - "Save offline"       → `dataSync.offline.save()` — snapshots the store into IndexedDB.
+        - "Restore offline"    → `dataSync.offline.restore()` — replaces the store from the
+          IndexedDB snapshot (a bulk replacement — clears the pending set, §6.1).
+        - "Clear offline"      → `dataSync.offline.clear()` — deletes the persisted snapshot.
+      The status line at the bottom mirrors the plugin's own `sync/*` events (§Events) plus the
+      live task count read off `stargantt.data`'s `tasks` store — nothing here polls or guesses.
+
+      The dataset is small and deterministic (no Math.random(), fixed relative offsets from
+      "today") so both a manual pass through this page and e2e/data-sync.spec.ts see the exact
+      same shapes. CLAUDE.md's documented viewport floor is 720x540 (tablet and up, no mobile
+      breakpoints) — the chrome below is kept minimal.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 420px;
+        border: 1px solid #ccc;
+      }
+      #toolbar button {
+        min-height: 24px;
+        margin: 0 4px 4px 0;
+        font: inherit;
+        cursor: pointer;
+      }
+      #status {
+        font-size: 12px;
+        color: #333;
+        margin: 4px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — data-sync</h1>
+    <details>
+      <summary>What's on this page</summary>
+      A `localAdapter` source (no server) plus a real IndexedDB offline snapshot. Load, edit, save
+      offline, then reload the page and restore — the buttons below drive the public
+      `stargantt.data-sync` service and the public `task/add` command exactly as a host would.
+    </details>
+    <div id="toolbar">
+      <button id="load-from-source">Load from source</button>
+      <button id="add-task">Add task</button>
+      <button id="save-offline">Save offline</button>
+      <button id="restore-offline">Restore offline</button>
+      <button id="clear-offline">Clear offline</button>
+    </div>
+    <div id="chart"></div>
+    <p id="status">idle</p>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      // The time-axis origin defaults to "today (UTC) at 0:00" (docs/specs/architecture.md
+      // §6.2), matching every other example page and letting e2e/data-sync.spec.ts pin
+      // `Date.now()` and recompute the same offsets it reads here.
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      // The document the local adapter serves. `localAdapter` reads it at fetch time (data-sync.md
+      // §2.7), so the object can be handed straight to the factory.
+      function seedDocument() {
+        return {
+          tasks: [
+            { id: "design", parentId: null, name: "Design", start: T0, end: T0 + 3 * DAY },
+            { id: "build", parentId: null, name: "Build", start: T0 + 3 * DAY, end: T0 + 8 * DAY },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: [
+          ...StarGantt.presetStandard(),
+          StarGantt.dataSync({
+            sources: { local: StarGantt.localAdapter(seedDocument()) },
+            active: "local",
+            // Real IndexedDB, default database/document names. `autoSave` and `autoRestore`
+            // default to `false` — persistence only happens through the buttons below, so a
+            // page reload never silently overwrites (or reads) the snapshot behind the user's
+            // back.
+            offline: {},
+          }),
+        ],
+      });
+
+      const sync = gantt.service("stargantt.data-sync");
+      const data = gantt.service("stargantt.data");
+      const statusEl = document.getElementById("status");
+
+      function setStatus(label) {
+        statusEl.textContent = `${label} (tasks: ${data.tasks.get().size})`;
+      }
+
+      // The status line is event-driven, not polled: every notification below is one this plugin
+      // actually emits for the operations this page performs (data-sync.md's Events table).
+      for (const name of [
+        "sync/sourceSynced",
+        "sync/offlineSaved",
+        "sync/offlineRestored",
+        "sync/offlineCleared",
+      ]) {
+        gantt.on(name, () => setStatus(name));
+      }
+      // "Add task" goes through the plain command pipeline and fires no sync/* event, so the
+      // handler below refreshes the label itself — keeping the task count live for manual use.
+
+      setStatus("idle");
+
+      // Every handler below stashes the promise it kicked off on `window.__lastOp` — a small
+      // observability hook (the same idea as `window.gantt` below), so e2e/data-sync.spec.ts can
+      // deterministically await "the click's async work finished" without polling or fixed
+      // sleeps, including for `restore()` when it resolves `{ ok: false }` and — correctly, per
+      // §4.2 — emits no event at all (no snapshot was there to restore).
+      let addedCount = 0;
+      document.getElementById("load-from-source").addEventListener("click", () => {
+        window.__lastOp = sync.load();
+      });
+      document.getElementById("add-task").addEventListener("click", () => {
+        addedCount += 1;
+        // The default `origin` is `"user"` — not a `"stargantt.data-sync/"` machine origin — so
+        // the pending-change tracker (§2.3) records this as one local create.
+        gantt.dispatch("task/add", {
+          task: {
+            id: `added-${addedCount}`,
+            parentId: null,
+            name: `Added task ${addedCount}`,
+            start: T0 + 8 * DAY,
+            end: T0 + 9 * DAY,
+          },
+        });
+        setStatus("task/add");
+        window.__lastOp = Promise.resolve();
+      });
+      document.getElementById("save-offline").addEventListener("click", () => {
+        window.__lastOp = sync.offline.save();
+      });
+      document.getElementById("restore-offline").addEventListener("click", () => {
+        window.__lastOp = sync.offline.restore();
+      });
+      document.getElementById("clear-offline").addEventListener("click", () => {
+        window.__lastOp = sync.offline.clear();
+      });
+
+      window.gantt = gantt;
+    </script>
+  </body>
+</html>

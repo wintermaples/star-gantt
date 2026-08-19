@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — File import &amp; export example</title>
+    <!--
+      All import/export functionality is composed by a single `stargantt.export` facade that
+      presetStandard() always includes — there is nothing to opt into here; this page configures
+      the merged plugin's `importExport`/`excel` nests.
+
+      - Methods: `export.toXlsx()`, `export.toMsProjectXml()`, `exportCsv`/`exportJson`/
+        `exportICal`.
+      - CSV/JSON import is a single call: `importCsv(text)` / `importJson(text)` applies
+        directly, `importCsv(text, { dialog: true })` opens the interactive dialog, and
+        `{ dryRun: true }` stops short of applying (docs/specs/plugins/export.md §1 "Not
+        ported" — the caller-constructed-document surface is deliberately narrow: there are no
+        separate `parseCsv`/`parseJson`/`validate`/`diff`/`apply` members). This page's
+        "Skip the dialog" checkbox toggles the `dialog` option.
+      - There is no combined "any format" import entry point — `importCsv`/`importJson` are
+        separate methods — so this page's own `routeFile()` sniffs the format for unrecognized
+        extensions (a JSON document starts with `{` or `[` after trimming; anything else is
+        treated as CSV).
+      - MS Project import is one `applyMsProjectXml(text)` call, returning `{ document,
+        baselineInits, applied }` together (there is no MSPDI import dialog).
+      - There are no `download*` service members (export.md §1.9); every export button below
+        builds its Blob/string/ArrayBuffer from the facade and saves it with
+        `StarGantt.downloadFile()` (the SDK's public `downloadFile`, re-exported on the IIFE
+        global). That helper is `(doc, data, filename, mimeType?) => void` — it doesn't return a
+        byte count, so the readouts below compute a `Blob` separately (`sizeOf()`) purely to
+        report size, not to drive the download.
+      - All service lookups are `gantt.service("stargantt.export")`. `canUndo` is a field on the
+        `state` store; `undo()` is a direct method instead of dispatching `history/undo` (both
+        exist, this page uses the direct method).
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 6px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 420px;
+        border: 1px solid #ccc;
+      }
+      .panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      .group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .group-label {
+        font-weight: 600;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      button {
+        font: inherit;
+        padding: 4px 8px;
+      }
+      .readout {
+        font-size: 12px;
+        margin: 4px 0;
+      }
+      #issueList {
+        font-size: 11px;
+        margin: 0 0 6px;
+        padding-left: 18px;
+        color: #a30000;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — file import &amp; export</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Every button below drives one member of the merged <code>stargantt.export</code> facade —
+      CSV/JSON/iCal/xlsx/MSPDI, both directions. See the top-of-file comment for details.
+    </details>
+    <div class="panel">
+      <div class="group">
+        <span class="group-label" id="exportLabel">Export (downloads a file)</span>
+        <div class="row" role="group" aria-labelledby="exportLabel">
+          <button id="csvBtn" type="button">CSV</button>
+          <button id="jsonBtn" type="button">Project JSON</button>
+          <button id="icalBtn" type="button">iCalendar</button>
+          <button id="xlsxBtn" type="button">Excel .xlsx</button>
+          <button id="mspBtn" type="button">MS Project .xml</button>
+        </div>
+        <div class="row">
+          <label for="csvDelimiter">
+            CSV delimiter
+            <select id="csvDelimiter">
+              <option value="," selected>Comma</option>
+              <option value=";">Semicolon</option>
+              <option value="&#9;">Tab</option>
+            </select>
+          </label>
+          <label><input id="icalSummaries" type="checkbox" /> iCalendar includes summary tasks</label>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="group-label" id="importLabel">Import</span>
+        <div class="row" role="group" aria-labelledby="importLabel">
+          <input
+            id="fileInput"
+            type="file"
+            accept=".csv,.json,.xml,.txt,text/csv,application/json,text/xml"
+            aria-label="Import a CSV, JSON or MS Project XML file"
+          />
+        </div>
+        <div class="row" role="group" aria-labelledby="importLabel">
+          <button id="sampleCsvBtn" type="button">Sample CSV</button>
+          <button id="sampleJsonBtn" type="button">Sample JSON</button>
+          <button id="sampleMspBtn" type="button">Sample MSPDI</button>
+          <button id="undoBtn" type="button">Undo import</button>
+        </div>
+        <div class="row">
+          <label><input id="directApply" type="checkbox" /> Skip the dialog (apply directly)</label>
+        </div>
+      </div>
+    </div>
+    <p class="readout"><span id="ioStatus" role="status">Ready. Export a file, or import one of the samples.</span> <span id="taskCount"></span></p>
+    <ul id="issueList" aria-label="Import issues"></ul>
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "root", parentId: null, name: "Website relaunch", type: "summary", start: T0 - 7 * DAY, end: T0 + 21 * DAY },
+            { id: "discovery", parentId: "root", name: "Discovery workshops", start: T0 - 7 * DAY, end: T0 - 2 * DAY, progress: 1 },
+            { id: "content", parentId: "root", name: "Content & copy", start: T0 - 3 * DAY, end: T0 + 4 * DAY, progress: 0.6 },
+            { id: "build", parentId: "root", name: "Build & integration", start: T0 + 1 * DAY, end: T0 + 12 * DAY, progress: 0.2 },
+            { id: "qa", parentId: "root", name: "QA & accessibility pass", start: T0 + 10 * DAY, end: T0 + 16 * DAY },
+            { id: "launch", parentId: "root", name: "Launch", type: "milestone", start: T0 + 21 * DAY, end: T0 + 21 * DAY },
+          ],
+          links: [
+            { id: "l1", sourceId: "discovery", targetId: "content", type: "FS" },
+            { id: "l2", sourceId: "content", targetId: "build", type: "FS" },
+            { id: "l3", sourceId: "build", targetId: "qa", type: "FS" },
+            { id: "l4", sourceId: "qa", targetId: "launch", type: "FS" },
+          ],
+          resources: [
+            { id: "r-alex", name: "Alex Kim", capacity: 1 },
+            { id: "r-sam", name: "Sam Patel", capacity: 1 },
+          ],
+          assignments: [
+            { taskId: "content", resourceId: "r-sam", units: 0.5 },
+            { taskId: "build", resourceId: "r-alex", units: 1 },
+            { taskId: "qa", resourceId: "r-sam", units: 0.5 },
+          ],
+        };
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        plugins: StarGantt.presetStandard({
+          // This page's whole point is importing files of arbitrary, unknown-at-composition-time
+          // date range, so the origin follows the data instead of a fixed instant.
+          view: { timeline: { autoExtendOrigin: true } },
+          export: {
+            importExport: { csvDelimiter: "," },
+            excel: { sheetName: "Tasks" },
+          },
+        }),
+      });
+      gantt.service("stargantt.data").load(dataset());
+      window.gantt = gantt;
+
+      // Byte-count readout only — StarGantt.downloadFile() itself returns void (it drives the
+      // save; this just measures what was saved without touching the URL/anchor machinery).
+      function sizeOf(data, mimeType) {
+        return data instanceof Blob ? data.size : new Blob([data], { type: mimeType }).size;
+      }
+
+      // ---- Embedded sample files -------------------------------------------------------------
+      const day = (offset) => new Date(T0 + offset * DAY).toISOString().slice(0, 10);
+      const stamp = (offset) => day(offset) + "T08:00:00";
+
+      const SAMPLE_CSV =
+        [
+          "Task ID,Title,Start Date,Finish,% Complete,Parent",
+          `content,Content & copy,${day(-3)},${day(7)},75%,root`,
+          `qa,QA & accessibility pass,${day(10)},${day(18)},10%,root`,
+          `seo,SEO audit,${day(4)},${day(9)},0%,root`,
+          "broken,Row with no dates,,,,root",
+        ].join("\r\n") + "\r\n";
+
+      const SAMPLE_JSON = JSON.stringify(
+        [
+          { uid: "build", title: "Build & integration", begin: day(1), due: day(14), percentComplete: 40, parent: "root" },
+          { uid: "handover", title: "Client handover", begin: day(18), due: day(20), parent: "root" },
+        ],
+        null,
+        2,
+      );
+
+      const SAMPLE_MSPDI = `<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns="http://schemas.microsoft.com/project">
+  <Name>Platform migration</Name>
+  <Tasks>
+    <Task><UID>0</UID><Name>Project summary</Name><OutlineLevel>0</OutlineLevel><Start>${stamp(0)}</Start><Finish>${stamp(30)}</Finish></Task>
+    <Task><UID>1</UID><Name>Platform migration</Name><OutlineNumber>1</OutlineNumber><OutlineLevel>1</OutlineLevel><Summary>1</Summary><Start>${stamp(2)}</Start><Finish>${stamp(24)}</Finish></Task>
+    <Task><UID>2</UID><Name>Server provisioning</Name><OutlineNumber>1.1</OutlineNumber><OutlineLevel>2</OutlineLevel><Start>${stamp(2)}</Start><Finish>${stamp(9)}</Finish><PercentComplete>25</PercentComplete>
+      <Baseline><Number>0</Number><Start>${stamp(2)}</Start><Finish>${stamp(7)}</Finish></Baseline></Task>
+    <Task><UID>3</UID><Name>Data migration</Name><OutlineNumber>1.2</OutlineNumber><OutlineLevel>2</OutlineLevel><Start>${stamp(9)}</Start><Finish>${stamp(20)}</Finish>
+      <PredecessorLink><PredecessorUID>2</PredecessorUID><Type>1</Type><LinkLag>0</LinkLag></PredecessorLink>
+      <Baseline><Number>0</Number><Start>${stamp(9)}</Start><Finish>${stamp(18)}</Finish></Baseline></Task>
+    <Task><UID>4</UID><Name>Cutover</Name><OutlineNumber>1.3</OutlineNumber><OutlineLevel>2</OutlineLevel><Milestone>1</Milestone><Start>${stamp(24)}</Start><Finish>${stamp(24)}</Finish>
+      <PredecessorLink><PredecessorUID>3</PredecessorUID><Type>1</Type></PredecessorLink></Task>
+  </Tasks>
+  <Resources>
+    <Resource><UID>0</UID><Name>Unassigned</Name></Resource>
+    <Resource><UID>1</UID><Name>Ops team</Name><MaxUnits>1</MaxUnits></Resource>
+  </Resources>
+  <Assignments>
+    <Assignment><UID>1</UID><TaskUID>2</TaskUID><ResourceUID>1</ResourceUID><Units>0.5</Units></Assignment>
+  </Assignments>
+</Project>
+`;
+
+      // ---- Small helpers ---------------------------------------------------------------------
+      const statusEl = document.getElementById("ioStatus");
+      const countEl = document.getElementById("taskCount");
+      const issueEl = document.getElementById("issueList");
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function showIssues(lines) {
+        issueEl.replaceChildren();
+        for (const line of lines) {
+          const li = document.createElement("li");
+          li.textContent = line;
+          issueEl.appendChild(li);
+        }
+      }
+
+      function refreshCount() {
+        const data = gantt.getService("stargantt.data");
+        countEl.textContent = data ? `Store: ${data.query().byId.size} tasks.` : "";
+      }
+
+      // A readable one-liner per issue.
+      function describeIssue(issue) {
+        const where = issue.row !== undefined ? ` (row ${issue.row})` : issue.uid !== undefined ? ` (UID ${issue.uid})` : "";
+        return `${issue.code}${where}: ${issue.reason ?? issue.field ?? issue.taskId ?? ""}`.trim();
+      }
+
+      function exportSvc() {
+        return gantt.getService("stargantt.export") ?? null;
+      }
+
+      function withService(run) {
+        const svc = exportSvc();
+        if (!svc) {
+          setStatus('Unavailable: "stargantt.export" is not composed.');
+          return;
+        }
+        showIssues([]);
+        run(svc);
+      }
+
+      // ---- Exports ---------------------------------------------------------------------------
+      document.getElementById("csvBtn").addEventListener("click", () => {
+        withService((svc) => {
+          const delimiter = document.getElementById("csvDelimiter").value;
+          const csv = svc.exportCsv({ delimiter, bom: true });
+          StarGantt.downloadFile(document, csv, "stargantt-tasks.csv", "text/csv;charset=utf-8");
+          setStatus(`Exported stargantt-tasks.csv (${sizeOf(csv, "text/csv;charset=utf-8")} bytes).`);
+        });
+      });
+
+      document.getElementById("jsonBtn").addEventListener("click", () => {
+        withService((svc) => {
+          const json = svc.exportJson();
+          StarGantt.downloadFile(document, json, "stargantt-project.json", "application/json");
+          setStatus(`Exported stargantt-project.json (${sizeOf(json, "application/json")} bytes) — tasks, links, resources, assignments and calendars.`);
+        });
+      });
+
+      document.getElementById("icalBtn").addEventListener("click", () => {
+        withService((svc) => {
+          const includeSummaryTasks = document.getElementById("icalSummaries").checked;
+          const text = svc.exportICal({ calendarName: "Website relaunch", includeSummaryTasks });
+          StarGantt.downloadFile(document, text, "stargantt-tasks.ics", "text/calendar;charset=utf-8");
+          const events = (text.match(/BEGIN:VEVENT/g) ?? []).length;
+          setStatus(`Exported stargantt-tasks.ics (${sizeOf(text, "text/calendar;charset=utf-8")} bytes, ${events} events).`);
+        });
+      });
+
+      document.getElementById("xlsxBtn").addEventListener("click", () => {
+        withService((svc) => {
+          const buffer = svc.toXlsx({ sheetName: "Tasks" });
+          const xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+          StarGantt.downloadFile(document, buffer, "stargantt-tasks.xlsx", xlsxMime);
+          setStatus(`Exported stargantt-tasks.xlsx (${sizeOf(buffer, xlsxMime)} bytes) — a self-contained OOXML workbook, written without any third-party library.`);
+        });
+      });
+
+      document.getElementById("mspBtn").addEventListener("click", () => {
+        withService((svc) => {
+          const xml = svc.toMsProjectXml({ projectName: "Website relaunch" });
+          StarGantt.downloadFile(document, xml, "stargantt-project.xml", "text/xml;charset=utf-8");
+          setStatus(`Exported stargantt-project.xml (${sizeOf(xml, "text/xml;charset=utf-8")} bytes) — MSPDI, openable in MS Project.`);
+        });
+      });
+
+      // ---- Imports ---------------------------------------------------------------------------
+      // CSV/JSON: one call does parse -> validate -> diff -> apply (or opens the dialog with
+      // { dialog: true }); there is no separate parse/validate/diff/apply pipeline to drive by
+      // hand anymore (see the top-of-file comment).
+      function importText(text, format) {
+        withService((svc) => {
+          const dialog = !document.getElementById("directApply").checked;
+          const importFn = format === "json" ? svc.importJson.bind(svc) : svc.importCsv.bind(svc);
+          const result = importFn(text, { dialog });
+          if (dialog) {
+            // The dialog always mounts (in v2 the chart pane always exists); an empty document
+            // shows its own "no changes" message inside, so this status line just names the state.
+            setStatus(
+              result.document.tasks.length === 0
+                ? "Import dialog open — nothing to import, the text was empty."
+                : "Import dialog open: remap columns, review the issues and the diff, then apply (Escape cancels).",
+            );
+            return;
+          }
+          showIssues(result.issues.map(describeIssue));
+          if (!result.applied || (result.applied.added === 0 && result.applied.updated === 0 && result.applied.removed === 0)) {
+            setStatus(`Parsed ${result.document.tasks.length} ${result.document.format.toUpperCase()} tasks — no changes to apply.`);
+          }
+          // A non-empty apply also fires `importexport/applied` below, which sets the final status.
+        });
+      }
+
+      function importMsProject(text) {
+        withService((svc) => {
+          const result = svc.applyMsProjectXml(text);
+          showIssues(result.document.issues.map(describeIssue));
+          if (result.document.tasks.length === 0) {
+            setStatus("No tasks found in that MS Project file.");
+            return;
+          }
+          if (result.baselineInits.length > 0) {
+            const names = result.baselineInits.map((baseline) => baseline.name).join(", ");
+            setStatus(
+              `${result.baselineInits.length} baseline generation(s) parsed (${names}) — feed result.baselineInits to the tracking plugin's baselines config at composition time to show them.`,
+            );
+          }
+          // A non-zero apply also fires `msprojectio/applied` below, which sets the final status.
+        });
+      }
+
+      // There are separate `importCsv`/`importJson` methods with no combined "any format" entry
+      // point, so this page does the sniff itself for files with an unrecognized extension.
+      function sniffFormat(text) {
+        const trimmed = text.trimStart();
+        return trimmed.startsWith("{") || trimmed.startsWith("[") ? "json" : "csv";
+      }
+
+      function routeFile(name, text) {
+        const lower = name.toLowerCase();
+        if (lower.endsWith(".xml")) return importMsProject(text);
+        if (lower.endsWith(".json")) return importText(text, "json");
+        if (lower.endsWith(".csv")) return importText(text, "csv");
+        return importText(text, sniffFormat(text));
+      }
+
+      document.getElementById("fileInput").addEventListener("change", (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        setStatus(`Reading ${file.name}…`);
+        file
+          .text()
+          .then((text) => routeFile(file.name, text))
+          .catch(() => setStatus("That file could not be read."));
+        event.target.value = "";
+      });
+
+      document.getElementById("sampleCsvBtn").addEventListener("click", () => importText(SAMPLE_CSV, "csv"));
+      document.getElementById("sampleJsonBtn").addEventListener("click", () => importText(SAMPLE_JSON, "json"));
+      document.getElementById("sampleMspBtn").addEventListener("click", () => importMsProject(SAMPLE_MSPDI));
+
+      document.getElementById("undoBtn").addEventListener("click", () => {
+        const history = gantt.getService("stargantt.history");
+        if (!history) {
+          setStatus('Unavailable: "stargantt.history" is not composed.');
+          return;
+        }
+        if (!history.state.get().canUndo) {
+          setStatus("Nothing to undo.");
+          return;
+        }
+        history.undo();
+        showIssues([]);
+        setStatus("Undone — the whole import reverted in one step.");
+        refreshCount();
+      });
+
+      // ---- Events -------------------------------------------------------------------------
+      gantt.on("importexport/applied", (event) => {
+        const { added, updated, removed } = event.result;
+        setStatus(`Imported via the ${event.cause === "dialog" ? "dialog" : "service API"}: ${added} added, ${updated} updated, ${removed} removed — one undo step.`);
+        refreshCount();
+      });
+      gantt.on("msprojectio/applied", (event) => {
+        const r = event.result;
+        setStatus(`MS Project applied: ${r.tasksAdded} tasks added, ${r.tasksUpdated} updated, ${r.linksAdded} links, ${r.resourcesAdded} resources, ${r.assignmentsSet} assignments.`);
+        refreshCount();
+      });
+
+      refreshCount();
+    </script>
+  </body>
+</html>

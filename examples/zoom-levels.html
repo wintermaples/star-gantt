@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Zoom Levels example</title>
+    <!--
+      Demonstrates setting the zoom level directly (setZoomLevel), stepping it one level at a time
+      (the timeline/zoomIn / timeline/zoomOut commands), the opt-in zoom-controls toolbar, and
+      five setup-time-only timeline axis options (firstDayOfWeek, fiscalYearStartMonth,
+      displayTimeZone, calendar, headerCellFormat).
+
+      This page is self-contained, wiring the controls directly (see examples/basic.html). Every
+      setup-time-only option tears the chart down and recreates it on change (the
+      "Setup-time-only options" badge below marks which controls trigger it) — a `rebuild()`
+      helper handles that.
+
+      The timeline service is `stargantt.timeline`; zoom level is observed through the
+      `timeline.zoomLevel` store (docs/specs/plugins/view.md). The timeline config nests under
+      `view({ timeline: {...} })`; zoom keyboard shortcuts under `a11y({ zoomKeys })`; the
+      zoom-controls toolbar under `interaction({ zoomControls: {...} })`; viewport geometry reads
+      from `view.viewport.get()`.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 16px 24px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      #chart {
+        height: 460px;
+        border: 1px solid #ccc;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 20px;
+        margin: 10px 0;
+      }
+      .group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .group-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #333;
+      }
+      button {
+        font: inherit;
+        font-size: 13px;
+        padding: 4px 10px;
+        border: 1px solid #999;
+        border-radius: 4px;
+        background: #f5f5f5;
+        cursor: pointer;
+      }
+      button.active,
+      button[aria-pressed="true"] {
+        background: #1f4e79;
+        color: #fff;
+        border-color: #1f4e79;
+      }
+      .badge {
+        font-size: 11px;
+        color: #7a5b00;
+        background: #fff4d6;
+        border: 1px solid #e0c368;
+        border-radius: 3px;
+        padding: 2px 6px;
+      }
+      .readout {
+        font-size: 12px;
+        color: #333;
+      }
+      .note {
+        max-width: 90ch;
+        font-size: 12px;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — zoom levels</h1>
+
+    <div class="toolbar">
+      <div class="group">
+        <span class="group-label">Zoom level (setZoomLevel)</span>
+        <div class="group" id="zoomButtons">
+          <button data-level="hour" aria-pressed="false">Hour</button>
+          <button data-level="day" aria-pressed="false">Day</button>
+          <button data-level="week" aria-pressed="false">Week</button>
+          <button data-level="month" aria-pressed="false">Month</button>
+          <button data-level="quarter" aria-pressed="false">Quarter</button>
+          <button data-level="year" aria-pressed="false">Year</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="group-label">One step (timeline/zoomIn / timeline/zoomOut)</span>
+        <button id="zoomOutCmd" type="button">&minus; Zoom out (coarser)</button>
+        <button id="zoomInCmd" type="button">+ Zoom in (finer)</button>
+      </div>
+
+      <div class="group">
+        <span class="group-label">Active level (timeline.zoomLevel store)</span>
+        <span class="readout" id="levelReadout">day</span>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <span class="badge">Setup-time-only options &mdash; changing one recreates the chart</span>
+
+      <div class="group">
+        <span class="group-label">firstDayOfWeek</span>
+        <div class="group" id="weekStartButtons">
+          <button data-first-day="1" class="active" aria-pressed="true">Monday (default)</button>
+          <button data-first-day="0" aria-pressed="false">Sunday</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="group-label">fiscalYearStartMonth</span>
+        <div class="group" id="fiscalButtons">
+          <button data-fiscal="1" class="active" aria-pressed="true">Calendar year (default)</button>
+          <button data-fiscal="4" aria-pressed="false">Fiscal year from April</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="group-label">displayTimeZone</span>
+        <div class="group" id="tzButtons">
+          <button data-tz="UTC" class="active" aria-pressed="true">UTC (default)</button>
+          <button data-tz="Asia/Tokyo" aria-pressed="false">Asia/Tokyo</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="group-label">calendar</span>
+        <div class="group" id="calendarButtons">
+          <button data-calendar="" class="active" aria-pressed="true">Locale default (default)</button>
+          <button data-calendar="japanese" aria-pressed="false">Japanese (wareki)</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="group-label">headerCellFormat</span>
+        <div class="group" id="headerFormatButtons">
+          <button data-header="off" class="active" aria-pressed="true">Default labels</button>
+          <button data-header="on" aria-pressed="false">Upper-case top row</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="group-label">TimelineService.formatDate(origin)</span>
+        <span class="readout" id="formatReadout">&mdash;</span>
+      </div>
+    </div>
+
+    <p class="note">
+      The chart also composes the opt-in <code>interaction({ zoomControls: {...} })</code> group: a
+      floating toolbar in the chart pane's <strong>bottom-right</strong> corner with &minus;/+
+      buttons, a ladder slider and <em>Fit</em> / <em>Today</em> / <em>Selected task</em> actions.
+      Because <code>a11y({ zoomKeys: true })</code> is on, clicking a chart row and then pressing
+      <kbd>+</kbd> or <kbd>&minus;</kbd> steps the same ladder from the keyboard (the plain keys, not
+      <kbd>Ctrl</kbd>+<kbd>+</kbd>, which stays with the browser's page zoom). Every one of these
+      paths anchors on the viewport centre and publishes through the <code>timeline.zoomLevel</code>
+      store, so the readout above stays correct whichever you use.
+    </p>
+
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the currently-composed official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      // Fixed anchor date (not "now"): keeps screenshots stable across runs.
+      // 2026-08-03 00:00 UTC, a Monday.
+      const DAY = 24 * 60 * 60 * 1000;
+      const T0 = Date.UTC(2026, 7, 3);
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "p1", parentId: null, name: "Program", start: T0, end: T0 + 180 * DAY, type: "summary" },
+            { id: "t1", parentId: "p1", name: "Discovery", start: T0, end: T0 + 20 * DAY, type: "task", progress: 1 },
+            { id: "t2", parentId: "p1", name: "Design", start: T0 + 15 * DAY, end: T0 + 60 * DAY, type: "task", progress: 0.6 },
+            { id: "t3", parentId: "p1", name: "Build", start: T0 + 40 * DAY, end: T0 + 130 * DAY, type: "task", progress: 0.2 },
+            { id: "t4", parentId: "p1", name: "Stabilize", start: T0 + 120 * DAY, end: T0 + 170 * DAY, type: "task" },
+            { id: "t5", parentId: "p1", name: "Launch", start: T0 + 180 * DAY, end: T0 + 180 * DAY, type: "milestone" },
+          ],
+        };
+      }
+
+      function pressed(groupId, attr, fallback) {
+        const btn = document.querySelector("#" + groupId + ' button[aria-pressed="true"]');
+        return btn ? btn.dataset[attr] : fallback;
+      }
+
+      const zoomButtons = Array.from(document.querySelectorAll("#zoomButtons button"));
+      const levelReadout = document.getElementById("levelReadout");
+      const formatReadout = document.getElementById("formatReadout");
+
+      const setupGroupIds = ["weekStartButtons", "fiscalButtons", "tzButtons", "calendarButtons", "headerFormatButtons"];
+
+      function setActiveZoomButton(id) {
+        zoomButtons.forEach((btn) => {
+          const isActive = btn.dataset.level === id;
+          btn.classList.toggle("active", isActive);
+          btn.setAttribute("aria-pressed", String(isActive));
+        });
+        levelReadout.textContent = id;
+      }
+
+      let gantt;
+      let origin;
+
+      function refreshFormatReadout() {
+        const timeline = gantt.service("stargantt.timeline");
+        formatReadout.textContent = timeline.formatDate(origin);
+      }
+
+      function rebuild() {
+        if (gantt) gantt.dispose();
+
+        // Every option below (zoom level plus the five setup-time axis options) is read straight
+        // from the visible controls' aria-pressed state, so the chart config can never diverge
+        // from what the buttons show — falling back to the original literals when nothing is
+        // pressed yet (first paint, before any control has been toggled).
+        const zoomLevel = pressed("zoomButtons", "level", "day");
+        const firstDayOfWeek = Number(pressed("weekStartButtons", "firstDay", "1"));
+        const fiscalStart = Number(pressed("fiscalButtons", "fiscal", "1"));
+        const displayTimeZone = pressed("tzButtons", "tz", "UTC");
+        const calendarId = pressed("calendarButtons", "calendar", "");
+        const headerTemplateOn = pressed("headerFormatButtons", "header", "off") === "on";
+
+        origin = T0;
+
+        // Built key-by-key rather than passing `undefined`: every option below is read once at
+        // setup, and an absent key is what "keep the default" means.
+        const timelineConfig = { firstDayOfWeek, initialZoom: zoomLevel, origin: T0 };
+        // 1 (January) means calendar periods, so the key stays absent for the default.
+        if (fiscalStart > 1) timelineConfig.fiscalYearStartMonth = fiscalStart;
+        // Boundaries move to the zone's wall clock; the stored task instants stay UTC epoch ms.
+        if (displayTimeZone !== "UTC") timelineConfig.displayTimeZone = displayTimeZone;
+        // Wording only — cells still begin where Gregorian arithmetic puts them.
+        if (calendarId) timelineConfig.calendar = calendarId;
+        if (headerTemplateOn) {
+          // Runs once per painted header cell, before the label is measured for fit-based
+          // thinning. Returning a non-string (here: for every row but the coarsest) keeps the
+          // default label, which is how a template can restyle one row and leave the rest alone.
+          timelineConfig.headerCellFormat = (cell) => (cell.rowIndex === 0 ? cell.defaultLabel.toUpperCase() : null);
+        }
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: [
+            ...StarGantt.presetStandard({
+              view: { timeline: timelineConfig },
+              // `+` / `-` step the zoom-controls ladder instead of expand/collapse (ArrowRight /
+              // ArrowLeft keep expand/collapse). Plain keys, so Ctrl+/Ctrl- stays browser page zoom.
+              a11y: { zoomKeys: true },
+              // Opt-in group inside interaction (not enabled unless the nest is present): a
+              // floating toolbar in the chart pane. Position claims the bottom-right corner (the
+              // group's own default).
+              interaction: { zoomControls: { position: "bottom-right" } },
+            }),
+          ],
+          locale: "en",
+        });
+
+        const dataService = gantt.service("stargantt.data");
+        dataService.load(dataset());
+
+        const timeline = gantt.service("stargantt.timeline");
+        setActiveZoomButton(timeline.zoomLevel.get().id);
+        refreshFormatReadout();
+        // Fires for every level change whatever caused it: these buttons, the commands below, the
+        // zoom-controls toolbar, the +/- chords, or Ctrl+wheel over the chart.
+        timeline.zoomLevel.subscribe((level) => setActiveZoomButton(level.id));
+
+        // Debug handle, following the existing pages' convention.
+        window.zoomLevelsDemo = { gantt, dataService, timelineService: timeline, origin };
+        window.gantt = gantt;
+      }
+
+      zoomButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const timeline = gantt.service("stargantt.timeline");
+          // Anchor the zoom on the viewport's current center: with no anchor, setZoomLevel keeps
+          // the timeline origin at content x = 0, which jumps the visible window instead of
+          // zooming in/out around what the user is looking at.
+          const view = gantt.service("stargantt.view");
+          const vp = view.viewport.get();
+          const anchor = timeline.xToT(vp.scrollLeft + vp.width / 2);
+          timeline.setZoomLevel(btn.dataset.level, anchor);
+        });
+      });
+
+      // One step along the composed ladder per dispatch, anchored on the viewport centre by the
+      // command itself when the payload carries no `anchorTime`; a silent no-op at either end.
+      document.getElementById("zoomInCmd").addEventListener("click", () => {
+        gantt.dispatch("timeline/zoomIn", {});
+      });
+      document.getElementById("zoomOutCmd").addEventListener("click", () => {
+        gantt.dispatch("timeline/zoomOut", {});
+      });
+
+      setupGroupIds.forEach((groupId) => {
+        const buttons = Array.from(document.querySelectorAll("#" + groupId + " button"));
+        buttons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            if (btn.getAttribute("aria-pressed") === "true") return; // already active
+            buttons.forEach((b) => {
+              b.classList.remove("active");
+              b.setAttribute("aria-pressed", "false");
+            });
+            btn.classList.add("active");
+            btn.setAttribute("aria-pressed", "true");
+            // Recreates the chart; rebuild() re-reads this group's option from the new
+            // aria-pressed state. The zoom level survives, because it is read the same way from a
+            // button the zoomLevel-store subscription keeps in sync.
+            rebuild();
+          });
+        });
+      });
+
+      rebuild();
+    </script>
+  </body>
+</html>

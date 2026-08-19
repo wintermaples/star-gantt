@@ -1,0 +1,46 @@
+{
+  "name": "@stargantt/core",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "StarGantt micro-kernel: plugin host, services, extension points, events, commands. Knows nothing about tasks, dates, or drawing. Zero runtime dependencies.",
+  "keywords": [
+    "gantt",
+    "gantt-chart",
+    "project-management",
+    "timeline",
+    "scheduling",
+    "typescript",
+    "plugin-architecture",
+    "zero-dependencies"
+  ],
+  "author": "wintermaples",
+  "homepage": "https://wintermaples.github.io/star-gantt/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wintermaples/star-gantt.git",
+    "directory": "packages/core"
+  },
+  "bugs": "https://github.com/wintermaples/star-gantt/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build && tsc -p tsconfig.build.json"
+  },
+  "main": "./dist/stargantt.core.iife.js",
+  "module": "./dist/core.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/core.js",
+      "default": "./dist/stargantt.core.iife.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Resource utilization example</title>
+    <!--
+      This page's focus is the merged plugin's `utilization` nest (docs/specs/plugins/resource.md
+      §3.5/§6.4): the over-allocation warning glyph on task bars, the Overallocation grid column,
+      and the team-capacity / demand-vs-supply panels. `pool` seeds the ledger (with
+      `syncToStore: true` so assignments resolve against the mirrored store copy) and `assign`
+      keeps the Resources column visible alongside it. The service id is `stargantt.utilization`
+      (resource.md §1.2).
+
+      - `pool.bookingsWhere(filter)` avoids a name collision with the mandated iterable `bookings`
+        store property (resource.md §1.1's naming resolution).
+      - `bucket` / `threshold` are read once at `setup()` (resource.md §6.4), so the toolbar's
+        bucket/threshold controls rebuild the whole chart (`gantt.dispose()` + a fresh
+        `StarGantt.create()`, the pattern `examples/basic-gantt.html` uses for its own setup-time
+        toggles) rather than mutating a live instance.
+      - The pool-edit buttons (time off, capacity, booking) and the panel buttons call the live
+        `stargantt.resource-pool` / `stargantt.utilization` services directly — those fields are
+        not setup-time config, so no rebuild is needed for them.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 480px;
+        border: 1px solid #ccc;
+      }
+      #toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+        align-items: center;
+        margin-bottom: 4px;
+      }
+      #toolbar button,
+      #toolbar select {
+        min-height: 24px;
+        font: inherit;
+        cursor: pointer;
+      }
+      #status {
+        font-size: 11px;
+        min-height: 1.4em;
+        margin: 4px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — resource utilization</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Over-allocation warnings (task-bar glyph + Overallocation column), the team-capacity and
+      demand-vs-supply panels, and pool edits (time off, capacity, booking state) that feed the
+      same aggregation engine live.
+    </details>
+    <div id="toolbar">
+      <span role="group" aria-label="Bucket width">
+        <button id="bucket-day" type="button" aria-pressed="true">Day buckets</button>
+        <button id="bucket-week" type="button" aria-pressed="false">Week buckets</button>
+      </span>
+      <label>
+        Threshold
+        <select id="threshold">
+          <option value="0.8">80%</option>
+          <option value="1" selected>100%</option>
+          <option value="1.25">125%</option>
+        </select>
+      </label>
+      <span role="group" aria-label="Panels">
+        <button id="btn-summary" type="button" aria-pressed="false">Team capacity…</button>
+        <button id="btn-trend" type="button" aria-pressed="false">Demand vs supply…</button>
+      </span>
+      <span role="group" aria-label="Pool edits">
+        <button id="btn-timeoff" type="button" aria-pressed="false">Priya: 5 days off</button>
+        <button id="btn-capacity" type="button" aria-pressed="false">Jordan at 50% capacity</button>
+        <button id="btn-booking" type="button" aria-pressed="false">Confirm lab booking</button>
+      </span>
+    </div>
+    <p id="status" role="status" aria-live="polite">Loading…</p>
+    <div id="chart"></div>
+
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+      const T0 = Math.floor(Date.now() / DAY) * DAY;
+      const PRIYA_TIME_OFF_ID = "priya-vacation";
+
+      function dataset() {
+        return {
+          tasks: [
+            { id: "platform", name: "Platform", type: "summary", start: T0, end: T0 + 20 * DAY },
+            { id: "api", parentId: "platform", name: "API service", start: T0, end: T0 + 10 * DAY, progress: 0.5 },
+            { id: "auth", parentId: "platform", name: "Auth hardening", start: T0 + 3 * DAY, end: T0 + 12 * DAY, progress: 0.3 },
+            { id: "qa", parentId: "platform", name: "Regression suite", start: T0 + 8 * DAY, end: T0 + 14 * DAY, progress: 0.1 },
+            { id: "perf", parentId: "platform", name: "Perf tuning", start: T0 + 14 * DAY, end: T0 + 20 * DAY },
+            { id: "nightly", parentId: "platform", name: "Nightly builds", start: T0, end: T0 + 20 * DAY, progress: 0.4 },
+            { id: "relbuild", parentId: "platform", name: "Release build", start: T0 + 9 * DAY, end: T0 + 13 * DAY },
+            { id: "experience", name: "Experience", type: "summary", start: T0, end: T0 + 14 * DAY },
+            { id: "ui", parentId: "experience", name: "UI redesign", start: T0, end: T0 + 8 * DAY, progress: 0.6 },
+            { id: "icons", parentId: "experience", name: "Icon set", start: T0 + 6 * DAY, end: T0 + 14 * DAY, progress: 0.2 },
+            { id: "beta", name: "Beta", type: "milestone", start: T0 + 20 * DAY, end: T0 + 20 * DAY },
+          ],
+          links: [
+            { sourceId: "ui", targetId: "qa", type: "FS" },
+            { sourceId: "qa", targetId: "perf", type: "FS" },
+            { sourceId: "perf", targetId: "beta", type: "FS" },
+          ],
+          // Mirrors of the pool entries so assignments resolve even before the pool syncs.
+          resources: [
+            { id: "alex", name: "Alex Ruiz", capacity: 1 },
+            { id: "priya", name: "Priya Shah", capacity: 1 },
+            { id: "jordan", name: "Jordan Lee", capacity: 1 },
+            { id: "mina", name: "Mina Okafor", capacity: 0.5 },
+            { id: "build01", name: "Build server 01", capacity: 1 },
+          ],
+          assignments: [
+            // Alex is on two overlapping tasks at 1.0 + 0.8 — over-allocated at any threshold <= 1.
+            { taskId: "api", resourceId: "alex", units: 1 },
+            { taskId: "auth", resourceId: "alex", units: 0.8 },
+            { taskId: "ui", resourceId: "priya", units: 1 },
+            { taskId: "icons", resourceId: "mina", units: 0.5 },
+            // Jordan's two tasks do not overlap: he only goes over once his capacity is halved.
+            { taskId: "qa", resourceId: "jordan", units: 1 },
+            { taskId: "perf", resourceId: "jordan", units: 0.6 },
+            // The build server is shared equipment: 0.6 + 0.6 while the release build runs.
+            { taskId: "nightly", resourceId: "build01", units: 0.6 },
+            { taskId: "relbuild", resourceId: "build01", units: 0.6 },
+          ],
+        };
+      }
+
+      // Team membership lives outside the ledger, so it is supplied as a `team` accessor over the
+      // pool entries; roles fall back to each entry's first skill tag.
+      const TEAMS = {
+        alex: "Platform",
+        jordan: "Platform",
+        build01: "Platform",
+        priya: "Experience",
+        mina: "Experience",
+      };
+
+      // Compact "MM-DD → MM-DD" window (UTC), so the grid can hold the Resources and
+      // Overallocation columns side by side without a horizontal scroll.
+      const mmdd = (ms) => new Date(ms).toISOString().slice(5, 10);
+      const windowText = (task) => {
+        if (!isFinite(task.start) || !isFinite(task.end)) return "";
+        return task.start === task.end ? mmdd(task.start) : mmdd(task.start) + " → " + mmdd(task.end);
+      };
+
+      let bucket = "day";
+      let threshold = 1;
+      let gantt;
+
+      function rebuild() {
+        if (gantt) gantt.dispose();
+
+        gantt = StarGantt.create({
+          element: document.getElementById("chart"),
+          plugins: [
+            // Auto-scheduling is off so the authored overlaps — which are what produces the
+            // over-allocation this page demonstrates — stay exactly as written.
+            ...StarGantt.presetStandard({
+              scheduling: { autoSchedule: { enabled: false } },
+              treeGrid: {
+                paneWidth: 700,
+                columns: [
+                  {
+                    id: "name",
+                    header: "Task",
+                    width: 210,
+                    render: (el, task) => {
+                      el.textContent = task.name;
+                    },
+                    getValue: (task) => task.name,
+                  },
+                  {
+                    id: "window",
+                    header: "Window (UTC)",
+                    width: 150,
+                    render: (el, task) => {
+                      el.textContent = windowText(task);
+                    },
+                    getValue: (task) => windowText(task),
+                  },
+                ],
+              },
+            }),
+            StarGantt.resource({
+              pool: {
+                syncToStore: true,
+                resources: [
+                  { id: "alex", name: "Alex Ruiz", kind: "person", capacity: 1, skills: ["Backend"], costRate: 95 },
+                  { id: "priya", name: "Priya Shah", kind: "person", capacity: 1, skills: ["Design"], costRate: 88 },
+                  { id: "jordan", name: "Jordan Lee", kind: "person", capacity: 1, skills: ["QA"], costRate: 74 },
+                  {
+                    id: "mina",
+                    name: "Mina Okafor",
+                    kind: "person",
+                    capacity: 0.5,
+                    skills: ["Design"],
+                    costRate: 88,
+                    // Part-time: Monday to Wednesday only (UTC weekdays).
+                    calendar: { workingDays: [1, 2, 3] },
+                  },
+                  {
+                    id: "build01",
+                    name: "Build server 01",
+                    kind: "equipment",
+                    capacity: 1,
+                    skills: ["Build"],
+                    billable: false,
+                  },
+                ],
+                bookings: [
+                  {
+                    id: "bk-lab",
+                    resourceId: "build01",
+                    taskId: "relbuild",
+                    start: T0 + 9 * DAY,
+                    end: T0 + 13 * DAY,
+                    state: "tentative",
+                    note: "Release lab slot",
+                  },
+                ],
+              },
+              assign: {},
+              utilization: {
+                bucket: bucket,
+                threshold: threshold,
+                team: (entry) => TEAMS[entry.id],
+              },
+            }),
+          ],
+        });
+
+        gantt.service("stargantt.data").load(dataset());
+        window.gantt = gantt;
+        refresh();
+      }
+
+      // --- Toolbar wiring (resolves the live `gantt` each time, since rebuild() replaces it) ----
+      const els = {
+        bucketDay: document.getElementById("bucket-day"),
+        bucketWeek: document.getElementById("bucket-week"),
+        threshold: document.getElementById("threshold"),
+        summary: document.getElementById("btn-summary"),
+        trend: document.getElementById("btn-trend"),
+        timeOff: document.getElementById("btn-timeoff"),
+        capacity: document.getElementById("btn-capacity"),
+        booking: document.getElementById("btn-booking"),
+        status: document.getElementById("status"),
+      };
+
+      function services() {
+        return {
+          util: gantt.service("stargantt.utilization"),
+          pool: gantt.service("stargantt.resource-pool"),
+        };
+      }
+
+      function panelOpen(kind) {
+        return !!document.querySelector("#chart .sg-ru-" + kind);
+      }
+
+      function pressed(el, on) {
+        el.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+
+      function pct(ratio) {
+        return ratio === null || ratio === undefined ? "n/a" : Math.round(ratio * 100) + "%";
+      }
+
+      function round1(n) {
+        return Math.round(n * 10) / 10;
+      }
+
+      function refresh() {
+        const svc = services();
+
+        pressed(els.bucketDay, bucket !== "week");
+        pressed(els.bucketWeek, bucket === "week");
+        pressed(els.summary, panelOpen("summary"));
+        pressed(els.trend, panelOpen("trend"));
+
+        const priyaOff = svc.pool.timeOff("priya").length > 0;
+        pressed(els.timeOff, priyaOff);
+
+        const jordan = svc.pool.get("jordan");
+        pressed(els.capacity, !!jordan && jordan.capacity === 0.5);
+
+        const booking = svc.pool.bookingsWhere({ resourceId: "build01" })[0];
+        pressed(els.booking, !!booking && booking.state === "confirmed");
+
+        const over = svc.util.overallocations();
+        const overText = over.length
+          ? over.map((info) => `${info.name} (peak ${pct(info.peakRatio)})`).join(", ")
+          : "nobody";
+
+        const teams = svc.util
+          .teamSummary()
+          .map(
+            (team) =>
+              `${team.team} ${round1(team.allocated)}/${round1(team.capacity)} FTE-days used, ${round1(team.available)} free`,
+          )
+          .join(" · ");
+
+        const roles = svc.util.demandByRole().map((role) => `${role.role} ${pct(role.ratio)}`).join(", ");
+
+        els.status.textContent =
+          `Buckets: ${bucket} · threshold ${pct(threshold)} — Over-allocated: ${overText}.` +
+          ` Teams: ${teams || "none"}. Demand by role: ${roles || "none"}.` +
+          ` Lab booking: ${booking ? booking.state : "none"}.`;
+      }
+
+      els.bucketDay.addEventListener("click", () => {
+        bucket = "day";
+        rebuild();
+      });
+      els.bucketWeek.addEventListener("click", () => {
+        bucket = "week";
+        rebuild();
+      });
+      els.threshold.addEventListener("change", () => {
+        const value = Number(els.threshold.value);
+        threshold = isFinite(value) ? value : 1;
+        rebuild();
+      });
+
+      els.summary.addEventListener("click", () => {
+        const svc = services();
+        if (panelOpen("summary")) svc.util.closeSummaryPanel();
+        else svc.util.openSummaryPanel();
+        refresh();
+      });
+      els.trend.addEventListener("click", () => {
+        const svc = services();
+        if (panelOpen("trend")) svc.util.closeTrendPanel();
+        else svc.util.openTrendPanel();
+        refresh();
+      });
+
+      els.timeOff.addEventListener("click", () => {
+        const svc = services();
+        if (svc.pool.timeOff("priya").length) {
+          svc.pool.removeTimeOff("priya", PRIYA_TIME_OFF_ID);
+        } else {
+          const t0 = Math.floor(Date.now() / DAY) * DAY;
+          svc.pool.addTimeOff("priya", {
+            id: PRIYA_TIME_OFF_ID,
+            start: t0 + 2 * DAY,
+            end: t0 + 7 * DAY,
+            reason: "vacation",
+          });
+        }
+        refresh();
+      });
+
+      els.capacity.addEventListener("click", () => {
+        const svc = services();
+        const jordan = svc.pool.get("jordan");
+        svc.pool.upsert({ id: "jordan", capacity: jordan && jordan.capacity === 0.5 ? 1 : 0.5 });
+        refresh();
+      });
+
+      els.booking.addEventListener("click", () => {
+        const svc = services();
+        const booking = svc.pool.bookingsWhere({ resourceId: "build01" })[0];
+        if (!booking) return;
+        svc.pool.setBookingState(booking.id, booking.state === "confirmed" ? "tentative" : "confirmed");
+        refresh();
+      });
+
+      // The panels can also be closed from their own close button or with Escape; re-derive the
+      // toggle states from the live DOM afterwards.
+      let refreshQueued = false;
+      function queueRefresh() {
+        if (refreshQueued) return;
+        refreshQueued = true;
+        requestAnimationFrame(() => {
+          refreshQueued = false;
+          refresh();
+        });
+      }
+      document.addEventListener("click", queueRefresh);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") queueRefresh();
+      });
+
+      rebuild();
+    </script>
+  </body>
+</html>

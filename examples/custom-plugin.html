@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StarGantt v2 — Custom plugin example</title>
+    <!--
+      How a THIRD PARTY writes StarGantt plugins, using nothing but the public API. Six small
+      plugins are defined in this page's own <script> and composed into the `plugins:` array
+      alongside `...StarGantt.presetStandard()` — exactly the way the opt-in official plugins
+      (`StarGantt.tracking()` and friends) are composed. Officialness confers no runtime privilege
+      (docs/specs/architecture.md chapter 8): everything below goes through `StarGantt.definePlugin`,
+      `PluginContext` and the published extension points.
+
+      Design notes on the architecture this page exercises:
+
+      1. Services are split by concern: `stargantt.view`, `stargantt.timeline` and
+         `stargantt.theme` are all provided by the ONE `stargantt.view` plugin, and
+         `stargantt.rows` is provided by `stargantt.tree-grid`.
+      2. There are no `…/changed` events (architecture.md chapter 3.3); change notification goes
+         through store subscriptions — `timeline.zoomLevel.subscribe(...)`,
+         `rows.rows.subscribe(...)`, `data.tasks.subscribe(...)` — and, unlike `ctx.on`, a store
+         subscription is NOT auto-owned, so each one is handed to `ctx.own()` explicitly.
+      3. Render z-order is arbitrated in code, not by a table in a document. Every layer here calls
+         `ctx.claimOrder("renderer/layers", key, order)`; the page prints the resulting live stack
+         through the instance handle's `orders("renderer/layers")`.
+      4. A third-party plugin registers its own service with `ctx.provide("custom.…", impl)`, and
+         the page (or another plugin) reads it back through `gantt.service("custom.…")` /
+         `ctx.use("custom.…")`. Two of the plugins below do that; one also claims a `task.meta`
+         key with `ctx.claimKey` and registers its own command with `ctx.registerCommand`, and one
+         DECLARES ITS OWN extension point with `ctx.defineExtensionPoint` + `StarGantt.collect()`,
+         which a second third-party plugin then contributes to.
+
+      The two features this page paints by hand — weekend shading and a today line — also exist as
+      built-ins of the official view plugin. They are switched off in the config below
+      (`gridLines.nonWorkingDays: false`, `todayLine: false`) so the page shows exactly one of each
+      and you can tell which pixels came from the code on this page.
+
+      One caveat for third-party authors reading this as a reference: `@stargantt/sdk` (the
+      published helper library — `listen`, `createDialog`, the working-time engine, `sdk/testing`)
+      is embedded in this bundle but is NOT re-exported on the global `StarGantt` object, so an
+      IIFE page like this one cannot reach it. Everything below therefore uses core APIs only. A
+      real plugin built with a bundler imports `@stargantt/core` and `@stargantt/sdk` directly and
+      gets both.
+
+      Viewport floor is 720x540 (tablet and up, no mobile breakpoints), per CLAUDE.md.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 6px 12px;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      details {
+        margin: 0 0 4px;
+        font-size: 11px;
+        color: #555;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      #chart {
+        height: 460px;
+        border: 1px solid #ccc;
+      }
+      #toolbar button {
+        min-height: 24px;
+        margin: 0 4px 4px 0;
+        font: inherit;
+        cursor: pointer;
+      }
+      .readout {
+        margin: 4px 0;
+        font-size: 11px;
+        color: #333;
+        min-height: 15px;
+      }
+      /*
+        The two DOM-overlay elements the plugins below create are page-authored content, not
+        library elements, so the bundled stylesheet knows nothing about them. Focus rings are
+        declared here: >=2px and drawn outside the element so it is never obscured
+        (WCAG 2.4.7 / 2.4.11).
+      */
+      .custom-at-risk-badge:focus-visible,
+      .custom-today-marker:focus-visible {
+        outline: 2px solid #005fcc;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StarGantt v2 — writing your own plugin</h1>
+    <details>
+      <summary>What's on this page</summary>
+      Six third-party plugins defined in this file: a weekend background layer and a today line
+      (<code>renderer/layers</code>), a hit tester for the today line
+      (<code>renderer/hitTest</code>), a tooltip provider for it (<code>tooltip/content</code>), a
+      focusable keyboard marker plus an <kbd>Alt</kbd>+<kbd>T</kbd> shortcut
+      (<code>renderer/domOverlays</code> + <code>keys/bindings</code> + a custom command), and an
+      "at risk" HTML badge that places itself through the renderer's batched layout queue. Two of
+      them register their own services, one claims a <code>task.meta</code> key, one declares its
+      own extension point and another contributes to it. Plus one OFFICIAL plugin configured rather
+      than replaced: <code>presetStandard({ taskBars: { label } })</code>.
+    </details>
+
+    <div id="toolbar">
+      <button type="button" id="btn-caption" aria-pressed="false">Long caption: off</button>
+      <button type="button" id="btn-measure">Measure 2,000 labels</button>
+      <button type="button" id="btn-batch">Re-place badge (batched)</button>
+      <button type="button" id="btn-today">Scroll to today (Alt+T)</button>
+      <button type="button" id="btn-orders">Show layer order registry</button>
+    </div>
+    <p class="readout" id="readout" role="status" aria-live="polite">
+      Toggle the caption to watch the today-line pill resize to the measured text width.
+    </p>
+
+    <div id="chart"></div>
+
+    <!-- A single file containing core + the official plugins + CSS. -->
+    <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
+    <script>
+      const DAY = 86400000;
+
+      /** UTC midnight of today — the instant every "today" computation on this page starts from. */
+      function todayUtc() {
+        const now = new Date();
+        return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      }
+
+      const TODAY = todayUtc();
+
+      /** Epoch ms for `n` days after today 0:00 UTC. Negative values are before today. */
+      function day(n) {
+        return TODAY + n * DAY;
+      }
+
+      /**
+       * The page's dataset. Dates are relative to today so the project always straddles the today
+       * line the custom plugins draw. Deterministic — no Math.random().
+       *
+       * `meta.customAtRisk` is this page's own metadata key: `custom.at-risk-badge` claims it below
+       * with `ctx.claimKey("task.meta", …)`, which is how the shared `task.meta` bag is
+       * arbitrated in code, not by a table in a contract document.
+       */
+      function dataset() {
+        return {
+          tasks: [
+            { id: "plan", parentId: null, name: "Project planning", type: "summary", start: day(0), end: day(7) },
+            { id: "req", parentId: "plan", name: "Requirements", start: day(0), end: day(4), progress: 1 },
+            { id: "design", parentId: "plan", name: "Basic design", start: day(4), end: day(11), progress: 0.4 },
+            {
+              id: "impl",
+              parentId: null,
+              name: "Implementation phase",
+              type: "summary",
+              start: day(11),
+              end: day(53),
+              meta: { customAtRisk: true },
+            },
+            { id: "fe", parentId: "impl", name: "Frontend development", start: day(11), end: day(39), progress: 0.2 },
+            { id: "be", parentId: "impl", name: "Backend development", start: day(11), end: day(46), progress: 0.1 },
+          ],
+        };
+      }
+
+      /* ================================================================== *
+       * Plugin 1 — weekend shading, a `renderer/layers` contribution
+       * ================================================================== *
+       *
+       * The smallest possible plugin: one `meta`, one `setup`, one contribution.
+       *
+       * `meta.dependsOn` names PROVIDER PLUGIN ids, while `ctx.use()` takes SERVICE ids — two
+       * separate namespaces. `stargantt.timeline` and `stargantt.theme` are both provided by the
+       * ONE plugin `stargantt.view`, so that single id is all `dependsOn` needs. Using a service
+       * whose provider is not declared here throws, which is how the core keeps the dependency
+       * graph honest (packages/core/src/internal/services.ts).
+       */
+      const weekendShading = StarGantt.definePlugin({
+        meta: {
+          id: "custom.weekend-shading",
+          dependsOn: ["stargantt.view"],
+        },
+        setup(ctx) {
+          const timeline = ctx.use("stargantt.timeline");
+          const theme = ctx.use("stargantt.theme");
+
+          // v2 CHANGE: the render stack is a registry, not a documentation table. Claiming
+          // (scope, key, order) makes a collision with another plugin a `core/pluginError` at
+          // startup instead of a mystery at paint time, and puts this layer into the snapshot
+          // `gantt.orders("renderer/layers")` returns (see the toolbar button).
+          // Orders below 50 paint on the background canvas — behind the bars, which is where a
+          // "ground" element such as weekend shading belongs.
+          ctx.claimOrder("renderer/layers", "custom:weekend-shading", 5);
+
+          ctx.contribute("renderer/layers", {
+            id: "custom:weekend-shading",
+            zIndex: 5,
+            draw(g, vp) {
+              // Below ~12 px per day the stripes read as noise rather than as weekends, and the
+              // day-stepping loop below would walk hundreds of iterations for no visible benefit.
+              // `timeline.zoomLevel` is a STORE; `get()` is the snapshot read.
+              if (timeline.zoomLevel.get().pxPerDay < 12) return;
+
+              // Viewport x -> time. `vp` is the live virtual viewport handed to every draw.
+              const leftT = timeline.xToT(vp.scrollLeft);
+              const rightT = timeline.xToT(vp.scrollLeft + vp.width);
+
+              // Colour from the theme token, never a literal: the tint then follows the active
+              // colour scheme, and it stays subordinate to the bars (ground, not figure).
+              g.fillStyle = theme.get("--sg-grid-nonworking") || "rgba(128, 128, 128, 0.10)";
+
+              for (let t = Math.floor(leftT / DAY) * DAY; t <= rightT; t += DAY) {
+                const weekday = new Date(t).getUTCDay(); // 0 = Sunday … 6 = Saturday
+                if (weekday !== 0 && weekday !== 6) continue;
+                const x = timeline.tToX(t) - vp.scrollLeft;
+                const width = timeline.tToX(t + DAY) - vp.scrollLeft - x;
+                g.fillRect(x, 0, width, vp.height);
+              }
+            },
+          });
+        },
+      });
+
+      /* ================================================================== *
+       * Plugin 2 — the today line: a layer, a store, and its own SERVICE
+       * ================================================================== *
+       *
+       * `ctx.provide(id, impl)` registers a service under any id the plugin likes, and
+       * the page reads it with `gantt.service(id)` while sibling plugins read it with
+       * `ctx.use(id)` after declaring this plugin in their `dependsOn`. Third-party service ids
+       * should be prefixed with the plugin's own id — the core reserves nothing but documents the
+       * convention (architecture.md chapter 8).
+       */
+      const todayLine = StarGantt.definePlugin({
+        meta: {
+          id: "custom.today-line",
+          dependsOn: ["stargantt.view"],
+        },
+        setup(ctx) {
+          const view = ctx.use("stargantt.view");
+          const timeline = ctx.use("stargantt.timeline");
+          const theme = ctx.use("stargantt.theme");
+
+          // `createStore` is core's own store primitive — the same one every official stateful
+          // service is built on, exported to third parties on equal terms.
+          const caption = StarGantt.createStore("Today");
+
+          // What `textWidth()` was asked to measure, for the page's readout.
+          const measured = { calls: 0, lastWidth: 0, lastText: "", strings: [] };
+
+          /**
+           * An extension point OWNED by this third-party plugin.
+           *
+           * `defineExtensionPoint(key, reduce)` is the same call the official plugins make, with
+           * the same three published strategies — `StarGantt.collect` (every contribution, in
+           * startup order), `StarGantt.first` (a composite that returns the first non-`undefined`
+           * answer) and `StarGantt.reduce` (an arbitrary fold). Contributions may arrive before
+           * the point is declared: they are buffered and delivered in order when it is.
+           *
+           * The contract here: each contribution is a `() => string | undefined` consulted per
+           * paint, and non-empty answers are appended to the caption. `custom.at-risk-badge`
+           * below contributes one.
+           */
+          const captionExtras = ctx.defineExtensionPoint(
+            "custom/todayCaptionExtra",
+            StarGantt.collect(),
+          );
+
+          // Repaint whenever the caption changes. A store subscription returns a `Disposable` and
+          // is NOT auto-owned (unlike `ctx.on`), so it is handed to `ctx.own()` — the core then
+          // releases it on `gantt.dispose()` and reports a throwing subscriber as
+          // `core/pluginError` against this plugin.
+          ctx.own(caption.subscribe(() => view.invalidate("overlay")));
+
+          // Orders >= 100 paint on the overlay canvas, in front of everything.
+          ctx.claimOrder("renderer/layers", "custom:today-line", 1000);
+
+          ctx.contribute("renderer/layers", {
+            id: "custom:today-line",
+            zIndex: 1000,
+            draw(g, vp) {
+              const x = timeline.tToX(TODAY) - vp.scrollLeft;
+              if (x < 0 || x > vp.width) return;
+
+              // Thin (2 px) and dashed, in the theme's dedicated today-line hue.
+              g.strokeStyle = theme.get("--sg-today-line") || "#c2410c";
+              g.lineWidth = 2;
+              g.setLineDash([5, 5]);
+              g.beginPath();
+              g.moveTo(x, 0);
+              g.lineTo(x, vp.height);
+              g.stroke();
+              g.setLineDash([]);
+
+              // The caption pill sits against the chart's bottom edge, so it never lands on a
+              // row-0 summary bar, and it is sized from the MEASURED advance width of the string —
+              // which is also what lets it flip to the other side of the line when it would
+              // otherwise run past the right edge. A painter cannot do that layout without
+              // measuring.
+              //
+              // `ViewService.textWidth(g, text)` is `g.measureText(text).width` behind a bounded
+              // cache keyed by font AND string, so this per-frame call costs a real `measureText`
+              // at most once per caption per font; the cache drops itself on a devicePixelRatio
+              // change, so browser zoom re-measures.
+              // The caption plus whatever the extension point contributed. Guarding each
+              // contribution is the POINT OWNER's job — `collect` and `first` deliberately do not
+              // try/catch, because only the owner knows what a broken contribution should cost.
+              const parts = [caption.get()];
+              for (const extra of captionExtras.get()) {
+                let value;
+                try {
+                  value = extra();
+                } catch {
+                  value = undefined; // a real plugin would latch this contribution off after a throw
+                }
+                if (typeof value === "string" && value !== "") parts.push(value);
+              }
+              const text = parts.join(" · ");
+
+              g.font = "11px system-ui, sans-serif";
+              const textWidth = view.textWidth(g, text);
+              measured.calls += 1;
+              measured.lastWidth = textWidth;
+              measured.lastText = text;
+              if (measured.strings.indexOf(text) === -1) measured.strings.push(text);
+
+              const padX = 6;
+              const boxH = 16;
+              const gap = 4;
+              const boxW = textWidth + padX * 2;
+              const flip = x + gap + boxW > vp.width;
+              const boxX = flip ? x - gap - boxW : x + gap;
+              const boxY = vp.height - boxH - 4;
+
+              // Chart background plus a hairline in the today-line hue: the pill stays ground, not
+              // figure, so it never out-contrasts the task bars, while its text keeps the theme's
+              // own foreground contrast against the chart background.
+              g.fillStyle = theme.get("--sg-bg") || "#ffffff";
+              g.fillRect(boxX, boxY, boxW, boxH);
+              g.strokeStyle = theme.get("--sg-today-line") || "#c2410c";
+              g.lineWidth = 1;
+              g.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
+              g.fillStyle = theme.get("--sg-fg") || "#1f2933";
+              g.fillText(text, boxX + padX, boxY + boxH - 5);
+            },
+          });
+
+          /**
+           * This plugin's public surface. Everything the sibling plugins and the page below need
+           * about "today" lives here, so the computation is written once instead of copied into
+           * every plugin that needs it.
+           */
+          ctx.provide("custom.today-line", {
+            time: () => TODAY,
+            /** The date as prose, in the chart's own locale (`ctx.locale`, from `create()`). */
+            text: () =>
+              new Date(TODAY).toLocaleDateString(ctx.locale, {
+                timeZone: "UTC",
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }),
+            /**
+             * The READ side of the caption store. `createStore` returns a `WritableStore`
+             * (`get`/`subscribe`/`set`/`update`); a service publishes only `get`/`subscribe` so
+             * the state has exactly one writer — the same split every official service uses.
+             * The store's methods are plain closures, so handing them out directly is safe.
+             */
+            caption: { get: caption.get, subscribe: caption.subscribe },
+            setCaption: (text) => caption.set(String(text)),
+            measurements: () => ({ ...measured, strings: measured.strings.slice() }),
+          });
+        },
+      });
+
+      /* ================================================================== *
+       * Plugin 3 — hit testing the today line (`renderer/hitTest`)
+       * ================================================================== *
+       *
+       * `renderer/hitTest` uses the `first` strategy: testers are consulted in startup order until
+       * one returns something other than `undefined`. Returning `undefined` is how a tester
+       * declines and delegates to the next one — here, to the official task-bars tester.
+       *
+       * `HitResult.kind` is `"bar" | "handle" | "link" | (string & {})`: any other string is
+       * explicitly allowed so third parties can report their own shapes, which is what makes the
+       * tooltip plugin below possible.
+       */
+      const todayLineHitTest = StarGantt.definePlugin({
+        meta: {
+          id: "custom.today-line-hit-test",
+          dependsOn: ["stargantt.view", "custom.today-line"],
+        },
+        setup(ctx) {
+          const view = ctx.use("stargantt.view");
+          const timeline = ctx.use("stargantt.timeline");
+          const today = ctx.use("custom.today-line");
+
+          ctx.contribute("renderer/hitTest", (x, y) => {
+            // Hit-test coordinates are viewport-local CSS pixels, so the scroll offset is
+            // subtracted from the content-space x the time scale returns.
+            // `view.viewport` is a STORE; `get()` is the snapshot read.
+            const lineX = timeline.tToX(today.time()) - view.viewport.get().scrollLeft;
+            // 12 px each side = a 24 px wide target for a 2 px line (WCAG 2.2 §2.5.8). The
+            // official task-bars tester is registered earlier, so a press where the line crosses a
+            // bar resolves to the bar — figure beats ground, which is the behaviour you want.
+            if (Math.abs(x - lineX) > 12) return undefined;
+            return {
+              kind: "custom:today-line",
+              id: "today",
+              // "help" promises extra information without promising the drag that `col-resize`
+              // would imply.
+              cursor: "help",
+            };
+          });
+        },
+      });
+
+      /* ================================================================== *
+       * Plugin 4 — a tooltip for that hit (`tooltip/content`)
+       * ================================================================== *
+       *
+       * The tooltip extension point is owned by the `stargantt.interaction` plugin, using a
+       * `first` strategy: contributed providers are consulted BEFORE the built-in fallback —
+       * which declines every hit kind that is not `"bar"` or `"handle"` anyway.
+       *
+       * The default trigger is `"click"`, so press the today line to see this.
+       *
+       * Note what `dependsOn` does NOT list: `stargantt.interaction`, the plugin that owns the
+       * point. Declaring a dependency is only required to `ctx.use()` a service; contributing needs
+       * nothing, and a contribution made to a point nobody has declared yet is buffered and
+       * delivered when (or if) that plugin starts.
+       */
+      const todayLineTooltip = StarGantt.definePlugin({
+        meta: {
+          id: "custom.today-line-tooltip",
+          dependsOn: ["custom.today-line"],
+        },
+        setup(ctx) {
+          const today = ctx.use("custom.today-line");
+
+          ctx.contribute("tooltip/content", (hit) => {
+            // Not our shape -> decline, and the next provider (or the built-in) answers.
+            if (hit.kind !== "custom:today-line") return undefined;
+
+            // A provider may return a plain string or an HTMLElement. The element form is built
+            // with the document the chart lives in; the tooltip panel owns it from here on.
+            const box = document.createElement("div");
+            box.style.padding = "6px 8px";
+            box.style.fontSize = "12px";
+            box.style.lineHeight = "1.5";
+
+            const title = document.createElement("strong");
+            title.textContent = "Today";
+            title.style.display = "block";
+
+            const body = document.createElement("div");
+            body.textContent = today.text();
+
+            box.appendChild(title);
+            box.appendChild(body);
+            return box;
+          });
+        },
+      });
+
+      /* ================================================================== *
+       * Plugin 5 — keyboard access: a DOM overlay, a key binding, a command
+       * ================================================================== *
+       *
+       * A hit test only ever reaches pointer users. This plugin gives the same information to
+       * keyboard and screen-reader users three ways:
+       *
+       *  - a focusable 24 px wide marker contributed to `renderer/domOverlays`, carrying the same
+       *    date string as the tooltip in an `aria-label`;
+       *  - a real command registered with `ctx.registerCommand`, dispatchable by anyone through
+       *    `gantt.dispatch("custom/scroll-to-today")`;
+       *  - an Alt+T binding contributed to the a11y plugin's `keys/bindings` point, which runs
+       *    that command. Bindings carrying a `description` are listed in the shortcut-help dialog.
+       *
+       * `renderer/domOverlays` gives each contribution its own wrapper element, clipped to the
+       * chart viewport and kept aligned by the renderer while the chart scrolls — so a contributor
+       * positions its children in CONTENT coordinates (no `scrollLeft` subtraction) and never has
+       * to listen for `view/scrolled`. Wrappers are inert (`pointer-events: none`); a child opts
+       * back in with `pointer-events: auto`.
+       */
+      const todayMarker = StarGantt.definePlugin({
+        meta: {
+          id: "custom.today-marker",
+          dependsOn: ["stargantt.view", "custom.today-line"],
+        },
+        setup(ctx) {
+          const view = ctx.use("stargantt.view");
+          const timeline = ctx.use("stargantt.timeline");
+          const today = ctx.use("custom.today-line");
+          let marker = null;
+
+          function place() {
+            if (marker === null) return;
+            const vp = view.viewport.get();
+            // Content coordinates: x from the time scale, y tracking the visible band so the
+            // marker always covers the rows on screen.
+            marker.style.left = `${timeline.tToX(today.time()) - 12}px`;
+            marker.style.top = `${vp.scrollTop}px`;
+            marker.style.height = `${vp.height}px`;
+            marker.setAttribute("aria-label", `Today: ${today.text()}`);
+          }
+
+          ctx.contribute("renderer/domOverlays", {
+            id: "custom.today-marker",
+            mount(wrapper) {
+              marker = wrapper.ownerDocument.createElement("div");
+              marker.className = "custom-today-marker";
+              marker.style.position = "absolute";
+              marker.style.width = "24px"; // 24 CSS px total — 12 px each side of the 2 px line
+              // Deliberately NOT `pointer-events: auto`. The DOM overlay sits above the canvases,
+              // so an interactive marker here would swallow every press within 12 px of the line
+              // and the `renderer/hitTest` contribution above would never fire. Pointer users are
+              // served by that hit test; this element exists for the keyboard, and
+              // `pointer-events: none` does not stop it being reachable with Tab.
+              marker.style.pointerEvents = "none";
+              marker.tabIndex = 0;
+              marker.setAttribute("role", "img");
+              wrapper.appendChild(marker);
+              place();
+            },
+          });
+
+          // The zoom level and the viewport are both stores, so change notification is done via
+          // subscriptions. `ctx.own` is mandatory here: store subscriptions, unlike `ctx.on`,
+          // are not registered with the core automatically.
+          ctx.own(timeline.zoomLevel.subscribe(place));
+          ctx.own(view.viewport.subscribe(place));
+
+          // A plugin's own command. Commands are the core's mutation/action channel; anything may
+          // dispatch one, and an unregistered command id is a silent no-op rather than a throw.
+          ctx.registerCommand("custom/scroll-to-today", () => {
+            const vp = view.viewport.get();
+            const centered = timeline.tToX(today.time()) - vp.width / 2;
+            view.scrollTo({ scrollLeft: Math.max(0, centered) });
+          });
+
+          // Contributed to the OFFICIAL a11y plugin's point, on exactly the same terms its own
+          // default bindings use. No `dependsOn` entry is needed to contribute — only to `use` a
+          // service — and a contribution made before the point is declared is buffered and
+          // delivered when it is.
+          ctx.contribute("keys/bindings", {
+            key: "Alt+T",
+            description: "Scroll the chart to today",
+            run: () => ctx.dispatch("custom/scroll-to-today", undefined),
+          });
+        },
+      });
+
+      /* ================================================================== *
+       * Plugin 6 — an HTML badge placed through the batched layout queue
+       * ================================================================== *
+       *
+       * Demonstrates, in one plugin: `ctx.claimKey` over the shared `task.meta` bag, two store
+       * subscriptions replacing two abolished events, the renderer's `batchRead`/`batchWrite`
+       * layout queue, and a second third-party service.
+       */
+      const atRiskBadge = StarGantt.definePlugin({
+        meta: {
+          id: "custom.at-risk-badge",
+          dependsOn: ["stargantt.view", "stargantt.tree-grid", "stargantt.data-store"],
+        },
+        setup(ctx) {
+          const view = ctx.use("stargantt.view");
+          const timeline = ctx.use("stargantt.timeline");
+          const rows = ctx.use("stargantt.rows");
+          const data = ctx.use("stargantt.data");
+
+          // `task.meta` keys are arbitrated in code — a second claim of the same (bag, key) is
+          // reported as `core/pluginError` against the later claimant. A claim is conflict
+          // detection only: the core never intercepts reads or writes, and unclaimed keys stay
+          // free for anyone.
+          ctx.claimKey("task.meta", "customAtRisk");
+
+          /** The first task flagged by this page's own meta key, or `undefined`. */
+          function targetId() {
+            for (const [id, task] of data.tasks.get()) {
+              if (task.meta !== undefined && task.meta.customAtRisk === true) return id;
+            }
+            return undefined;
+          }
+
+          let badge = null;
+          /** "read" / "write" entries, in the order the renderer drained the queues. */
+          const phases = [];
+          /** Bounded: this is demo bookkeeping on a path that runs on every data change. */
+          function record(phase) {
+            if (phases.length < 20) phases.push(phase);
+          }
+
+          /** Computes the badge's content-coordinate placement, or `null` when it has none. */
+          function measure() {
+            if (badge === null) return null;
+            const id = targetId();
+            if (id === undefined) return null;
+            const task = data.getTask(id);
+            const row = rows.rowOf(id);
+            if (task === undefined || row === undefined) return null;
+            const barLeft = timeline.tToX(task.start);
+            const barRight = timeline.tToX(task.end);
+            // A layout READ: the badge's own rendered width. Pairing it with the bar's pixel span
+            // is what decides whether the badge fits inside the bar or has to sit past its end.
+            const badgeWidth = badge.getBoundingClientRect().width;
+            const insideFits = barLeft + 8 + badgeWidth <= barRight - 4;
+            return { left: insideFits ? barLeft + 8 : barRight + 8, top: rows.yOf(row) + 2 };
+          }
+
+          /** Applies a placement produced by `measure()`. A layout WRITE, never a read. */
+          function apply(placement) {
+            if (badge === null) return;
+            if (placement === null) {
+              badge.style.visibility = "hidden";
+              return;
+            }
+            // Content coordinates — the pre-scroll pixel space the canvas layers reason in. The
+            // renderer keeps the wrapper aligned, so scrolling needs no work here.
+            badge.style.left = `${placement.left}px`;
+            badge.style.top = `${placement.top}px`;
+            badge.style.visibility = "visible";
+          }
+
+          /**
+           * Re-places the badge through the renderer's layout queue.
+           *
+           * `batchRead` and `batchWrite` drain once per animation-frame pass, EVERY queued read
+           * before EVERY queued write regardless of the order they were queued in — so a page full
+           * of independent measure-then-mutate call sites costs one forced reflow per pass instead
+           * of one each.
+           */
+          function place() {
+            if (badge === null) return;
+            let placement = null;
+            view.batchRead(() => {
+              record("read");
+              placement = measure();
+            });
+            view.batchWrite(() => {
+              record("write");
+              apply(placement);
+            });
+          }
+
+          ctx.contribute("renderer/domOverlays", {
+            id: "custom.at-risk-badge",
+            mount(wrapper) {
+              badge = wrapper.ownerDocument.createElement("div");
+              badge.className = "custom-at-risk-badge";
+              badge.textContent = "At risk";
+              badge.style.position = "absolute";
+              badge.style.visibility = "hidden"; // laid out (so it can be measured), not yet shown
+              badge.style.boxSizing = "border-box";
+              badge.style.display = "flex";
+              badge.style.alignItems = "center";
+              badge.style.minHeight = "24px"; // WCAG 2.2 target-size minimum
+              badge.style.padding = "0 6px";
+              badge.style.borderRadius = "9px";
+              // ~5.5:1 with white text in light mode, ~6.6:1 in dark — both clear WCAG 1.4.3.
+              // light-dark() keeps the badge scheme-aware like the rest of the page's own paint.
+              badge.style.background = "light-dark(#b34700, #a03e00)";
+              badge.style.color = "#fff";
+              badge.style.font = "11px system-ui, sans-serif";
+              badge.style.whiteSpace = "nowrap";
+              // Overlay wrappers are inert; opt this element back in so it is hoverable and
+              // focusable. The status is carried by the WORD "At risk", not by the colour alone.
+              badge.style.pointerEvents = "auto";
+              badge.tabIndex = 0;
+              badge.setAttribute("role", "img");
+              badge.setAttribute("aria-label", "At risk: this summary task is behind schedule");
+              wrapper.appendChild(badge);
+              // The first placement is direct, not queued: `mount()` already runs inside a paint
+              // pass whose queues were drained a moment ago, and there is nothing to batch with —
+              // this is the only measurement of the pass.
+              apply(measure());
+            },
+          });
+
+          // Row and task changes are published as stores, not events, so they are observed via
+          // subscriptions.
+          ctx.own(rows.rows.subscribe(place));
+          ctx.own(data.tasks.subscribe(place));
+          ctx.own(timeline.zoomLevel.subscribe(place));
+
+          // A contribution to a point owned by ANOTHER THIRD-PARTY plugin (`custom.today-line`),
+          // made on exactly the same terms as a contribution to an official point: no dependency
+          // declaration, no import, nothing but the agreed key and contribution shape. If
+          // `custom.today-line` is not composed, this is silently buffered and never delivered.
+          ctx.contribute("custom/todayCaptionExtra", () =>
+            targetId() === undefined ? undefined : "1 at risk",
+          );
+
+          ctx.provide("custom.at-risk-badge", {
+            replace: place,
+            phases: () => phases.slice(),
+            resetPhases: () => {
+              phases.length = 0;
+            },
+          });
+        },
+      });
+
+      /* ================================================================== *
+       * Composition
+       * ================================================================== */
+
+      /**
+       * Configuring an OFFICIAL plugin instead of adding one.
+       *
+       * `taskBars.label` is a display option of `stargantt.task-bars`: the function runs once per
+       * visible bar on every paint and whatever string it returns is drawn beside that bar.
+       * Returning `undefined` leaves the bar unlabelled, which is how the summary rows stay clean.
+       * It runs inside the paint loop, so it only reads fields the task already carries and never
+       * touches the DOM.
+       */
+      const barLabelsDrawn = [];
+      function barLabel(task) {
+        // Recording what the provider was asked about, so the page can show that the option really
+        // reached the official plugin. Capped, because this runs once per visible bar per paint —
+        // an uncapped log in a paint-loop callback is a leak. A real page would just return the
+        // string.
+        if (barLabelsDrawn.length < 200) barLabelsDrawn.push(task.id);
+        if (task.type === "summary") return undefined;
+        const days = Math.round((task.end - task.start) / DAY);
+        return `${task.name} (${days}d)`;
+      }
+
+      const gantt = StarGantt.create({
+        element: document.getElementById("chart"),
+        locale: "en",
+        plugins: [
+          // The official set, with two of its plugins configured by key. This is not a
+          // replacement composition — just options handed to the real plugins.
+          ...StarGantt.presetStandard({
+            view: {
+              timeline: {
+                // Pull the axis five days before today so the today line lands inside the visible
+                // range instead of half-clipped against the grid/chart divider.
+                origin: day(-5),
+              },
+              // The official view plugin paints weekends and a today line itself. Both are off
+              // here so the only ones on screen are the ones this page's plugins draw.
+              gridLines: { nonWorkingDays: false },
+              todayLine: false,
+            },
+            taskBars: { label: barLabel },
+          }),
+          // Third-party plugins, composed into the same array on the same terms. The core
+          // topologically sorts by `dependsOn`, so this order is documentation, not a constraint.
+          weekendShading,
+          todayLine,
+          todayLineHitTest,
+          todayLineTooltip,
+          todayMarker,
+          atRiskBadge,
+        ],
+      });
+
+      gantt.service("stargantt.data").load(dataset());
+
+      /* ================================================================== *
+       * Page chrome — everything below drives the plugins through their
+       * published services, exactly as any other consumer would.
+       * ================================================================== */
+
+      const view = gantt.service("stargantt.view");
+      const today = gantt.service("custom.today-line");
+      const badge = gantt.service("custom.at-risk-badge");
+      const readout = document.getElementById("readout");
+
+      function say(text) {
+        readout.textContent = text;
+      }
+
+      const captionBtn = document.getElementById("btn-caption");
+      captionBtn.addEventListener("click", () => {
+        const next = captionBtn.getAttribute("aria-pressed") !== "true";
+        captionBtn.setAttribute("aria-pressed", String(next));
+        captionBtn.textContent = `Long caption: ${next ? "on" : "off"}`;
+        today.setCaption(next ? "Today · measured caption" : "Today");
+        // The width is read on the next paint, so report it once that paint has happened.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const m = today.measurements();
+            say(
+              `Caption "${m.lastText}" measured at ${m.lastWidth.toFixed(1)} px — ` +
+                `${m.calls} textWidth() calls so far across ${m.strings.length} distinct ` +
+                `string(s), each measured by the browser once.`,
+            );
+          });
+        });
+      });
+
+      /**
+       * Measures a fixed label set twice — once through raw `measureText`, once through the view's
+       * cache — and reports both timings. Strings and iteration count are fixed, so the comparison
+       * is the only thing that varies.
+       */
+      const BENCH_LABELS = [];
+      for (let i = 0; i < 20; i += 1) BENCH_LABELS.push(`Milestone ${i} — review gate`);
+
+      document.getElementById("btn-measure").addEventListener("click", () => {
+        const bench = document.createElement("canvas").getContext("2d");
+        if (bench === null) {
+          say("This browser gave no 2D context, so the measurement demo cannot run.");
+          return;
+        }
+        bench.font = "11px system-ui, sans-serif";
+        const iterations = 2000;
+        let sink = 0;
+
+        const rawStart = performance.now();
+        for (let i = 0; i < iterations; i += 1) {
+          sink += bench.measureText(BENCH_LABELS[i % BENCH_LABELS.length]).width;
+        }
+        const rawMs = performance.now() - rawStart;
+
+        const cachedStart = performance.now();
+        for (let i = 0; i < iterations; i += 1) {
+          sink += view.textWidth(bench, BENCH_LABELS[i % BENCH_LABELS.length]);
+        }
+        const cachedMs = performance.now() - cachedStart;
+
+        say(
+          `${iterations} measurements over ${BENCH_LABELS.length} distinct strings: ` +
+            `measureText() ${rawMs.toFixed(2)} ms, ViewService.textWidth() ${cachedMs.toFixed(2)} ms ` +
+            `(cached after the first ${BENCH_LABELS.length}). Sink ${Math.round(sink)}.`,
+        );
+      });
+
+      document.getElementById("btn-batch").addEventListener("click", () => {
+        badge.resetPhases();
+        badge.replace();
+        // Queue three write/read pairs in INTERLEAVED order. The renderer drains every queued read
+        // before every queued write, so the recorded order is always three reads then three
+        // writes — that is the whole point of the queue.
+        const order = [];
+        for (let i = 0; i < 3; i += 1) {
+          view.batchWrite(() => order.push(`W${i}`));
+          view.batchRead(() => order.push(`R${i}`));
+        }
+        // Queued last, so it runs after the writes above and sees the finished order.
+        view.batchWrite(() => {
+          say(
+            `Queued as W0 R0 W1 R1 W2 R2, ran as ${order.join(" ")} — all reads before all writes. ` +
+              `The badge's own re-placement ran in the same pass: ${badge.phases().join(", ")}.`,
+          );
+        });
+      });
+
+      document.getElementById("btn-today").addEventListener("click", () => {
+        // The custom plugin's own command, dispatched from application code exactly as an
+        // official command would be. Alt+T runs the same command through `keys/bindings`.
+        gantt.dispatch("custom/scroll-to-today", undefined);
+        say("Dispatched custom/scroll-to-today — the same command Alt+T runs.");
+      });
+
+      document.getElementById("btn-orders").addEventListener("click", () => {
+        // `orders(scope)` is the arbitration registry's read side, on the public instance handle:
+        // a snapshot of every `claimOrder` in the scope, ascending. Official and third-party
+        // claims sit in the same table — which is the whole point.
+        const lines = gantt
+          .orders("renderer/layers")
+          .map((entry) => `${entry.order} ${entry.key} (${entry.pluginId})`);
+        say(`renderer/layers — ${lines.join(" | ")}`);
+      });
+
+      // Surfaced for manual inspection and automated checks, matching the other example pages.
+      window.gantt = gantt;
+      window.ganttDemo = { today, badge, barLabelsDrawn, barLabel };
+    </script>
+  </body>
+</html>

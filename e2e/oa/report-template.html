@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>__TITLE__</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff; --fg: #17212b; --muted: #5b6874; --line: #dfe4ea;
+        --card: #f7f9fb; --pass: #157347; --fail: #b02a37; --warn: #a2711b; --accent: #1f4e79;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #12171d; --fg: #e6ecf2; --muted: #9aa7b4; --line: #2a3440;
+          --card: #19212a; --pass: #4cc38a; --fail: #f2757f; --warn: #e0b055; --accent: #7cb2e8;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 24px 28px 64px; background: var(--bg); color: var(--fg);
+        font: 14px/1.5 ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      h2 { font-size: 15px; margin: 32px 0 8px; }
+      .sub { color: var(--muted); margin: 0 0 20px; }
+      .cards { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+      .card {
+        background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+        padding: 10px 14px; min-width: 132px;
+      }
+      .card .n { font-size: 22px; font-weight: 600; }
+      .card .l { color: var(--muted); font-size: 12px; }
+      .pass { color: var(--pass); } .fail { color: var(--fail); } .warn { color: var(--warn); }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; vertical-align: top; }
+      th { position: sticky; top: 0; background: var(--bg); font-size: 12px; color: var(--muted); }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      tr.row-fail { background: color-mix(in srgb, var(--fail) 8%, transparent); }
+      tr.row-issue { background: color-mix(in srgb, var(--warn) 9%, transparent); }
+      .tag {
+        display: inline-block; border: 1px solid var(--line); border-radius: 999px;
+        padding: 0 8px; font-size: 12px; white-space: nowrap;
+      }
+      ul.msgs { margin: 0; padding-left: 16px; }
+      ul.msgs li { color: var(--fail); }
+      ul.msgs li.w { color: var(--warn); }
+      details { margin-top: 4px; }
+      summary { cursor: pointer; color: var(--accent); font-size: 12px; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      pre { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow-x: auto; }
+      a.shot img { width: 260px; border: 1px solid var(--line); border-radius: 4px; display: block; }
+      .filters { display: flex; gap: 8px; align-items: center; margin: 14px 0 10px; }
+      button {
+        font: inherit; padding: 4px 12px; border: 1px solid var(--line); border-radius: 6px;
+        background: var(--card); color: var(--fg); cursor: pointer;
+      }
+      button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+      .note { white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1 id="title">__TITLE__</h1>
+    <p class="sub" id="subtitle"></p>
+    <div class="cards" id="cards"></div>
+    <div class="filters">
+      <span class="l">Show:</span>
+      <button type="button" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" data-filter="fail" aria-pressed="false">Machine failures</button>
+      <button type="button" data-filter="issue" aria-pressed="false">Visual issues</button>
+      <button type="button" data-filter="warn" aria-pressed="false">Warnings</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th><th>View</th><th class="num">Config off default</th>
+          <th>Machine</th><th>Visual</th><th>Findings</th><th>Screenshot</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <script>
+      const DATA = /*__DATA__*/ null;
+
+      const esc = (s) =>
+        String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+      document.getElementById("title").textContent = DATA.title;
+      document.title = DATA.title;
+      document.getElementById("subtitle").textContent = DATA.subtitle;
+
+      const counts = [
+        ["Runs", DATA.runs.length, ""],
+        ["Machine pass", DATA.runs.filter((r) => r.verdict === "pass").length, "pass"],
+        ["Machine fail", DATA.runs.filter((r) => r.verdict === "fail").length, "fail"],
+        ["Visual OK", DATA.runs.filter((r) => r.visual === "ok").length, "pass"],
+        ["Visual issue", DATA.runs.filter((r) => r.visual === "issue").length, "fail"],
+        ["Not reviewed", DATA.runs.filter((r) => !r.visual).length, "warn"],
+        ["With warnings", DATA.runs.filter((r) => (r.warnings || []).length > 0).length, "warn"],
+      ];
+      document.getElementById("cards").innerHTML = counts
+        .map(([l, n, c]) => `<div class="card"><div class="n ${c}">${n}</div><div class="l">${esc(l)}</div></div>`)
+        .join("");
+
+      const rowHtml = (r) => {
+        const cls =
+          r.verdict === "fail" ? "row-fail" : r.visual === "issue" ? "row-issue" : "";
+        const findings = [
+          ...(r.failures || []).map((f) => `<li>${esc(f)}</li>`),
+          ...(r.warnings || []).map((w) => `<li class="w">${esc(w)}</li>`),
+        ].join("");
+        const note = r.note ? `<div class="note">${esc(r.note)}</div>` : "";
+        const factors = (r.nonDefault || [])
+          .map((f) => `<li><code>${esc(f.id)}</code> = L${f.level + 1}: <code>${esc(f.value)}</code></li>`)
+          .join("");
+        return `<tr class="${cls}" data-fail="${r.verdict === "fail"}" data-issue="${r.visual === "issue"}" data-warn="${(r.warnings || []).length > 0}">
+          <td class="num">${r.run}</td>
+          <td><span class="tag">${esc(r.viewMode || "split")}</span></td>
+          <td class="num">${r.nonDefaultCount}</td>
+          <td class="${r.verdict === "pass" ? "pass" : "fail"}">${esc(r.verdict)}</td>
+          <td class="${r.visual === "ok" ? "pass" : r.visual === "issue" ? "fail" : "warn"}">${esc(r.visual || "not reviewed")}</td>
+          <td>${findings ? `<ul class="msgs">${findings}</ul>` : ""}${note}
+            <details><summary>${(r.nonDefault || []).length} config values off default</summary><ul>${factors}</ul></details>
+          </td>
+          <td><a class="shot" href="${esc(r.screenshot)}"><img loading="lazy" src="${esc(r.screenshot)}" alt="run ${r.run}" /></a></td>
+        </tr>`;
+      };
+
+      const tbody = document.getElementById("rows");
+      tbody.innerHTML = DATA.runs.map(rowHtml).join("");
+
+      for (const button of document.querySelectorAll("button[data-filter]")) {
+        button.addEventListener("click", () => {
+          for (const other of document.querySelectorAll("button[data-filter]")) {
+            other.setAttribute("aria-pressed", String(other === button));
+          }
+          const mode = button.dataset.filter;
+          for (const row of tbody.rows) {
+            const show =
+              mode === "all" ||
+              (mode === "fail" && row.dataset.fail === "true") ||
+              (mode === "issue" && row.dataset.issue === "true") ||
+              (mode === "warn" && row.dataset.warn === "true");
+            row.hidden = !show;
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
