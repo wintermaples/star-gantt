@@ -11,6 +11,11 @@
 ![Core: <12KB min](https://img.shields.io/badge/core-%3C12KB%20min-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 
+> [!WARNING]
+> **StarGantt is under active development.** We are currently polishing the library and
+> performing manual (human) testing. APIs, behavior, and documentation may change without
+> notice — it is not yet recommended for production use.
+
 StarGantt is built like VS Code, not like a widget: a **micro-kernel of less than 12 KB**
 (minified) that knows nothing about tasks, dates, or drawing, plus **15 official plugins**
 that implement everything else — rendering, drag editing, dependencies, auto-scheduling,
