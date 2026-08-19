@@ -1,14 +1,18 @@
 # Release — publishes every public workspace package to npm.
 #
 # Manual trigger only (workflow_dispatch). Requirements:
-#   - repository secret NPM_TOKEN: an npm automation token that may publish the
-#     `stargantt` package and the `@stargantt` scope.
+#   - every package in the @stargantt scope (and `stargantt`) already has a
+#     Trusted Publisher configured on npmjs.com pointing at this repo/workflow
+#     (`npm trust github <pkg> --file release.yml --repo wintermaples/star-gantt
+#     --allow-publish`). npm mints a short-lived OIDC token per run — no
+#     repository secret is used or needed.
 #   - the version fields in packages/*/package.json are already what you want to publish
 #     (this workflow never bumps versions).
 #
 # The full verification gate runs first; publishing is skipped if anything fails.
 # `pnpm -r publish` rewrites workspace:* dependencies to real version ranges and
-# skips private packages. npm provenance is enabled (requires the public repository).
+# skips private packages. Provenance is attached automatically by npm as part of
+# Trusted Publishing.
 name: Release (npm publish)
 
 on:
@@ -25,7 +29,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance
+  id-token: write # npm Trusted Publishing (OIDC) + provenance
 
 jobs:
   publish:
@@ -70,6 +74,3 @@ jobs:
           --no-git-checks
           --tag ${{ inputs.npm-tag }}
           ${{ inputs.dry-run && '--dry-run' || '' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "true"
