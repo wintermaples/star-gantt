@@ -40,22 +40,11 @@ jobs:
       - name: Typecheck E2E sources
         run: pnpm exec tsc -p e2e --noEmit
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install Playwright browser (chromium only)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium --with-deps
-
-      - name: Install Playwright OS dependencies (cache hit — browser binary already present)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - name: E2E tests (Playwright)
+      # E2E runs inside the pinned Playwright container image (tag derived from the
+      # installed @playwright/test version by tools/e2e-in-container.sh), so screenshot
+      # rendering is identical to the environment where baselines are generated. No
+      # host-side browser install or font packages are needed.
+      - name: E2E tests (Playwright, in pinned container)
         run: pnpm run test:e2e
 
       - name: Upload Playwright report on failure

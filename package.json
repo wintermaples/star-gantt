@@ -12,7 +12,7 @@
     "test": "pnpm run lint:arch && vitest run",
     "typecheck": "pnpm -r run typecheck",
     "lint:arch": "node tools/lint-deps.mjs && node tools/core-size-gate.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "bash tools/e2e-in-container.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

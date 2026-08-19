@@ -3,16 +3,34 @@
   "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
   "features": {
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      // "moby" is disabled because the base image (mcr.microsoft.com/devcontainers/javascript-node:24,
+      // built on Debian "trixie") does not yet provide the "moby-cli" / "moby-engine" apt packages.
+      // With moby:true (the feature's default), the Docker-in-Docker feature install fails during
+      // container build with: "The 'moby' option is not supported on debian 'trixie' because
+      // 'moby-cli' and related system packages are not available in that distribution."
+      // Setting moby:false installs Docker CE instead, which is packaged for trixie and works.
+      // TODO: once moby-cli/moby-engine are published for trixie upstream, re-test with moby:true
+      // and remove this override if it's no longer needed. (checked: 2026-08-19)
+      "moby": false
+    }
   },
   "remoteUser": "node",
   "mounts": [
     "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
     "source=${localEnv:HOME}/.claude.json,target=/home/node/.claude.json,type=bind"
   ],
-  "forwardPorts": [4173, 4175, 5175],
+  "forwardPorts": [
+    4173,
+    4175,
+    5175
+  ],
   "portsAttributes": {
-    "4173": { "label": "examples / Playwright", "onAutoForward": "silent" }
+    "4173": {
+      "label": "examples / Playwright",
+      "onAutoForward": "silent"
+    }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "customizations": {

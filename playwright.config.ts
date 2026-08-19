@@ -19,6 +19,10 @@ export default defineConfig({
   // and is run explicitly, never as part of the default suite.
   testIgnore: "oa/**",
   fullyParallel: true,
+  // Set by tools/e2e-in-container.sh on non-x86_64 hosts: screenshot baselines form a single
+  // amd64 lineage, so toHaveScreenshot() assertions are skipped there and the visual verdict
+  // is left to CI. Functional assertions still run.
+  ignoreSnapshots: !!process.env.STARGANTT_SKIP_VISUAL,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   ...(process.env.CI ? { workers: 1 } : {}),
@@ -37,7 +41,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm exec vite --port ${PORT} --strictPort`,
+    // npx (not pnpm exec) so the config also works inside the pinned Playwright container
+    // image (tools/e2e-in-container.sh), which ships node/npx but not pnpm. npx resolves the
+    // workspace-local vite from node_modules/.bin either way.
+    command: `npx vite --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}/examples/basic.html`,
     reuseExistingServer: !process.env.CI,
   },
