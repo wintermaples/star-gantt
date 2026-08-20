@@ -8,7 +8,7 @@ import type { ApiMember, ApiPlugin } from "../generated/api";
 import { pluginById, shortName } from "../generated/api";
 import { oneLine } from "../lib/apiText";
 import { printCall } from "../lib/printSpec";
-import { currentQuery, href } from "../lib/router";
+import { currentQuery, currentRoute, href } from "../lib/router";
 
 type TabId = "overview" | "config" | "services" | "events" | "commands" | "points" | "recipes";
 
@@ -30,6 +30,20 @@ const TAB_IDS: readonly TabId[] = [
 function initialTab(): TabId {
   const asked = currentQuery().get("tab");
   return TAB_IDS.find((id) => id === asked) ?? "overview";
+}
+
+/**
+ * Selecting a tab goes through the hash rather than straight to state, so each tab is a history
+ * entry the back button can return to. The overview drops the parameter instead of spelling it
+ * out, which keeps the page's own address the one a reader would write down. Other parameters
+ * (`p=` on the way to a config property) are carried over untouched.
+ */
+function tabHref(id: TabId): string {
+  const query = currentQuery();
+  if (id === "overview") query.delete("tab");
+  else query.set("tab", id);
+  const rest = query.toString();
+  return href(rest ? `${currentRoute()}?${rest}` : currentRoute());
 }
 
 /**
@@ -94,7 +108,10 @@ export function PluginPage({ doc }: { doc: PluginDoc }): React.JSX.Element {
             role="tab"
             className="btn"
             aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => {
+              // The hashchange listener above is what moves `tab`; writing the hash is enough.
+              window.location.hash = tabHref(t.id);
+            }}
           >
             {t.label}
           </button>
