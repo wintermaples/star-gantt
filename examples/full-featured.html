@@ -89,6 +89,16 @@
         font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       }
 
+      /* `.ex-page` is normally just a margin wrapper, but this page needs `main` to fill the
+         viewport (see `#gantt-root`'s `height: 100%` below), so it also has to carry the flex
+         column that `body`'s own height chain depends on. */
+      .ex-page {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
       /* Focus is visible everywhere and never thinner than 2px (WCAG 2.4.7 / 2.4.11). */
       :focus-visible {
         outline: 2px solid var(--focus);

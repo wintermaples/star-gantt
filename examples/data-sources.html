@@ -53,32 +53,32 @@
     <div class="panels">
       <div class="panel ex-panel">
         <h2 class="ex-panel-title">Backend source</h2>
-        <select id="source-select">
+        <select id="source-select" class="ex-select">
           <option value="rest" selected>rest (REST adapter)</option>
           <option value="graphql">graphql (GraphQL adapter)</option>
         </select>
         <br />
-        <button id="load-btn">Load snapshot</button>
-        <button id="sync-btn">Delta sync</button>
+        <button id="load-btn" class="ex-btn">Load snapshot</button>
+        <button id="sync-btn" class="ex-btn">Delta sync</button>
         <br />
-        <input id="filter-input" type="text" placeholder="e.g. migration" />
-        <button id="filter-btn">Apply &amp; reload</button>
+        <input id="filter-input" type="text" class="ex-input" placeholder="e.g. migration" />
+        <button id="filter-btn" class="ex-btn">Apply &amp; reload</button>
         <p class="readout ex-readout" id="server-out">server: revision v1</p>
       </div>
 
       <div class="panel ex-panel">
         <h2 class="ex-panel-title">Optimistic write-back</h2>
-        <button id="edit-btn">Reschedule a task locally (+1 day)</button>
+        <button id="edit-btn" class="ex-btn">Reschedule a task locally (+1 day)</button>
         <br />
-        <button id="flush-btn">Flush pending changes</button>
+        <button id="flush-btn" class="ex-btn">Flush pending changes</button>
         <p class="readout ex-readout" id="pending-out">pending: 0 creates, 0 updates, 0 removes</p>
         <p class="readout ex-readout">Flush with "fail the next request" armed to watch the rollback.</p>
       </div>
 
       <div class="panel ex-panel">
         <h2 class="ex-panel-title">Lazy loading (backlog)</h2>
-        <button id="page-btn">Load next backlog page</button>
-        <button id="stream-btn">Apply streamed change</button>
+        <button id="page-btn" class="ex-btn">Load next backlog page</button>
+        <button id="stream-btn" class="ex-btn">Apply streamed change</button>
         <br />
         <label class="ex-checkbox"><input id="auto-page-toggle" type="checkbox" /> Fetch next page near scroll end</label>
         <p class="readout ex-readout" id="lazy-out">pages loaded: 0, total: unknown</p>

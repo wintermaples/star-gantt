@@ -57,8 +57,10 @@
       <button id="btn-summary" class="ex-btn">Team capacity…</button>
       <button id="btn-trend" class="ex-btn">Demand vs supply…</button>
     </div>
-    <!-- The load-chart band is a chart-internal row — 1280px starves it of room. -->
-    <div id="chart" class="ex-chart" style="--ex-chart-max-width: none"></div>
+    <!-- The load-chart band is a chart-internal row — 1280px starves it of room. 640px (up from
+         the 600px shared default) gives room for the resource-view strip, the load-chart band
+         and the lanes strip stacked below the grid+timeline pane. -->
+    <div id="chart" class="ex-chart" style="--ex-chart-max-width: none; --ex-chart-height: 640px"></div>
     </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->

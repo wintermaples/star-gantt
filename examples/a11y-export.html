@@ -29,6 +29,8 @@
        (600px) is a default a page may override via this custom property. */
     #chart {
       --ex-chart-height: 400px;
+      /* The announcement-log aside sits beside the chart — 1280px starves that row of room. */
+      --ex-chart-max-width: none;
     }
 
     /* This page's content column is NOT inside `.ex-shell` (the index.html topbar/sidebar
@@ -44,7 +46,7 @@
     /* `.ex-slot-aside` supplies sizing/scroll (flex basis, max-height) but no visual framing —
        restore the original bordered/padded panel look for the announcement-log aside. */
     aside {
-      border: 1px solid #ddd;
+      border: 1px solid var(--ex-border);
       padding: 6px 8px;
       font-size: 11px;
     }
@@ -59,7 +61,7 @@
 
     /* Per-entry separator in the announcement log — no examples.css equivalent. */
     .announcement {
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid var(--ex-border);
       padding: 2px 0;
     }
 
@@ -70,7 +72,7 @@
       display: none;
       max-width: 100%;
       max-height: 260px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--ex-border);
       border-radius: 4px;
       margin-top: 4px;
     }

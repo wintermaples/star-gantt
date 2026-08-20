@@ -33,15 +33,14 @@
 
     /* .ex-readout is designed for a single readout item, not a wrapper of several (see its other
        uses across examples/*.html: always on the leaf span/p, never the container). Restore the
-       original flex-wrap row layout for this multi-readout wrapper, and cancel the 44ch cap
-       .ex-readout leaves on it so the four readouts still flow in one wrapping row. */
+       original flex-wrap row layout for this multi-readout wrapper so the four readouts still
+       flow in one wrapping row. */
     .readouts {
       display: flex;
       flex-wrap: wrap;
       gap: 4px 16px;
       margin: 6px 0;
       font-size: 11px;
-      max-width: none;
     }
     .readouts span.value {
       font: 11px/1.3 ui-monospace, monospace;

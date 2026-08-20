@@ -44,7 +44,7 @@
     /* Plain inline label preceding a control/readout — no group-label wrapper existed around
        these, and nothing in examples.css styles a bare `.label`. */
     .label {
-      color: #555;
+      color: var(--ex-muted);
       font-size: 11px;
     }
 
@@ -60,13 +60,12 @@
       font-size: 11px;
     }
 
-    /* Not covered by `.ex-readout` (which caps width at 44ch and drops the monospace font) —
-       the tab-separated preview needs a wide, monospace, horizontally-scrollable code block.
-       Targeted by id so it reliably outranks `.ex-readout`'s max-width. */
+    /* Not covered by `.ex-readout` (which drops the monospace font) — the tab-separated preview
+       needs a wide, monospace, horizontally-scrollable code block. */
     #tsvReadout {
       margin: 2px 0 0;
       padding: 3px 6px;
-      border: 1px solid #eee;
+      border: 1px solid var(--ex-border);
       font: 11px ui-monospace, monospace;
       max-width: 100%;
       overflow-x: auto;

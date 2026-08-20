@@ -6,9 +6,10 @@ import type { Page } from "@playwright/test";
 // in a real `colorScheme: "dark"` context.
 //
 // examples/site.js loads ONLY on index.html (see examples-smoke.spec.ts's header for the full
-// explanation); `grep -rl "ex-footer" examples/*.html` confirms no demo page's own markup contains
-// it. index.html is the ONLY page with a `.ex-footer` at all, so this file tests it directly —
-// same computation, same 4.5:1 floor, singular subject.
+// explanation) and injects `.ex-footer` into it at runtime — index.html's own markup carries no
+// such element. A handful of demo pages (STATIC_FOOTER_PAGES below) additionally carry their own
+// static `.ex-footer` markup; `grep -rl "ex-footer" examples/*.html` is the source of truth for
+// that list and must be re-run whenever a page gains or loses the shared footer chrome.
 //
 // The remaining checks are four *component-level* contrast checks (the task-edit dialog, the
 // resource-assign editor, the resource-utilization panel, zoom-levels' active button) — none of
@@ -39,10 +40,13 @@ function contrastRatio(fg: string, bg: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-// Confirms no demo page's own markup carries `.ex-footer` (only site.js injects it, and only into
-// index.html), so this file's single index.html test below is not silently under-covering a page
-// that regained the shared chrome.
-test("only index.html carries the shared .ex-footer chrome", async ({ page }) => {
+// Demo pages whose own markup carries a static `.ex-footer` (distinct from index.html, which
+// gets it injected by site.js at runtime — see the file header).
+const STATIC_FOOTER_PAGES = ["basic.html", "hello.html", "load-chart-config.html"];
+
+// Confirms a page outside STATIC_FOOTER_PAGES carries no `.ex-footer`, so the per-page contrast
+// checks below are not silently under-covering a page that (re)gained the shared chrome.
+test("a page outside STATIC_FOOTER_PAGES carries no .ex-footer", async ({ page }) => {
   await page.goto("/examples/basic-gantt.html");
   await expect(page.locator(".ex-footer")).toHaveCount(0);
 });
@@ -81,6 +85,20 @@ test("index.html — .ex-footer clears 4.5:1 text contrast in the dark scheme", 
   expectNoPageErrors(errors);
   expect(ratio).toBeGreaterThanOrEqual(4.5);
 });
+
+for (const pageFile of STATIC_FOOTER_PAGES) {
+  test(`${pageFile} — .ex-footer clears 4.5:1 text contrast in the dark scheme`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ colorScheme: "dark" });
+    const page = await context.newPage();
+    const errors = watchPageErrors(page);
+    const ratio = await footerContrast(page, `/examples/${pageFile}`);
+    await context.close();
+    expectNoPageErrors(errors);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+}
 
 // docs/specs/plugins/interaction.md — the task-edit dialog is styled inline from the shared
 // `--sg-dialog-*` custom properties; a dark-scheme page falling back to their light literals would

@@ -17,7 +17,7 @@ pnpm run build
 
 # here
 pnpm install
-pnpm run dev          # http://localhost:5175
+pnpm run dev          # http://localhost:4175
 pnpm run generate     # re-extract src/generated/*.json (API snapshot + search index)
 pnpm run test         # vitest — coverage and consistency
 pnpm run test:e2e     # Playwright — every page runs
