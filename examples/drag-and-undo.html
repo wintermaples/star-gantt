@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Drag editing and undo/redo example</title>
+    <title>StarGantt — Drag editing and undo/redo example</title>
     <!--
       One HTML file + one script tag. Demonstrates drag/resize/progress editing, the undo/redo
       toolbar and its keyboard chords, keyboard-only editing chords, and an opt-in "task-edge
@@ -21,7 +21,7 @@
   </head>
   <body class="ex-body">
     <div class="ex-page">
-    <h1 class="ex-title">StarGantt v2 — drag editing and undo/redo</h1>
+    <h1 class="ex-title">StarGantt — drag editing and undo/redo</h1>
     <div class="ex-note">
       <p class="ex-note-title">How to use</p>
       <ul>
@@ -193,7 +193,7 @@
         const data = gantt.service("stargantt.data");
         data.load(dataset());
 
-        // History toolbar. `HistoryService.bindButtons()` is removed in v2 — the plugin's
+        // History toolbar. `HistoryService.bindButtons()` does not exist — the plugin's
         // `state` store is subscribed instead (undo-redo.md "Service" resolution note).
         const history = gantt.service("stargantt.history");
 

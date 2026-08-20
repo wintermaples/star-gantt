@@ -477,7 +477,7 @@ describe("working-time avoidance", () => {
     expect(service.step(utc(2024, 3, 17, 10), -1)).toBe(-MS_DAY);
   });
 
-  // New in v2 (§3, WorkingTimeProvider): the provider is consulted on every adjustment and never
+  // §3, WorkingTimeProvider: the provider is consulted on every adjustment and never
   // cached across them — the freshness contract this file was specifically asked to verify.
   it("asks the composed provider fresh on every adjustment, never caching across calls", () => {
     const provider = countingProvider(() => boundsOf(DAY_GRANULAR));
@@ -490,7 +490,7 @@ describe("working-time avoidance", () => {
     expect(provider.calls).toBe(3);
   });
 
-  // New in v2: a provider that throws is reported through `onFault` and the instant it was given
+  // A provider that throws is reported through `onFault` and the instant it was given
   // (already day-rounded by the built-in rule) passes through unchanged.
   it("reports a throwing provider through onFault and passes the rounded instant through", () => {
     const { onFault, faults } = faultSink();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StarGantt v2 — Task fields and custom fields example</title>
+  <title>StarGantt — Task fields and custom fields example</title>
   <!--
     Demonstrates the standard task-field columns (status/priority/tags/deadline/duration), their
     bar decorations (status glyph, overdue warning, assignee avatars), the side-panel detail
@@ -107,7 +107,7 @@
 </head>
 <body class="ex-body">
   <div class="ex-page">
-  <h1 class="ex-title">StarGantt v2 — task fields and custom fields</h1>
+  <h1 class="ex-title">StarGantt — task fields and custom fields</h1>
   <div id="chart" class="ex-chart"></div>
 
   <section class="panel ex-panel" aria-labelledby="panelHeading">
@@ -549,7 +549,7 @@
       const duration = durationOf(task);
       durationInput.value = duration === undefined ? "" : String(Math.round(duration * 100) / 100);
 
-      // See the file header GAP note: no public `displayId()` getter exists in v2, so this shows
+      // See the file header GAP note: no public `displayId()` getter exists, so this shows
       // the raw stored `customId` (falling back to the task id) instead of the formatted
       // idNumbering sequence.
       addDetail("Display ID (raw)", f.customId || String(id));

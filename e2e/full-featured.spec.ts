@@ -1,6 +1,6 @@
 import { FIXED_TIME, expect, settle, test } from "./_fixtures";
 
-// Coverage for `examples/full-featured.html` — the one v2 demo page that composes all fifteen
+// Coverage for `examples/full-featured.html` — the one demo page that composes all fifteen
 // official plugins from a single self-contained HTML file (presetStandard()'s nine plus the six
 // opt-in factories: tracking, resource, dataSync, portfolio, i18n, perfTools). The suite exercises
 // a settings dialog arbitrating combinations that genuinely fight each other (a bar's fill, a
@@ -17,7 +17,7 @@ import { FIXED_TIME, expect, settle, test } from "./_fixtures";
 //     the count is fixed regardless of settings — all six opt-ins are always pushed).
 //   - The settings button reads "Settings"; the calendar-editor button reads "Edit"; the history
 //     buttons read "Undo"/"Redo" — no emoji glyphs in the app bar.
-//   - `STORAGE_KEY` is `"stargantt.v2.example.full-featured"`.
+//   - `STORAGE_KEY` is `"stargantt.example.full-featured"`.
 //   - 20 settings groups exist — confirmed by counting the `SECTIONS` array's flattened `GROUPS`
 //     index.
 // Everything else below (radio group ids/values for barEmphasis/sidePane/replacements/barLabels,
@@ -25,7 +25,7 @@ import { FIXED_TIME, expect, settle, test } from "./_fixtures";
 // filenames "atlas-plan.png"/"atlas-plan.csv", the custom-columns header labels
 // ["Task", "Window", "Done"]) is read straight from the page itself.
 
-const STORAGE_KEY = "stargantt.v2.example.full-featured";
+const STORAGE_KEY = "stargantt.example.full-featured";
 
 /** Opens the dialog with every collapsible section expanded, as a pointer user would. */
 async function openSettings(page: import("@playwright/test").Page): Promise<void> {

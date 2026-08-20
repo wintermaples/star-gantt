@@ -153,7 +153,7 @@
         file: "custom-plugin.html",
         title: "Custom plugin",
         blurb:
-          "Six third-party plugins written against the real v2 public API: renderer/layers, renderer/hitTest, tooltip/content, renderer/domOverlays, a custom extension point and a claimed task.meta key — composed the same way official opt-in plugins are (alongside presetStandard() in the plugins array).",
+          "Six third-party plugins written against the real public API: renderer/layers, renderer/hitTest, tooltip/content, renderer/domOverlays, a custom extension point and a claimed task.meta key — composed the same way official opt-in plugins are (alongside presetStandard() in the plugins array).",
       },
     ],
   },
@@ -400,7 +400,7 @@
       // pane row in `.sg-pane-row`, so the chart pane's parent is the ROW, not the root —
       // stamping the row would restyle nothing the observer sees and the canvas would keep its
       // stale colours. Resolve the root deliberately: the row's parent when the row exists, the
-      // pane's parent otherwise. (No v2 example page currently loads this script, so this
+      // pane's parent otherwise. (No example page currently loads this script, so this
       // currently has nothing to do — see the file header — but stays correct if one does.)
       var parent = panes[i].parentElement;
       if (parent === null) continue;

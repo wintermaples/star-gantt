@@ -3,7 +3,7 @@
  * docs/specs/plugins/interaction.md §6.6 — the zoom feature wired into a real composition: slot
  * claim / arbitration, config presence gating (opt-in, disabled when the nest is omitted), button
  * dispatches through `stargantt.timeline`, and the internal fit / today / selection actions (no
- * `ZoomControlsService` in v2 — §2.4).
+ * `ZoomControlsService` — §2.4).
  */
 import { describe, expect, it } from "vitest";
 import { definePlugin } from "@stargantt/core";
@@ -139,7 +139,7 @@ describe("zoom stepping (§1.1, anchored-ladder behavior)", () => {
   });
 });
 
-describe("fit / today / selection (internal — no ZoomControlsService in v2, §2.4)", () => {
+describe("fit / today / selection (internal — no ZoomControlsService, §2.4)", () => {
   it("fit-to-project centers the whole span at the densest level that fits, without a redundant zoom call", () => {
     const tasks = [task({ id: 1, start: 0, end: 10 * MS_DAY })];
     const b = boot({ config: { zoomControls: {} }, tasks });

@@ -2,7 +2,7 @@
  * Shared print-test harness: a recording canvas-2D double over happy-dom, plus a real host booted
  * around `exportPlugin` with mock `stargantt.data` / `view` / `timeline` / `theme` services.
  *
- * v2 has no shared test-utils package (the SDK sits at the bottom of the dependency graph and
+ * There is no shared test-utils package (the SDK sits at the bottom of the dependency graph and
  * nothing may sit below it), so each package brings its own doubles. Here the DOM itself is real
  * — happy-dom — and only the canvas is faked, which is the one part happy-dom does not implement:
  * `getContext("2d")` answers `null` there, so the print pipeline would degrade instead of drawing.

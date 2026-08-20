@@ -366,7 +366,7 @@ export function createSelectionModule(
     },
     clear: () => apply(new Set()),
     // An explicit request outranks a default-behavior switch: `revealSelected` governs only the
-    // automatic reveals (§2.1, deliberate v2 deviation).
+    // automatic reveals (§2.1, deliberate deviation).
     reveal,
     mode: () => mode,
     deleteSelected: () => deleteFlow.request(),

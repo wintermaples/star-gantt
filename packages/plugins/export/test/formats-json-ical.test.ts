@@ -107,10 +107,10 @@ describe("JSON export / import (service)", () => {
 });
 
 describe("iCal export (unit + service)", () => {
-  it("writes one VEVENT per non-summary task with UTC stamps, escaping, and the v2 PRODID", () => {
+  it("writes one VEVENT per non-summary task with UTC stamps, escaping, and the spec PRODID", () => {
     const now = Date.UTC(2026, 0, 2, 3, 4, 5);
     const ics = serializeICal(sampleData().tasks, { calendarName: "My; plan" }, now);
-    expect(ics.startsWith("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//StarGantt//StarGantt v2//EN\r\n")).toBe(true);
+    expect(ics.startsWith("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//StarGantt//StarGantt//EN\r\n")).toBe(true);
     expect(ics).toContain("X-WR-CALNAME:My\\; plan");
     expect(ics).toContain("DTSTAMP:20260102T030405Z");
     // The summary task is skipped by default: three events for four tasks.

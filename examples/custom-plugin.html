@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Custom plugin example</title>
+    <title>StarGantt — Custom plugin example</title>
     <!--
       How a THIRD PARTY writes StarGantt plugins, using nothing but the public API. Six small
       plugins are defined in this page's own <script> and composed into the `plugins:` array
@@ -62,7 +62,7 @@
   </head>
   <body class="ex-body">
     <div class="ex-page">
-    <h1 class="ex-title">StarGantt v2 — writing your own plugin</h1>
+    <h1 class="ex-title">StarGantt — writing your own plugin</h1>
     <div class="ex-note">
       <p class="ex-note-title">What's on this page</p>
       <p>
@@ -160,7 +160,7 @@
           const timeline = ctx.use("stargantt.timeline");
           const theme = ctx.use("stargantt.theme");
 
-          // v2 CHANGE: the render stack is a registry, not a documentation table. Claiming
+          // NOTE: the render stack is a registry, not a documentation table. Claiming
           // (scope, key, order) makes a collision with another plugin a `core/pluginError` at
           // startup instead of a mystery at paint time, and puts this layer into the snapshot
           // `gantt.orders("renderer/layers")` returns (see the toolbar button).

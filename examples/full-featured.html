@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Full-featured example</title>
+    <title>StarGantt — Full-featured example</title>
     <!--
       The kitchen-sink page: one HTML file plus the one bundle script tag, composing ALL FIFTEEN
       official plugins at once with (nearly) every published config field given a deliberate value.
@@ -394,7 +394,7 @@
 
     <header class="appbar ex-toolbar">
       <div class="brand">
-        <strong>StarGantt v2 — full-featured chart</strong>
+        <strong>StarGantt — full-featured chart</strong>
       </div>
 
       <div class="group ex-group">
@@ -459,7 +459,7 @@
             double-click, the bottom region's height, the store's contents. The library cannot
             arbitrate those for a host, so this page makes the broken combinations unreachable
             rather than letting you build one and then explaining the mess. The one exception is
-            <em>Overlays</em>: v2's core arbitrates chart-pane corners itself through
+            <em>Overlays</em>: the core arbitrates chart-pane corners itself through
             <code>claimSlot("overlay-corner", …)</code> and moves a displaced overlay to a free
             corner, so those groups are a layout preference, not a correctness constraint.
             Everything <em>not</em> in this dialog is set to a fixed, good value in the page source.
@@ -815,7 +815,7 @@
          * localStorage round-trip are all generated from this array, so adding a group is one edit.
          */
 
-        var STORAGE_KEY = "stargantt.v2.example.full-featured";
+        var STORAGE_KEY = "stargantt.example.full-featured";
 
         var SECTIONS = [
           {
@@ -958,7 +958,7 @@
               {
                 id: "cornerTR",
                 label: "Top-right",
-                hint: "Two overlays request top-right. Composing both is legal in v2 — the core grants the loser a free corner instead — but only one of them lands where you expect it.",
+                hint: "Two overlays request top-right. Composing both is legal — the core grants the loser a free corner instead — but only one of them lands where you expect it.",
                 def: "search",
                 options: [
                   { v: "search", l: "Search & filter" },
@@ -2433,7 +2433,7 @@
               },
 
               offline: {
-                databaseName: "stargantt-v2-example-full-featured",
+                databaseName: "stargantt-example-full-featured",
                 documentKey: "atlas",
                 // Only the IndexedDB origin persists the project; every other origin leaves the
                 // browser's storage exactly as it found it.

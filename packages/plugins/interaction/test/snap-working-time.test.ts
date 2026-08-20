@@ -141,7 +141,7 @@ describe("adjustToWorkingBoundary — intra-day windows", () => {
   });
 });
 
-// New in v2: `isUsableWorkingTimeProvider` is the structural guard `snap/workingTime` (first)
+// `isUsableWorkingTimeProvider` is the structural guard `snap/workingTime` (first)
 // applies to each contribution — a contribution without a `boundaries` member is treated as
 // absent (../src/types.ts).
 describe("isUsableWorkingTimeProvider", () => {

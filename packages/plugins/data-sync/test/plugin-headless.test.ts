@@ -1,7 +1,7 @@
 /**
  * The plugin's own wiring: headless composition (dataStore() + dataSync() alone), the
  * `dependsOn`/`ctx.use()` mechanical consistency check, config defaults/unusable-value fallbacks,
- * and cross-area `sync/activity` ordering guarantees (§6.2). New v2 coverage (root `index.ts`).
+ * and cross-area `sync/activity` ordering guarantees (§6.2). Coverage for the root `index.ts`.
  */
 import { expectDepsConsistency } from "@stargantt/sdk";
 import { describe, expect, it } from "vitest";

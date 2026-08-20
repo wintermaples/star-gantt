@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — File import &amp; export example</title>
+    <title>StarGantt — File import &amp; export example</title>
     <!--
       All import/export functionality is composed by a single `stargantt.export` facade that
       presetStandard() always includes — there is nothing to opt into here; this page configures
@@ -53,7 +53,7 @@
   </head>
   <body class="ex-body">
     <div class="ex-page">
-      <h1 class="ex-title">StarGantt v2 — file import &amp; export</h1>
+      <h1 class="ex-title">StarGantt — file import &amp; export</h1>
       <div class="ex-note">
         <p class="ex-note-title">What's on this page</p>
         <p>
@@ -310,7 +310,7 @@
           const importFn = format === "json" ? svc.importJson.bind(svc) : svc.importCsv.bind(svc);
           const result = importFn(text, { dialog });
           if (dialog) {
-            // The dialog always mounts (in v2 the chart pane always exists); an empty document
+            // The dialog always mounts (the chart pane always exists); an empty document
             // shows its own "no changes" message inside, so this status line just names the state.
             setStatus(
               result.document.tasks.length === 0

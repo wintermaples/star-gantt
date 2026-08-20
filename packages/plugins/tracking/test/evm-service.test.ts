@@ -4,7 +4,7 @@
  * §2.15).
  *
  * Rather than composing the sibling plugins (cost-tracking, baselines, progress-tracking), this
- * drives the same inputs through `extras` and the claimed `progressTracking` meta bag — the v2
+ * drives the same inputs through `extras` and the claimed `progressTracking` meta bag — the
  * fan-in, which reaches no sibling service at all.
  */
 import { afterEach, describe, expect, it } from "vitest";

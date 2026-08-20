@@ -1,7 +1,7 @@
 /* Part 3/3 of the StarGantt default stylesheet — split from styles/layout.css at a rule boundary
    (a blank line between two complete rules, not inside one), so each part parses standalone as
    valid CSS; see styles/tokens.css's header for the split rationale. Sections below "Task bars"
-   style plugins not yet implemented in v2 (tooltip, side-panel, a11y mirror, load chart, resource
+   style plugins not yet implemented (tooltip, side-panel, a11y mirror, load chart, resource
    lanes); kept in place for behavioral fidelity — harmless until those plugins land. */
 
 .sg-scrollbar__thumb:active {

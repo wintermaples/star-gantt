@@ -35,8 +35,8 @@ export function serializeICal(
   options: ICalExportOptions | undefined,
   now: number,
 ): string {
-  // §1.5 — the PRODID's version token names v2.
-  const lines: string[] = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//StarGantt//StarGantt v2//EN"];
+  // §1.5 — PRODID as fixed by the spec.
+  const lines: string[] = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//StarGantt//StarGantt//EN"];
   if (typeof options?.calendarName === "string" && options.calendarName !== "") {
     lines.push(`X-WR-CALNAME:${escapeIcalText(options.calendarName)}`);
   }

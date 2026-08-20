@@ -118,7 +118,7 @@ describe("source area — flush()", () => {
   });
 });
 
-describe("source area — rollback() (explicit, §2.5, v2 addition)", () => {
+describe("source area — rollback() (explicit, §2.5)", () => {
   it("reverts the current pending set synchronously and returns the touched count", async () => {
     const { ds, host, collected } = await seeded();
     host.host.dispatch("task/update", { id: "t1", after: { name: "Renamed" } });

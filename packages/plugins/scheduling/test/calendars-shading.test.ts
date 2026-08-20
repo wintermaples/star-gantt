@@ -1,6 +1,6 @@
 /**
  * `internal/calendars/shading.ts` — the order-8 non-working shading layer and the §6.2
- * minimum-band-width guard, restated normatively there because v2's view.md does not carry it.
+ * minimum-band-width guard, restated normatively there because view.md does not carry it.
  *
  * Pure and hostless: `createShadingLayer` takes plain callbacks (`shading.ts`'s own `ShadingDeps` —
  * narrow `Pick`s over the real `@stargantt/plugin-view` service types, not a hand-mirrored

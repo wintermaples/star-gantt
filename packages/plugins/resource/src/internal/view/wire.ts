@@ -316,7 +316,7 @@ export function wireView(deps: ResourceAreaDeps): void {
 
   /* --- repaint triggers ---------------------------------------------------------------------- */
 
-  // Store-shaped, per §5: v2 has no `data/*Changed` events. Tasks move segments, resources move
+  // Store-shaped, per §5: there are no `data/*Changed` events. Tasks move segments, resources move
   // rows and capacities, assignments move both.
   ctx.own(data.tasks.subscribe(invalidate));
   ctx.own(data.resources.subscribe(invalidate));
