@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Interaction example</title>
+    <title>StarGantt — Interaction example</title>
     <!--
       One HTML file + one script tag, composed with `presetStandard()` and every interaction
       feature turned on: selection (multi, shortcuts), drag editing (move / resize / progress / row
@@ -14,46 +14,19 @@
       table). The chrome below is kept deliberately minimal — CLAUDE.md's documented viewport floor
       is 720x540 (tablet and up, no mobile breakpoints), and the chart itself is the point.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-      #log {
-        margin-top: 4px;
-        font: 11px/1.3 ui-monospace, monospace;
-        max-height: 6em;
-        overflow-y: auto;
-        border: 1px solid #eee;
-        padding: 3px 6px;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — interaction</h1>
-    <details>
-      <summary>Activity log</summary>
-      <div id="log"></div>
-    </details>
-    <div id="chart"></div>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt — interaction</h1>
+      <details>
+        <summary>Activity log</summary>
+        <div id="log"></div>
+      </details>
+      <!-- The side panel is a chart-internal column — 1280px starves it of room. -->
+      <div id="chart" class="ex-chart" style="--ex-chart-max-width: none"></div>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

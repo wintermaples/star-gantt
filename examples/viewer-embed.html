@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Viewer &amp; embed example</title>
+    <title>StarGantt — Viewer &amp; embed example</title>
     <!--
       Read-only/embed/snapshot are one facet of the single `stargantt.export` facade
       presetStandard() always includes, config nested at `export.viewerEmbed`.
@@ -24,57 +24,13 @@
         chart; this page implements that rebuild directly with `gantt.dispose()` +
         `StarGantt.create()`.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 6px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 420px;
-        border: 1px solid #ccc;
-      }
-      .panel {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        margin: 0 0 6px;
-        font-size: 12px;
-        align-items: center;
-      }
-      .group {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      button {
-        font: inherit;
-        padding: 4px 8px;
-      }
-      .state {
-        font-size: 12px;
-        color: #444;
-      }
+  <link rel="stylesheet" href="examples.css">
+  <style>
+      /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+         chrome) now comes from the shared .ex-* vocabulary above. .state is redundant with
+         .ex-readout, so it is intentionally not restored here. */
       #snapshotUrl {
         width: 320px;
-        font: inherit;
-      }
-      #viewerStatus {
-        font-size: 12px;
-        margin: 4px 0;
       }
       #eventLog {
         list-style: none;
@@ -83,61 +39,61 @@
         max-height: 90px;
         overflow-y: auto;
         font-size: 11px;
-        border: 1px solid #ddd;
-        background: #fafafa;
-      }
-      .note {
-        font-size: 11px;
-        color: #666;
+        border: 1px solid var(--ex-border);
+        background: var(--ex-surface-raised);
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — viewer &amp; embed</h1>
-    <details>
-      <summary>What's on this page</summary>
-      Read-only mode vetoes transactions at the store's cancelable pre-event, except origins
-      matching the built-in exempt prefix or the configured <code>readOnlyExemptOrigins</code>.
-      Embed mode dresses the root for iframe hosting and flips the read-only default on. Snapshot
-      links encode the whole project into the URL fragment.
-    </details>
-    <div class="panel">
-      <span>Modes:</span>
-      <button id="readOnlyBtn" type="button" aria-pressed="false">Read-only: off</button>
-      <button id="embedBtn" type="button" aria-pressed="false">Embed mode: off</button>
-      <span class="state" id="viewerState">Editable · no viewer classes on the root</span>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — viewer &amp; embed</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        Read-only mode vetoes transactions at the store's cancelable pre-event, except origins
+        matching the built-in exempt prefix or the configured <code>readOnlyExemptOrigins</code>.
+        Embed mode dresses the root for iframe hosting and flips the read-only default on. Snapshot
+        links encode the whole project into the URL fragment.
+      </p>
     </div>
-    <div class="panel">
-      <span>Try an edit:</span>
+    <div class="panel ex-toolbar">
+      <span class="ex-group-label">Modes:</span>
+      <button id="readOnlyBtn" type="button" aria-pressed="false" class="ex-btn">Read-only: off</button>
+      <button id="embedBtn" type="button" aria-pressed="false" class="ex-btn">Embed mode: off</button>
+      <span class="state ex-readout" id="viewerState">Editable · no viewer classes on the root</span>
+    </div>
+    <div class="panel ex-toolbar">
+      <span class="ex-group-label">Try an edit:</span>
       <label for="originSelect">Transaction origin</label>
-      <select id="originSelect">
+      <select id="originSelect" class="ex-select">
         <option value="user">user — a normal edit</option>
         <option value="schedule">schedule — auto-scheduling</option>
         <option value="stargantt.data-sync/import">stargantt.data-sync/import — built-in exempt</option>
         <option value="demo-feed">demo-feed — exempt via config</option>
       </select>
-      <button id="editBtn" type="button">Advance "Implementation" progress by 10%</button>
+      <button id="editBtn" type="button" class="ex-btn">Advance "Implementation" progress by 10%</button>
     </div>
-    <div class="panel">
-      <span>Share link:</span>
-      <button id="snapshotBtn" type="button">Create snapshot link</button>
-      <button id="copyBtn" type="button">Copy</button>
-      <button id="restoreBtn" type="button">Restore from link</button>
-      <button id="replaceBtn" type="button">Replace data</button>
+    <div class="panel ex-toolbar">
+      <span class="ex-group-label">Share link:</span>
+      <button id="snapshotBtn" type="button" class="ex-btn">Create snapshot link</button>
+      <button id="copyBtn" type="button" class="ex-btn">Copy</button>
+      <button id="restoreBtn" type="button" class="ex-btn">Restore from link</button>
+      <button id="replaceBtn" type="button" class="ex-btn">Replace data</button>
     </div>
-    <div class="panel">
+    <div class="panel ex-field">
       <label for="snapshotUrl">Snapshot URL</label>
-      <input id="snapshotUrl" type="text" spellcheck="false" placeholder="Press “Create snapshot link” — the whole project is encoded into the URL fragment" />
+      <input id="snapshotUrl" type="text" spellcheck="false" class="ex-input" placeholder="Press “Create snapshot link” — the whole project is encoded into the URL fragment" />
     </div>
-    <p id="viewerStatus" role="status"></p>
+    <p id="viewerStatus" role="status" class="ex-readout"></p>
     <h2 style="font-size: 12px; margin: 0 0 2px">Plugin events</h2>
     <ul id="eventLog"><li>Waiting for <code>viewerembed/*</code> events…</li></ul>
-    <p class="note">
+    <p class="note ex-note">
       Reload this page with the generated link in the address bar and the chart rebuilds itself
       from the fragment alone — no server, no storage, no id registry. Tokens are uncompressed, so
       the spec recommends staying under ~64KB of token text for URL delivery.
     </p>
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

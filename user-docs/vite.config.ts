@@ -11,5 +11,5 @@ export default defineConfig({
   // or the site documents a stale artifact.
   resolve: { alias: { stargantt: dist } },
   plugins: [react()],
-  server: { port: 5175, fs: { allow: [fileURLToPath(new URL("..", import.meta.url))] } },
+  server: { port: 4175, host: true, fs: { allow: [fileURLToPath(new URL("..", import.meta.url))] } },
 });

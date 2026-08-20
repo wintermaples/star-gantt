@@ -491,8 +491,11 @@ test.describe("print preview", () => {
     const { options: printOptions, expectedPages } = await multiPagePrintPlan(page);
 
     // A real, previously-focused element to prove focus actually returns to it (WCAG 2.4.3), not
-    // merely "focus left the dialog".
-    const opener = page.locator("summary").first();
+    // merely "focus left the dialog". scheduling.html's own chrome carries no <summary> (its
+    // instructions render as a static .ex-note, not a <details> disclosure), so this uses the
+    // a11y mirror's first row instead — the same stable, always-present focus target
+    // e2e/scheduling.spec.ts's own "Alt+L two-step keyboard chord" test focuses.
+    const opener = page.locator(".sg-a11y-row").first();
     await opener.focus();
 
     const opened = await page.evaluate(

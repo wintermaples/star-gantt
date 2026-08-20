@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Load chart configuration example</title>
+    <title>StarGantt — Load chart configuration example</title>
     <!--
       This page's focus is the merged plugin's `loadChart` nest config surface itself
       (docs/specs/plugins/resource.md §6.5) — the aggregate band's `bucket` ladder (including
@@ -21,96 +21,53 @@
       - Services: `stargantt.view` / `stargantt.timeline` (view.md); the viewport is the
         `view.viewport` store (`.viewport.get()`).
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-      #toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 14px;
-        align-items: center;
-        margin-bottom: 4px;
-      }
-      #toolbar span[role="group"] {
-        display: inline-flex;
-        gap: 4px;
-        align-items: center;
-      }
-      .group-label {
-        font-size: 11px;
-        color: #555;
-      }
-      #toolbar button {
-        min-height: 24px;
-        font: inherit;
-        cursor: pointer;
-      }
-      .footnote {
-        font-size: 11px;
-        color: #555;
-        margin: 4px 0;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — load chart configuration</h1>
-    <details>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — load chart configuration</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
       Every toggle below is a <code>loadChart</code> config field, read once at setup — changing
       one rebuilds the chart from scratch (except timeline zoom, which is a live call).
-    </details>
-    <div id="toolbar">
-      <span role="group" aria-label="Bucket width">
-        <span class="group-label">bucket</span>
-        <button class="bucket-btn" data-bucket="minute15" aria-pressed="false">15 min</button>
-        <button class="bucket-btn" data-bucket="hour" aria-pressed="false">hour</button>
-        <button class="bucket-btn" data-bucket="day" aria-pressed="true">day</button>
-        <button class="bucket-btn" data-bucket="week" aria-pressed="false">week</button>
-        <button class="bucket-btn" data-bucket="month" aria-pressed="false">month</button>
-        <button class="bucket-btn" data-bucket="auto" aria-pressed="false">auto</button>
+      </p>
+    </div>
+    <div id="toolbar" class="ex-toolbar">
+      <span role="group" aria-label="Bucket width" class="ex-group">
+        <span class="group-label ex-group-label">bucket</span>
+        <button class="bucket-btn ex-btn" data-bucket="minute15" aria-pressed="false">15 min</button>
+        <button class="bucket-btn ex-btn" data-bucket="hour" aria-pressed="false">hour</button>
+        <button class="bucket-btn ex-btn" data-bucket="day" aria-pressed="true">day</button>
+        <button class="bucket-btn ex-btn" data-bucket="week" aria-pressed="false">week</button>
+        <button class="bucket-btn ex-btn" data-bucket="month" aria-pressed="false">month</button>
+        <button class="bucket-btn ex-btn" data-bucket="auto" aria-pressed="false">auto</button>
       </span>
-      <span role="group" aria-label="Timeline zoom">
-        <span class="group-label">timeline zoom</span>
-        <button class="zoom-btn" data-zoom="hour" aria-pressed="false">hour</button>
-        <button class="zoom-btn" data-zoom="day" aria-pressed="true">day</button>
-        <button class="zoom-btn" data-zoom="week" aria-pressed="false">week</button>
-        <button class="zoom-btn" data-zoom="month" aria-pressed="false">month</button>
+      <span role="group" aria-label="Timeline zoom" class="ex-group">
+        <span class="group-label ex-group-label">timeline zoom</span>
+        <button class="zoom-btn ex-btn" data-zoom="hour" aria-pressed="false">hour</button>
+        <button class="zoom-btn ex-btn" data-zoom="day" aria-pressed="true">day</button>
+        <button class="zoom-btn ex-btn" data-zoom="week" aria-pressed="false">week</button>
+        <button class="zoom-btn ex-btn" data-zoom="month" aria-pressed="false">month</button>
       </span>
-      <label>
+      <label class="ex-checkbox">
         <input type="checkbox" id="allowlist-toggle" />
         Only Alice &amp; Bob (drops Carol)
       </label>
-      <label>
+      <label class="ex-checkbox">
         <input type="checkbox" id="custom-load-toggle" />
         Custom weighted-hours load/capacity
       </label>
     </div>
-    <div id="chart"></div>
-    <p class="footnote">
+    <!-- The load-chart band is a chart-internal row — 1280px starves it of room. -->
+    <div id="chart" class="ex-chart" style="--ex-chart-max-width: none"></div>
+    <p class="footnote ex-footer">
       Rebuilding on every toggle: <code>bucket</code>, <code>resources</code>, <code>load</code>
       and <code>capacity</code> are all read once at <code>setup()</code>, so each change here
       recreates the chart with a freshly configured <code>loadChart</code> nest.
     </p>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

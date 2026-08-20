@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Baselines example</title>
+    <title>StarGantt — Baselines example</title>
     <!--
       One HTML file + one script tag, composed with `presetStandard()` plus the OPT-IN tracking
       plugin (tracking ships in the bundle but is not preset-composed), configured with only
@@ -24,51 +24,36 @@
       CLAUDE.md's documented viewport floor is 720x540 (tablet and up, no mobile breakpoints) — the
       chrome below is kept minimal and purely declarative.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
+  <link rel="stylesheet" href="examples.css">
+  <style>
+      /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+         chrome) now comes from the shared .ex-* vocabulary above. */
       #report {
         margin: 6px 0 0;
         padding: 6px 8px;
-        font: 11px/1.5 ui-monospace, monospace;
-        background: #f6f6f6;
-        border: 1px solid #ddd;
+        font: 11px/1.5 var(--ex-mono);
+        background: var(--ex-surface-raised);
+        border: 1px solid var(--ex-border);
         white-space: pre-wrap;
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — baselines</h1>
-    <details>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — baselines</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
       A seeded "Plan of record" baseline: thin baseline bars under each task's current bar, a
       slip triangle + signed-day label wherever the current schedule has moved from the baseline,
       and a centered actual-dates stripe on the two tasks that recorded actuals. The panel below
       the chart is read once from <code>BaselinesService.variance()</code> /
       <code>.summary()</code> — the same public API a host would call to build its own report.
-    </details>
-    <div id="chart"></div>
+      </p>
+    </div>
+    <div id="chart" class="ex-chart"></div>
     <pre id="report"></pre>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

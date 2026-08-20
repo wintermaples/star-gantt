@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — File import &amp; export example</title>
+    <title>StarGantt — File import &amp; export example</title>
     <!--
       All import/export functionality is composed by a single `stargantt.export` facade that
       presetStandard() always includes — there is nothing to opt into here; this page configures
@@ -33,120 +33,83 @@
         `state` store; `undo()` is a direct method instead of dispatching `history/undo` (both
         exist, this page uses the direct method).
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 6px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 420px;
-        border: 1px solid #ccc;
-      }
-      .panel {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 24px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      .group {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .group-label {
-        font-weight: 600;
-      }
+  <link rel="stylesheet" href="examples.css">
+  <style>
+      /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+         chrome) now comes from the shared .ex-* vocabulary above. */
       .row {
         display: flex;
         align-items: center;
         gap: 6px;
         flex-wrap: wrap;
       }
-      button {
-        font: inherit;
-        padding: 4px 8px;
-      }
-      .readout {
-        font-size: 12px;
-        margin: 4px 0;
-      }
       #issueList {
         font-size: 11px;
         margin: 0 0 6px;
         padding-left: 18px;
-        color: #a30000;
+        color: light-dark(#b3261e, #ff8f88);
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — file import &amp; export</h1>
-    <details>
-      <summary>What's on this page</summary>
-      Every button below drives one member of the merged <code>stargantt.export</code> facade —
-      CSV/JSON/iCal/xlsx/MSPDI, both directions. See the top-of-file comment for details.
-    </details>
-    <div class="panel">
-      <div class="group">
-        <span class="group-label" id="exportLabel">Export (downloads a file)</span>
-        <div class="row" role="group" aria-labelledby="exportLabel">
-          <button id="csvBtn" type="button">CSV</button>
-          <button id="jsonBtn" type="button">Project JSON</button>
-          <button id="icalBtn" type="button">iCalendar</button>
-          <button id="xlsxBtn" type="button">Excel .xlsx</button>
-          <button id="mspBtn" type="button">MS Project .xml</button>
-        </div>
-        <div class="row">
-          <label for="csvDelimiter">
-            CSV delimiter
-            <select id="csvDelimiter">
-              <option value="," selected>Comma</option>
-              <option value=";">Semicolon</option>
-              <option value="&#9;">Tab</option>
-            </select>
-          </label>
-          <label><input id="icalSummaries" type="checkbox" /> iCalendar includes summary tasks</label>
-        </div>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt — file import &amp; export</h1>
+      <div class="ex-note">
+        <p class="ex-note-title">What's on this page</p>
+        <p>
+          Every button below drives one member of the merged <code>stargantt.export</code> facade —
+          CSV/JSON/iCal/xlsx/MSPDI, both directions. See the top-of-file comment for details.
+        </p>
       </div>
+      <div class="panel ex-toolbar">
+        <div class="group ex-group">
+          <span class="group-label ex-group-label" id="exportLabel">Export (downloads a file)</span>
+          <div class="row" role="group" aria-labelledby="exportLabel">
+            <button id="csvBtn" type="button" class="ex-btn">CSV</button>
+            <button id="jsonBtn" type="button" class="ex-btn">Project JSON</button>
+            <button id="icalBtn" type="button" class="ex-btn">iCalendar</button>
+            <button id="xlsxBtn" type="button" class="ex-btn">Excel .xlsx</button>
+            <button id="mspBtn" type="button" class="ex-btn">MS Project .xml</button>
+          </div>
+          <div class="row">
+            <label for="csvDelimiter" class="ex-field">
+              CSV delimiter
+              <select id="csvDelimiter" class="ex-select">
+                <option value="," selected>Comma</option>
+                <option value=";">Semicolon</option>
+                <option value="&#9;">Tab</option>
+              </select>
+            </label>
+            <label class="ex-checkbox"><input id="icalSummaries" type="checkbox" /> iCalendar includes summary tasks</label>
+          </div>
+        </div>
 
-      <div class="group">
-        <span class="group-label" id="importLabel">Import</span>
-        <div class="row" role="group" aria-labelledby="importLabel">
-          <input
-            id="fileInput"
-            type="file"
-            accept=".csv,.json,.xml,.txt,text/csv,application/json,text/xml"
-            aria-label="Import a CSV, JSON or MS Project XML file"
-          />
-        </div>
-        <div class="row" role="group" aria-labelledby="importLabel">
-          <button id="sampleCsvBtn" type="button">Sample CSV</button>
-          <button id="sampleJsonBtn" type="button">Sample JSON</button>
-          <button id="sampleMspBtn" type="button">Sample MSPDI</button>
-          <button id="undoBtn" type="button">Undo import</button>
-        </div>
-        <div class="row">
-          <label><input id="directApply" type="checkbox" /> Skip the dialog (apply directly)</label>
+        <div class="group ex-group">
+          <span class="group-label ex-group-label" id="importLabel">Import</span>
+          <div class="row" role="group" aria-labelledby="importLabel">
+            <input
+              id="fileInput"
+              type="file"
+              accept=".csv,.json,.xml,.txt,text/csv,application/json,text/xml"
+              aria-label="Import a CSV, JSON or MS Project XML file"
+              class="ex-input"
+            />
+          </div>
+          <div class="row" role="group" aria-labelledby="importLabel">
+            <button id="sampleCsvBtn" type="button" class="ex-btn">Sample CSV</button>
+            <button id="sampleJsonBtn" type="button" class="ex-btn">Sample JSON</button>
+            <button id="sampleMspBtn" type="button" class="ex-btn">Sample MSPDI</button>
+            <button id="undoBtn" type="button" class="ex-btn">Undo import</button>
+          </div>
+          <div class="row">
+            <label class="ex-checkbox"><input id="directApply" type="checkbox" /> Skip the dialog (apply directly)</label>
+          </div>
         </div>
       </div>
+      <p class="readout ex-readout"><span id="ioStatus" role="status">Ready. Export a file, or import one of the samples.</span> <span id="taskCount"></span></p>
+      <ul id="issueList" aria-label="Import issues"></ul>
+      <div id="chart" class="ex-chart"></div>
     </div>
-    <p class="readout"><span id="ioStatus" role="status">Ready. Export a file, or import one of the samples.</span> <span id="taskCount"></span></p>
-    <ul id="issueList" aria-label="Import issues"></ul>
-    <div id="chart"></div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
@@ -347,7 +310,7 @@
           const importFn = format === "json" ? svc.importJson.bind(svc) : svc.importCsv.bind(svc);
           const result = importFn(text, { dialog });
           if (dialog) {
-            // The dialog always mounts (in v2 the chart pane always exists); an empty document
+            // The dialog always mounts (the chart pane always exists); an empty document
             // shows its own "no changes" message inside, so this status line just names the state.
             setStatus(
               result.document.tasks.length === 0

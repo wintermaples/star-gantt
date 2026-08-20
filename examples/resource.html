@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Resource example</title>
+    <title>StarGantt — Resource example</title>
     <!--
       One HTML file + one script tag, composed with `presetStandard()` (interaction included, with
       `dragEdit.resourceDrag: true` so a vertical bar drag can reassign through the resource
@@ -38,54 +38,30 @@
       shapes. CLAUDE.md's documented viewport floor is 720x540 (tablet and up, no mobile
       breakpoints) — the chrome below is kept minimal.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        /* Taller than examples/scheduling.html's 480px: this page stacks the chart body, the
-           resource-view strip and both load-chart strips, so a resize needs real headroom
-           (e2e/resource.spec.ts's "restore-last-height" scenario resizes the lanes strip). */
-        height: 640px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — resource</h1>
-    <details>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — resource</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
       Resource pool + assignments (Resources column, drag-reassign chips), the resource-view strip
       (open by default, team-grouped lanes), overload warnings (task-bar glyph + Overallocation
       column) and the load chart (band, lanes, heatmap — the heatmap opens in its granted corner,
       see the source comment for which one and why).
-    </details>
-    <div id="toolbar">
-      <button id="btn-summary">Team capacity…</button>
-      <button id="btn-trend">Demand vs supply…</button>
+      </p>
     </div>
-    <div id="chart"></div>
+    <div id="toolbar" class="ex-toolbar">
+      <button id="btn-summary" class="ex-btn">Team capacity…</button>
+      <button id="btn-trend" class="ex-btn">Demand vs supply…</button>
+    </div>
+    <!-- The load-chart band is a chart-internal row — 1280px starves it of room. 640px (up from
+         the 600px shared default) gives room for the resource-view strip, the load-chart band
+         and the lanes strip stacked below the grid+timeline pane. -->
+    <div id="chart" class="ex-chart" style="--ex-chart-max-width: none; --ex-chart-height: 640px"></div>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

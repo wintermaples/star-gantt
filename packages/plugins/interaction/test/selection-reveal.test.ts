@@ -123,9 +123,9 @@ describe("revealing on selection", () => {
     expect(h.scrolls).toEqual([250 - 50 - M]);
   });
 
-  // v2 deviation (deliberate): `SelectionService.reveal(id)` is ungated — it works even with
+  // Deliberate deviation: `SelectionService.reveal(id)` is ungated — it works even with
   // `revealSelected: false`, which governs only the automatic reveals above.
-  describe("`service.reveal(id)` — ungated, unlike the automatic paths (v2 deviation)", () => {
+  describe("`service.reveal(id)` — ungated, unlike the automatic paths (deliberate deviation)", () => {
     it("scrolls even with `revealSelected: false`", () => {
       const h = harness({ revealSelected: false });
       h.viewport.width = VIEW;

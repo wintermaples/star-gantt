@@ -1,8 +1,8 @@
-# StarGantt v2 Architecture
+# StarGantt Architecture
 
 Status: normative. This document governs the core, the SDK boundary, and the cross-cutting rules; the per-plugin specifications in `docs/specs/plugins/` are authoritative for plugin details.
 
-StarGantt v2 is a zero-runtime-dependency, plugin-based Gantt chart library: a minimal core + an official SDK + 15 official plugins. The core knows nothing about Gantt concepts (tasks, dates, rendering). Official features are implemented exclusively through the same public APIs available to third parties (no back-door APIs).
+StarGantt is a zero-runtime-dependency, plugin-based Gantt chart library: a minimal core + an official SDK + 15 official plugins. The core knows nothing about Gantt concepts (tasks, dates, rendering). Official features are implemented exclusively through the same public APIs available to third parties (no back-door APIs).
 
 ---
 

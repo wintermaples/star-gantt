@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StarGantt v2 — Filter and search example</title>
+  <title>StarGantt — Filter and search example</title>
   <!--
     Demonstrates the incremental search box and the filter panel (checkbox value-list per
     filterable field).
@@ -13,27 +13,14 @@
     when omitted"; the tree-grid spec has no such nest). `searchBox`/`filterPanel` are the
     relevant fields.
   -->
-  <style>
-    body {
-      margin: 0;
-      padding: 6px 12px;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-    }
-    h1 {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 4px;
-    }
-    #chart {
-      height: 480px;
-      border: 1px solid #ccc;
-    }
-  </style>
+<link rel="stylesheet" href="examples.css">
+  
 </head>
-<body>
-  <h1>StarGantt v2 — filter and search</h1>
-  <div id="chart"></div>
+<body class="ex-body">
+  <div class="ex-page">
+    <h1 class="ex-title">StarGantt — filter and search</h1>
+    <div id="chart" class="ex-chart"></div>
+  </div>
 
   <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
   <script>

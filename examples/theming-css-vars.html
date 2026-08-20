@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StarGantt v2 — Theming with CSS Variables example</title>
+  <title>StarGantt — Theming with CSS Variables example</title>
   <!--
     CSS custom properties control every painted color/font/bar-geometry token; the page-local
     `.sg-root.<name>-theme` blocks below (this page's SUBJECT is that CSS) demonstrate
@@ -23,67 +23,19 @@
     `colorScheme`, `refresh`) is available. `HIGH_CONTRAST_DARK` is exported off the global
     `StarGantt` object.
   -->
+<link rel="stylesheet" href="examples.css">
   <style>
-    body {
-      margin: 0;
-      padding: 16px 24px;
-      font-family: system-ui, sans-serif;
-    }
-    h1 {
-      font-size: 18px;
-      margin: 0 0 4px;
-    }
-    #chart {
-      height: 440px;
-      border: 1px solid #ccc;
-    }
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      margin: 10px 0;
-    }
-    button {
-      font: inherit;
-      font-size: 13px;
-      padding: 5px 10px;
-      border: 1px solid #999;
-      border-radius: 4px;
-      background: #f5f5f5;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    button[aria-pressed="true"] {
-      background: #1f4e79;
-      color: #fff;
-      border-color: #1f4e79;
-    }
-    .readout {
-      max-width: 82ch;
-      font-size: 13px;
-      color: #333;
-    }
-    section.panel {
-      margin: 18px 0;
-      padding-top: 8px;
-      border-top: 1px solid #ddd;
-    }
-    section.panel h2 {
-      font-size: 15px;
-      margin: 0 0 4px;
-    }
+    /*
+     * This page's subject *is* the CSS: the `--sg-*` theme palettes it demonstrates plus the two
+     * swatch/audit helpers those panels need. Generic chrome (body/h1/#chart/.toolbar/button/etc.)
+     * is covered by examples.css's `.ex-*` classes now, so only the load-bearing, page-specific
+     * rules stay here.
+     */
     .check {
       display: inline-block;
       width: 1em;
     }
 
-    /*
-     * This page's subject *is* the CSS: the `--sg-*` theme palettes it demonstrates plus the two
-     * swatch/audit helpers those panels need.
-     */
     .sg-root.dark-theme {
       --sg-bg: #14181d;
       --sg-fg: #e6eaef;
@@ -296,9 +248,10 @@
     }
   </style>
 </head>
-<body>
-  <h1>StarGantt v2 — theming with CSS variables</h1>
-  <p class="readout">
+<body class="ex-body">
+<div class="ex-page">
+  <h1 class="ex-title">StarGantt — theming with CSS variables</h1>
+  <p class="ex-readout">
     CSS custom properties (CSS variables) control every painted colour, the canvas fonts and the
     bar geometry. Click the theme buttons to change the chart element's class, and watch the new
     look apply through CSS inheritance: the view plugin's theme module reads the
@@ -309,34 +262,34 @@
     following the OS into a mixed palette. <strong>System default</strong> overrides nothing at all
     and follows the OS.
   </p>
-  <div class="toolbar" id="themeButtons">
-    <button data-theme="light" type="button" aria-pressed="true">
+  <div class="ex-toolbar" id="themeButtons">
+    <button data-theme="light" type="button" aria-pressed="true" class="ex-btn">
       <span class="color-swatch" style="background: #f2f4f7; border-color: #999;"></span>
       System default
     </button>
-    <button data-theme="dark" type="button" aria-pressed="false">
+    <button data-theme="dark" type="button" aria-pressed="false" class="ex-btn">
       <span class="color-swatch" style="background: #1b2027; border-color: #666;"></span>
       Dark
     </button>
-    <button data-theme="ocean" type="button" aria-pressed="false">
+    <button data-theme="ocean" type="button" aria-pressed="false" class="ex-btn">
       <span class="color-swatch" style="background: #b3e5fc; border-color: #0088cc;"></span>
       Custom (Ocean)
     </button>
-    <button data-theme="classic" type="button" aria-pressed="false">
+    <button data-theme="classic" type="button" aria-pressed="false" class="ex-btn">
       <span class="color-swatch" style="background: #ece9d8; border-color: #aca899;"></span>
       Classic (XP era)
     </button>
-    <button data-theme="glass" type="button" aria-pressed="false">
+    <button data-theme="glass" type="button" aria-pressed="false" class="ex-btn">
       <span class="color-swatch" style="background: linear-gradient(135deg, #ffd5e2, #a8d8ff); border-color: rgba(60,60,67,0.25);"></span>
       Glass
     </button>
   </div>
 
-  <div id="chart" class="sg-root"></div>
+  <div id="chart" class="sg-root ex-chart"></div>
 
-  <section class="panel" aria-labelledby="presetHeading">
-    <h2 id="presetHeading">Theme presets (runtime switching)</h2>
-    <p class="readout">
+  <section class="ex-panel" aria-labelledby="presetHeading">
+    <h2 id="presetHeading" class="ex-panel-title">Theme presets (runtime switching)</h2>
+    <p class="ex-readout">
       The buttons above swap CSS classes; these buttons call <code>ThemeService.setPreset(name)</code>
       instead. The list comes from <code>presets()</code> — the two bundled high-contrast palettes
       plus the <em>Blueprint</em> palette this page supplies through <code>ThemeConfig.presets</code>.
@@ -344,19 +297,19 @@
       deliberately wins over the page's own CSS blocks; <strong>None</strong> removes them again and
       hands control back to the theme buttons above.
     </p>
-    <div class="toolbar" id="presetButtons" role="group" aria-label="Theme preset"></div>
-    <p class="readout" id="presetStatus" role="status" aria-live="polite">Waiting for the chart to boot&hellip;</p>
-    <p class="readout" id="tokenReadout">
+    <div class="ex-toolbar" id="presetButtons" role="group" aria-label="Theme preset"></div>
+    <p class="ex-readout" id="presetStatus" role="status" aria-live="polite">Waiting for the chart to boot&hellip;</p>
+    <p class="ex-readout" id="tokenReadout">
       <span class="color-swatch" id="tokenSwatch"></span>
       <code>theme.get('--sg-bar-fill')</code> &rarr; <code id="tokenValue">&mdash;</code>
       (re-read on every <code>theme.tokens</code> store update)
     </p>
-    <p class="readout" id="forcedStatus"></p>
+    <p class="ex-readout" id="forcedStatus"></p>
   </section>
 
-  <section class="panel" aria-labelledby="auditHeading">
-    <h2 id="auditHeading">Palette audit</h2>
-    <p class="readout">
+  <section class="ex-panel" aria-labelledby="auditHeading">
+    <h2 id="auditHeading" class="ex-panel-title">Palette audit</h2>
+    <p class="ex-readout">
       <code>ThemeService.audit()</code> measures the palette actually in force — page CSS, scheme
       pin and any applied preset together — against the contrast floors this project audits its own
       defaults to: 4.5:1 for text, 3:1 for non-text UI marks, plus the row-state ordering
@@ -364,9 +317,10 @@
       left out rather than reported as passing. <code>theme.tokens</code> lists what a
       self-contained palette has to cover.
     </p>
-    <p class="readout" id="auditSummary">Waiting for the chart to boot&hellip;</p>
+    <p class="ex-readout" id="auditSummary">Waiting for the chart to boot&hellip;</p>
     <ul class="audit-list" id="auditList"></ul>
   </section>
+</div>
 
   <!-- A single file containing core + the currently-composed official plugins + CSS. -->
   <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Offline &amp; realtime example</title>
+    <title>StarGantt — Offline &amp; realtime example</title>
     <!--
       Demonstrates the merged, OPT-IN `StarGantt.dataSync()` plugin: `dataSync({ offline,
       realtime })` composed as one call, driven through one
@@ -20,59 +20,22 @@
       IndexedDB under the document key `offline-realtime-example`. Try it: let the peer edit a few
       tasks, reload the page, then press "Restore snapshot".
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 340px;
-        border: 1px solid #ccc;
-      }
+  <link rel="stylesheet" href="examples.css">
+  <style>
+      /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+         chrome) now comes from the shared .ex-* vocabulary above. */
       .panels {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
         margin: 6px 0;
       }
-      fieldset.panel {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 6px 8px;
+      .panel {
         min-width: 230px;
         flex: 1 1 230px;
       }
-      .panel legend {
-        font-size: 12px;
-        font-weight: 600;
-      }
-      .panel button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-      .readout {
-        font-size: 11px;
-        color: #333;
-        margin: 2px 0;
-      }
       #event-log {
-        border: 1px solid #ddd;
+        border: 1px solid var(--ex-border);
         border-radius: 4px;
         padding: 4px 8px;
         height: 90px;
@@ -85,52 +48,54 @@
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — offline storage &amp; realtime sync</h1>
-    <details>
-      <summary>What's on this page</summary>
-      One <code>dataSync({ offline, realtime })</code> composition: a real IndexedDB snapshot plus
-      an in-page loopback WebSocket transport standing in for a second client.
-    </details>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt — offline storage &amp; realtime sync</h1>
+      <div class="ex-note">
+        <p class="ex-note-title">What's on this page</p>
+        <p>
+          One <code>dataSync({ offline, realtime })</code> composition: a real IndexedDB snapshot plus
+          an in-page loopback WebSocket transport standing in for a second client.
+        </p>
+      </div>
 
-    <div class="panels">
-      <fieldset class="panel">
-        <legend>Connection</legend>
-        <button id="rt-connect">Connect</button>
-        <button id="rt-disconnect">Disconnect</button>
-        <button id="rt-drop">Simulate drop</button>
-        <button id="rt-offline" aria-pressed="false">Peer server: online</button>
-        <br />
-        <label>Latency <input id="rt-latency" type="range" min="0" max="1500" step="50" value="150" /></label>
-        <output id="rt-latency-out">150 ms</output>
-        <p class="readout" id="rt-status" role="status">Booting…</p>
-      </fieldset>
+      <div class="panels">
+        <fieldset class="panel ex-toolbar">
+          <legend class="ex-group-label">Connection</legend>
+          <button id="rt-connect" class="ex-btn">Connect</button>
+          <button id="rt-disconnect" class="ex-btn">Disconnect</button>
+          <button id="rt-drop" class="ex-btn">Simulate drop</button>
+          <button id="rt-offline" aria-pressed="false" class="ex-btn">Peer server: online</button>
+          <label class="ex-field">Latency <input id="rt-latency" type="range" min="0" max="1500" step="50" value="150" class="ex-input" /></label>
+          <output id="rt-latency-out">150 ms</output>
+          <p class="readout ex-readout" id="rt-status" role="status">Booting…</p>
+        </fieldset>
 
-      <fieldset class="panel">
-        <legend>Peer (second client)</legend>
-        <button id="peer-rename">Rename a task</button>
-        <button id="peer-shift">Shift by +1 day</button>
-        <button id="peer-add">Add a task</button>
-        <button id="peer-remove">Delete a task</button>
-        <br />
-        <button id="peer-echo">Echo unchanged row</button>
-        <button id="peer-resync">Request resync</button>
-        <button id="peer-direct">applyMessage() direct</button>
-        <p class="readout" id="rt-applied" role="status">No remote message applied yet.</p>
-      </fieldset>
+        <fieldset class="panel ex-toolbar">
+          <legend class="ex-group-label">Peer (second client)</legend>
+          <button id="peer-rename" class="ex-btn">Rename a task</button>
+          <button id="peer-shift" class="ex-btn">Shift by +1 day</button>
+          <button id="peer-add" class="ex-btn">Add a task</button>
+          <button id="peer-remove" class="ex-btn">Delete a task</button>
+          <button id="peer-echo" class="ex-btn">Echo unchanged row</button>
+          <button id="peer-resync" class="ex-btn">Request resync</button>
+          <button id="peer-direct" class="ex-btn">applyMessage() direct</button>
+          <p class="readout ex-readout" id="rt-applied" role="status">No remote message applied yet.</p>
+        </fieldset>
 
-      <fieldset class="panel">
-        <legend>Offline storage</legend>
-        <button id="off-save">Save snapshot</button>
-        <button id="off-restore">Restore snapshot</button>
-        <button id="off-clear">Clear snapshot</button>
-        <button id="off-refresh">Refresh state</button>
-        <p class="readout" id="off-status" role="status">Checking IndexedDB…</p>
-      </fieldset>
+        <fieldset class="panel ex-toolbar">
+          <legend class="ex-group-label">Offline storage</legend>
+          <button id="off-save" class="ex-btn">Save snapshot</button>
+          <button id="off-restore" class="ex-btn">Restore snapshot</button>
+          <button id="off-clear" class="ex-btn">Clear snapshot</button>
+          <button id="off-refresh" class="ex-btn">Refresh state</button>
+          <p class="readout ex-readout" id="off-status" role="status">Checking IndexedDB…</p>
+        </fieldset>
+      </div>
+
+      <div id="chart" class="ex-chart"></div>
+      <div id="event-log" role="log" aria-live="polite" aria-label="Sync and storage events"></div>
     </div>
-
-    <div id="chart"></div>
-    <div id="event-log" role="log" aria-live="polite" aria-label="Sync and storage events"></div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

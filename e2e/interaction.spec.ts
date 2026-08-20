@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 // E2E for examples/interaction.html: interaction/undo-redo/a11y wiring, composed with
 // `presetStandard()` and every peripheral feature (docs/specs/plugins/interaction.md §6.4–§6.10)
 // turned on. Covers bar drag/undo, selection, keyboard, tooltip, context menu, edit dialog,
-// filter/search and zoom against v2's actual service/DOM surface (`stargantt.view`,
+// filter/search and zoom against the actual service/DOM surface (`stargantt.view`,
 // `stargantt.timeline`, `stargantt.rows`, `stargantt.history`).
 //
 // Every assertion below is DOM/behavioral (public service state, dispatched commands, rendered

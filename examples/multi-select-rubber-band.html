@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Multi-select and rubber-band example</title>
+    <title>StarGantt — Multi-select and rubber-band example</title>
     <!--
       One HTML file + one script tag. Demonstrates click / Ctrl-click / Shift-click selection,
       rubber-band drag, the selectAll/clearOnEscape/deleteSelected keyboard shortcuts, and a
@@ -15,57 +15,14 @@
       selection. This page is self-contained, so the `confirmDelete` hook and the contributed
       handlers report back directly through a closure.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 6px;
-        font-size: 11px;
-        color: #333;
-      }
-      details > summary {
-        cursor: pointer;
-        color: #555;
-      }
-      details ul {
-        margin: 4px 0 0;
-        padding-left: 18px;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 16px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      button {
-        font: inherit;
-        padding: 4px 10px;
-        cursor: pointer;
-      }
-      .label {
-        color: #555;
-        font-size: 11px;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — multi-select and rubber-band</h1>
-    <details open>
-      <summary>How to use</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — multi-select and rubber-band</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">How to use</p>
       <ul>
         <li>Click a bar to select only that bar.</li>
         <li><strong>Ctrl</strong> (<strong>Cmd</strong> on macOS) + click a bar to toggle its membership in the selection.</li>
@@ -78,23 +35,24 @@
         <li><em>Confirm mode</em> switches between the plugin's built-in <code>alertdialog</code> (its wording comes from this page's <code>messages</code> overrides — <em>Remove</em> / <em>Keep</em>) and a host <code>confirmDelete</code> hook that replaces the dialog with a policy: it approves at most two rows at a time and refuses larger deletions. Either way the outcome is reported in the <em>Confirmation outcome</em> readout. Switching re-creates the chart, which also restores the data.</li>
         <li>Keyboard: with a row focused (click a grid row, or Tab into the grid), <strong>Shift</strong> + <strong>&uarr;</strong>/<strong>&darr;</strong> extends the selection from the row where the Shift sequence began to the newly focused row, and <strong>Ctrl</strong> (<strong>Cmd</strong> on macOS) + <strong>Space</strong> toggles the focused row's membership — both only while selection runs in <code>mode: "multi"</code>, as configured here.</li>
       </ul>
-    </details>
+    </div>
 
-    <div class="toolbar">
-      <button type="button" id="clearBtn">Clear selection</button>
-      <button type="button" id="selectAllBtn">Select all (via service)</button>
-      <span class="label">Current selection</span>
-      <span id="selectionReadout">(none)</span>
+    <div class="ex-toolbar">
+      <button type="button" id="clearBtn" class="ex-btn">Clear selection</button>
+      <button type="button" id="selectAllBtn" class="ex-btn">Select all (via service)</button>
+      <span class="ex-group-label">Current selection</span>
+      <span id="selectionReadout" class="ex-readout">(none)</span>
     </div>
-    <div class="toolbar">
-      <span class="label">Bulk delete</span>
-      <button type="button" id="deleteBtn">Delete selected&hellip;</button>
-      <button type="button" id="confirmModeBtn" aria-pressed="false">Confirm mode: built-in dialog</button>
-      <button type="button" id="resetDataBtn">Reset demo data</button>
-      <span class="label">Confirmation outcome</span>
-      <span id="deleteReadout" role="status">(nothing deleted yet)</span>
+    <div class="ex-toolbar">
+      <span class="ex-group-label">Bulk delete</span>
+      <button type="button" id="deleteBtn" class="ex-btn">Delete selected&hellip;</button>
+      <button type="button" id="confirmModeBtn" aria-pressed="false" class="ex-btn">Confirm mode: built-in dialog</button>
+      <button type="button" id="resetDataBtn" class="ex-btn">Reset demo data</button>
+      <span class="ex-group-label">Confirmation outcome</span>
+      <span id="deleteReadout" role="status" class="ex-readout">(nothing deleted yet)</span>
     </div>
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

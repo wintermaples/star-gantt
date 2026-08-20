@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Resource utilization example</title>
+    <title>StarGantt — Resource utilization example</title>
     <!--
       This page's focus is the merged plugin's `utilization` nest (docs/specs/plugins/resource.md
       §3.5/§6.4): the over-allocation warning glyph on task bars, the Overallocation grid column,
@@ -22,82 +22,46 @@
         `stargantt.resource-pool` / `stargantt.utilization` services directly — those fields are
         not setup-time config, so no rebuild is needed for them.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-      #toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 12px;
-        align-items: center;
-        margin-bottom: 4px;
-      }
-      #toolbar button,
-      #toolbar select {
-        min-height: 24px;
-        font: inherit;
-        cursor: pointer;
-      }
-      #status {
-        font-size: 11px;
-        min-height: 1.4em;
-        margin: 4px 0;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — resource utilization</h1>
-    <details>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — resource utilization</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
       Over-allocation warnings (task-bar glyph + Overallocation column), the team-capacity and
       demand-vs-supply panels, and pool edits (time off, capacity, booking state) that feed the
       same aggregation engine live.
-    </details>
-    <div id="toolbar">
-      <span role="group" aria-label="Bucket width">
-        <button id="bucket-day" type="button" aria-pressed="true">Day buckets</button>
-        <button id="bucket-week" type="button" aria-pressed="false">Week buckets</button>
+      </p>
+    </div>
+    <div id="toolbar" class="ex-toolbar">
+      <span role="group" aria-label="Bucket width" class="ex-group">
+        <button id="bucket-day" type="button" aria-pressed="true" class="ex-btn">Day buckets</button>
+        <button id="bucket-week" type="button" aria-pressed="false" class="ex-btn">Week buckets</button>
       </span>
-      <label>
+      <label class="ex-field">
         Threshold
-        <select id="threshold">
+        <select id="threshold" class="ex-select">
           <option value="0.8">80%</option>
           <option value="1" selected>100%</option>
           <option value="1.25">125%</option>
         </select>
       </label>
-      <span role="group" aria-label="Panels">
-        <button id="btn-summary" type="button" aria-pressed="false">Team capacity…</button>
-        <button id="btn-trend" type="button" aria-pressed="false">Demand vs supply…</button>
+      <span role="group" aria-label="Panels" class="ex-group">
+        <button id="btn-summary" type="button" aria-pressed="false" class="ex-btn">Team capacity…</button>
+        <button id="btn-trend" type="button" aria-pressed="false" class="ex-btn">Demand vs supply…</button>
       </span>
-      <span role="group" aria-label="Pool edits">
-        <button id="btn-timeoff" type="button" aria-pressed="false">Priya: 5 days off</button>
-        <button id="btn-capacity" type="button" aria-pressed="false">Jordan at 50% capacity</button>
-        <button id="btn-booking" type="button" aria-pressed="false">Confirm lab booking</button>
+      <span role="group" aria-label="Pool edits" class="ex-group">
+        <button id="btn-timeoff" type="button" aria-pressed="false" class="ex-btn">Priya: 5 days off</button>
+        <button id="btn-capacity" type="button" aria-pressed="false" class="ex-btn">Jordan at 50% capacity</button>
+        <button id="btn-booking" type="button" aria-pressed="false" class="ex-btn">Confirm lab booking</button>
       </span>
     </div>
-    <p id="status" role="status" aria-live="polite">Loading…</p>
-    <div id="chart"></div>
+    <p id="status" role="status" aria-live="polite" class="ex-readout">Loading…</p>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

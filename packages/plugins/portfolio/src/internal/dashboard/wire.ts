@@ -1,7 +1,7 @@
 // docs/specs/plugins/portfolio.md §3
 /**
  * Assembles `DashboardService`: the store snapshot cache, formulas, the portfolio-backed
- * aggregations (always composed — dashboard and portfolio are one plugin in v2, so no
+ * aggregations (always composed — dashboard and portfolio are one plugin, so no
  * `stargantt.portfolio` service lookup is needed here at all), the panel and its live-refresh
  * coalescing, direct task updates, and the report export.
  */
@@ -56,7 +56,7 @@ export interface DashboardWireDeps {
   data: DataService;
   config: DashboardWireConfig;
   messages: PortfolioMessages;
-  /** The portfolio service this same plugin instance just assembled — always present in v2. */
+  /** The portfolio service this same plugin instance just assembled — always present. */
   portfolio: PortfolioService;
 }
 

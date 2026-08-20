@@ -1,0 +1,38 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build all packages",
+            "type": "shell",
+            "command": "pnpm run build",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "Preview user docs",
+            "type": "shell",
+            "command": "pnpm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/user-docs"
+            },
+            "dependsOn": "Build all packages",
+            "problemMatcher": [],
+            "isBackground": true
+        },
+        {
+            "label": "Preview user docs (without building package)",
+            "type": "shell",
+            "command": "pnpm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/user-docs"
+            },
+            "problemMatcher": [],
+            "isBackground": true
+        }
+    ]
+}

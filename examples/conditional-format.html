@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StarGantt v2 — Conditional formatting example</title>
+  <title>StarGantt — Conditional formatting example</title>
   <!--
     Demonstrates the conditional-format rule engine: a custom rule matching `meta.category`, the
     built-in overdue warning, the built-in progress-status coloring, and the bottom-right legend.
@@ -13,27 +13,14 @@
     fields. The timeline origin nests under `view.timeline.origin`. There is no page chrome or
     controls beyond the chart itself, so this page stays a static (no-JS-UI) demonstration.
   -->
-  <style>
-    body {
-      margin: 0;
-      padding: 6px 12px;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-    }
-    h1 {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 4px;
-    }
-    #chart {
-      height: 480px;
-      border: 1px solid #ccc;
-    }
-  </style>
+<link rel="stylesheet" href="examples.css">
+  
 </head>
-<body>
-  <h1>StarGantt v2 — conditional formatting</h1>
-  <div id="chart"></div>
+<body class="ex-body">
+  <div class="ex-page">
+  <h1 class="ex-title">StarGantt — conditional formatting</h1>
+  <div id="chart" class="ex-chart"></div>
+  </div>
 
   <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
   <script>

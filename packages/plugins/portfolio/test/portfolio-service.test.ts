@@ -93,7 +93,7 @@ describe("portfolio service basics", () => {
   });
 });
 
-describe("nodes/goals store publication (v2-new)", () => {
+describe("nodes/goals store publication", () => {
   it("publishes a fresh snapshot array per observable set change; an earlier snapshot's contents never change under it", () => {
     const boot = bootHeadless();
     const seen: (readonly unknown[])[] = [];
@@ -370,7 +370,7 @@ describe("portfolio filter and saved views", () => {
     boot.dispose();
   });
 
-  it("narrows rows regardless of registration order (v2: meta.optional never orders startup)", () => {
+  it("narrows rows regardless of registration order (meta.optional never orders startup)", () => {
     const state: { criteria: FilterCriteria | null } = { criteria: null };
     const boot = bootHeadlessFilterAfter({ nodes: projectNodes }, [filterStub(state)]);
     loadTwoProjects(boot.data);

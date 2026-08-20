@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StarGantt v2 — Task fields and custom fields example</title>
+  <title>StarGantt — Task fields and custom fields example</title>
   <!--
     Demonstrates the standard task-field columns (status/priority/tags/deadline/duration), their
     bar decorations (status glyph, overdue warning, assignee avatars), the side-panel detail
@@ -39,26 +39,14 @@
     - Task changes are observed via `gantt.service("stargantt.data").tasks.subscribe(render)`.
     - This page is self-contained (see examples/interaction.html for the pattern).
   -->
+<link rel="stylesheet" href="examples.css">
   <style>
-    body {
-      margin: 0;
-      padding: 6px 12px;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-    }
-    h1 {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 4px;
-    }
-    h2 {
-      font-size: 13px;
-      font-weight: 600;
-      margin: 8px 0 4px;
-    }
+    /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+       chrome) now comes from the shared .ex-* vocabulary above. */
     #chart {
-      height: 420px;
-      border: 1px solid #ccc;
+      --ex-chart-height: 420px;
+      /* The side panel is a chart-internal column — 1280px starves it of room. */
+      --ex-chart-max-width: none;
     }
     .panel {
       margin-top: 8px;
@@ -99,11 +87,6 @@
       flex-wrap: wrap;
       gap: 4px;
     }
-    .btn-group button[aria-pressed="true"] {
-      background: #0f766e;
-      color: #fff;
-      border-color: #0f766e;
-    }
     .hint {
       display: block;
       font-size: 10px;
@@ -122,12 +105,13 @@
     }
   </style>
 </head>
-<body>
-  <h1>StarGantt v2 — task fields and custom fields</h1>
-  <div id="chart"></div>
+<body class="ex-body">
+  <div class="ex-page">
+  <h1 class="ex-title">StarGantt — task fields and custom fields</h1>
+  <div id="chart" class="ex-chart"></div>
 
-  <section class="panel" aria-labelledby="panelHeading">
-    <h2 id="panelHeading">Selected task</h2>
+  <section class="panel ex-panel" aria-labelledby="panelHeading">
+    <h2 id="panelHeading" class="ex-panel-title">Selected task</h2>
     <p id="selStatus" role="status" aria-live="polite">Select a task row to edit its fields.</p>
 
     <dl class="detail" id="selDetail"></dl>
@@ -136,10 +120,10 @@
       <fieldset>
         <legend>Status</legend>
         <div class="btn-group" id="statusRow">
-          <button type="button" data-status="not-started" aria-pressed="false" disabled><span aria-hidden="true">○</span> Not started</button>
-          <button type="button" data-status="in-progress" aria-pressed="false" disabled><span aria-hidden="true">▶</span> In progress</button>
-          <button type="button" data-status="done" aria-pressed="false" disabled><span aria-hidden="true">✓</span> Done</button>
-          <button type="button" data-status="on-hold" aria-pressed="false" disabled><span aria-hidden="true">‖</span> On hold</button>
+          <button type="button" class="ex-btn" data-status="not-started" aria-pressed="false" disabled><span aria-hidden="true">○</span> Not started</button>
+          <button type="button" class="ex-btn" data-status="in-progress" aria-pressed="false" disabled><span aria-hidden="true">▶</span> In progress</button>
+          <button type="button" class="ex-btn" data-status="done" aria-pressed="false" disabled><span aria-hidden="true">✓</span> Done</button>
+          <button type="button" class="ex-btn" data-status="on-hold" aria-pressed="false" disabled><span aria-hidden="true">‖</span> On hold</button>
         </div>
         <span class="hint">Pressing the active status again clears the field. Setting <em>Done</em> also stamps the actual end date inside the same undo step.</span>
       </fieldset>
@@ -147,7 +131,7 @@
       <fieldset>
         <legend>Priority</legend>
         <label for="prioritySelect">Priority</label>
-        <select id="prioritySelect" disabled>
+        <select id="prioritySelect" class="ex-select" disabled>
           <option value="">—</option>
           <option value="high">High</option>
           <option value="medium">Medium</option>
@@ -159,8 +143,8 @@
       <fieldset>
         <legend>Duration</legend>
         <label for="durationInput">Days</label>
-        <input type="number" id="durationInput" min="0.25" step="0.25" disabled />
-        <button type="button" id="durationApply" disabled>Set duration</button>
+        <input type="number" id="durationInput" class="ex-input" min="0.25" step="0.25" disabled />
+        <button type="button" id="durationApply" class="ex-btn" disabled>Set duration</button>
         <span class="hint">Moves the end date only, via <code>task/update</code>.</span>
       </fieldset>
 
@@ -172,12 +156,13 @@
 
       <fieldset>
         <legend>Custom field: Budget</legend>
-        <button type="button" id="budgetUp" disabled>Budget +5</button>
-        <button type="button" id="budgetClear" disabled>Clear budget</button>
+        <button type="button" id="budgetUp" class="ex-btn" disabled>Budget +5</button>
+        <button type="button" id="budgetClear" class="ex-btn" disabled>Clear budget</button>
         <span class="hint"><code>stargantt.fields.setValue()</code>; the Remaining and Flag formula columns recompute on read.</span>
       </fieldset>
     </div>
   </section>
+  </div>
 
   <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
   <script>
@@ -564,7 +549,7 @@
       const duration = durationOf(task);
       durationInput.value = duration === undefined ? "" : String(Math.round(duration * 100) / 100);
 
-      // See the file header GAP note: no public `displayId()` getter exists in v2, so this shows
+      // See the file header GAP note: no public `displayId()` getter exists, so this shows
       // the raw stored `customId` (falling back to the task id) instead of the formatted
       // idNumbering sequence.
       addDetail("Display ID (raw)", f.customId || String(id));

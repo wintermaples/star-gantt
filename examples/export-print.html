@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Print &amp; PDF export example</title>
+    <title>StarGantt — Print &amp; PDF export example</title>
     <!--
       Print is one facet of the single `stargantt.export` facade that presetStandard() always
       includes — there is no separate print plugin, and no separate service id. Configuration is
@@ -17,61 +17,29 @@
       `StarGantt.downloadFile(document, data, filename, mimeType?)`, void return, and it revokes
       the object URL synchronously after the click.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-      .toolbar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin: 0 0 6px;
-      }
-      button {
-        font: inherit;
-        padding: 4px 10px;
-      }
-      #pdfStatus {
-        font-size: 12px;
-        color: #555;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — print &amp; PDF export</h1>
-    <details>
-      <summary>What's on this page</summary>
-      "Open preview" opens the print-preview dialog (paper size, header/footer bands, the
-      built-in table and legend) with the paper/orientation/header configured on the export
-      plugin's <code>print</code> nest. "Download PDF" calls <code>toPdf()</code> to get a
-      <code>Blob</code>, then saves it through <code>StarGantt.downloadFile()</code> (see the
-      comment at the top of this file).
-    </details>
-    <div class="toolbar">
-      <button id="previewBtn" type="button">Open preview</button>
-      <button id="pdfBtn" type="button">Download PDF</button>
-      <span id="pdfStatus" role="status"></span>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt — print &amp; PDF export</h1>
+      <div class="ex-note">
+        <p class="ex-note-title">What's on this page</p>
+        <p>
+          "Open preview" opens the print-preview dialog (paper size, header/footer bands, the
+          built-in table and legend) with the paper/orientation/header configured on the export
+          plugin's <code>print</code> nest. "Download PDF" calls <code>toPdf()</code> to get a
+          <code>Blob</code>, then saves it through <code>StarGantt.downloadFile()</code> (see the
+          comment at the top of this file).
+        </p>
+      </div>
+      <div class="toolbar ex-toolbar">
+        <button id="previewBtn" type="button" class="ex-btn">Open preview</button>
+        <button id="pdfBtn" type="button" class="ex-btn">Download PDF</button>
+        <span id="pdfStatus" role="status" class="ex-readout"></span>
+      </div>
+      <div id="chart" class="ex-chart"></div>
     </div>
-    <div id="chart"></div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

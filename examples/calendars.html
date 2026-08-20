@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Calendars example</title>
+    <title>StarGantt — Calendars example</title>
     <!--
       Demonstrates the `stargantt.calendars` service (scheduling.md §1.2): a registry of named
       working calendars (Standard Mon-Fri 09:00-17:00 with two holidays, a Gulf Sun-Thu week, a
@@ -42,91 +42,46 @@
         `presetStandard()` — so this page's FS-chained rollout links paint as connector ports and
         dependency lines by default.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 14px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      .group {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-      .group label {
-        color: #444;
-      }
-      button,
-      select {
-        font: inherit;
-        font-size: 12px;
-      }
-      #status {
-        margin: 0 0 6px;
-        font-size: 12px;
-        color: #333;
-        min-height: 1.2em;
-      }
-      #chart {
-        height: 460px;
-        border: 1px solid #ccc;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — working calendars</h1>
-    <details>
-      <summary>What's on this page</summary>
-      A registry of named working calendars (Standard, Gulf week, 24/7 continuous), one task
-      calendar assigned directly through the data store's own <code>calendars</code> map, per-task
-      assignment (undoable), a switchable non-working-time overlay, and the exception editor
-      dialog.
-    </details>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt — working calendars</h1>
+      <div class="ex-note">
+        <p class="ex-note-title">What's on this page</p>
+        <p>
+          A registry of named working calendars (Standard, Gulf week, 24/7 continuous), one task
+          calendar assigned directly through the data store's own <code>calendars</code> map, per-task
+          assignment (undoable), a switchable non-working-time overlay, and the exception editor
+          dialog.
+        </p>
+      </div>
 
-    <div class="toolbar">
-      <div class="group">
-        <label for="shade-select">Overlay shading</label>
-        <select id="shade-select"></select>
+      <div class="toolbar ex-toolbar">
+        <div class="group ex-field">
+          <label for="shade-select">Overlay shading</label>
+          <select id="shade-select" class="ex-select"></select>
+        </div>
+        <div class="group ex-group" role="group" aria-label="Zoom">
+          <span class="ex-group-label">Zoom:</span>
+          <button id="zoom-day" type="button" aria-pressed="false" class="ex-btn">Day</button>
+          <button id="zoom-hour" type="button" aria-pressed="false" class="ex-btn">Hour (off-hours hatch)</button>
+        </div>
+        <div class="group ex-field">
+          <label for="task-select">Task</label>
+          <select id="task-select" class="ex-select"></select>
+        </div>
+        <div class="group ex-field">
+          <label for="cal-select">Calendar to assign</label>
+          <select id="cal-select" class="ex-select"></select>
+        </div>
+        <button id="assign-btn" type="button" class="ex-btn">Assign (undoable)</button>
+        <button id="editor-btn" type="button" class="ex-btn">Edit exceptions&hellip;</button>
       </div>
-      <div class="group" role="group" aria-label="Zoom">
-        <span>Zoom:</span>
-        <button id="zoom-day" type="button" aria-pressed="false">Day</button>
-        <button id="zoom-hour" type="button" aria-pressed="false">Hour (off-hours hatch)</button>
-      </div>
-      <div class="group">
-        <label for="task-select">Task</label>
-        <select id="task-select"></select>
-      </div>
-      <div class="group">
-        <label for="cal-select">Calendar to assign</label>
-        <select id="cal-select"></select>
-      </div>
-      <button id="assign-btn" type="button">Assign (undoable)</button>
-      <button id="editor-btn" type="button">Edit exceptions&hellip;</button>
+      <p id="status" role="status" aria-live="polite" class="ex-readout">Loading&hellip;</p>
+      <div id="chart" class="ex-chart"></div>
     </div>
-    <p id="status" role="status" aria-live="polite">Loading&hellip;</p>
-    <div id="chart"></div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

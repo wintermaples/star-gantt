@@ -20,7 +20,7 @@ export default defineConfig({
       ".claude/worktrees/**",
       "user-docs/**",
       ".pnpm-store/**",
-      // The pre-v2 repository may sit here as an untracked working copy; its test suite
+      // An older separate repository may sit here as an untracked working copy; its test suite
       // (and its own vendored stores) must never leak into a root run.
       "star-gantt-old/**",
     ],

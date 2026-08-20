@@ -1,0 +1,30 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node-terminal",
+            "name": "Build all packages",
+            "request": "launch",
+            "command": "pnpm run build",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "node-terminal",
+            "name": "Preview user docs",
+            "request": "launch",
+            "preLaunchTask": "Build all packages",
+            "command": "pnpm run dev",
+            "cwd": "${workspaceFolder}/user-docs"
+        },
+        {
+            "type": "node-terminal",
+            "name": "Preview user docs (without building package)",
+            "request": "launch",
+            "command": "pnpm run dev",
+            "cwd": "${workspaceFolder}/user-docs"
+        }
+    ]
+}

@@ -595,7 +595,7 @@ indistinguishable, from the outside, from a library that does not have that toke
 the registry: light and (where it differs) dark values come straight from
 `packages/stargantt/src/styles/tokens.css`'s `@property` registrations and
 `styles/layout.css`'s one themed rule, parsing each `light-dark(...)` declaration directly (see
-`docs/specs/plugins/view.md`, which documents the theme surface v2 folded into the `view` plugin).
+`docs/specs/plugins/view.md`, which documents the theme surface folded into the `view` plugin).
 Which plugin *reads* a token is derived the same way the group is — by scanning every plugin
 package's own sources for the name — since there is no attribution column to read instead. The
 canvas-read set and the forced-colours mapping come from the view plugin's own internal theme

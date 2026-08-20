@@ -239,11 +239,10 @@
 
 /*
  * No max-width here on purpose: the chart wants every pixel the column has, and several pages
- * mount a side panel beside it. Line length is bounded on the prose blocks themselves
- * (`.ex-description`, `.ex-footer`) instead, which is where over-long measure actually hurts.
+ * mount a side panel beside it.
  */
 .ex-page {
-  width: 100%;
+  margin: 24px 28px 40px;
 }
 
 .ex-title {
@@ -254,9 +253,6 @@
 }
 
 .ex-description {
-  /* A prose measure rather than the full column: past ~85 characters a line is hard to track
-     back to the start of the next one. */
-  max-width: 78ch;
   margin: 0 0 20px;
   color: var(--ex-muted);
 }
@@ -272,7 +268,6 @@
 }
 
 .ex-footer {
-  max-width: 78ch;
   margin: 24px 0 0;
   padding-top: 14px;
   border-top: 1px solid var(--ex-border);
@@ -330,6 +325,12 @@
 .ex-chart {
   flex: 1;
   min-width: 0;
+  /* Caps the chart at 1280px so it does not stretch edge-to-edge on very wide windows; still
+     shrinks below that on narrower ones (down to the 720px viewport floor), so no page overflows
+     horizontally. A page that mounts extra chart-internal columns (a side panel, a load-chart
+     band) sets `--ex-chart-max-width: none` inline — 1280px is comfortable for a single
+     grid+timeline pane, but starves those extra columns of room. */
+  max-width: var(--ex-chart-max-width, 1280px);
   /* Pages set their own height by overriding this custom property inline; 600px is the height
      most pages used before the unification. */
   height: var(--ex-chart-height, 600px);
@@ -476,7 +477,6 @@
 }
 
 .ex-readout {
-  max-width: 44ch;
   font-size: 12.5px;
   line-height: 1.4;
   color: var(--ex-muted);

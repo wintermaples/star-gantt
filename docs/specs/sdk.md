@@ -1,4 +1,4 @@
-# StarGantt v2 SDK (@stargantt/sdk)
+# StarGantt SDK (@stargantt/sdk)
 
 Status: normative — the full public API enumeration. Module map and design constraints are summarized in `architecture.md`, chapter 2.
 

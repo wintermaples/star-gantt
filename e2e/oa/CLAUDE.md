@@ -83,7 +83,7 @@ cd user-docs && node tools/extract-api.ts && cd .. # rewrites user-docs/src/gene
 
 `api.json` gives, per plugin: `id`, `factory`, `category`, `inPresetStandard`, `dependsOn`, and a
 `config[]` of `{ name, type, optional, doc }`. Everything `catalog.json` needs except the level
-*values* is mechanical from that. Note: `doc` is often empty for several v2 plugins (data-sync's
+*values* is mechanical from that. Note: `doc` is often empty for several plugins (data-sync's
 top-level fields in particular) — read the plugin's `docs/specs/plugins/<name>.md` and, for a
 complex/callback/adapter type, the BUILT declaration under
 `packages/plugins/<dir>/dist/**/*.d.ts` rather than guessing.
@@ -282,7 +282,7 @@ at one already-running server on the same port (`reuseExistingServer` is on).
 ## 5. What a run checks
 
 `oa.spec.ts` boots directly on `examples/hello.html` (a real example page — **no test-only HTML**,
-matching the E2E policy the rest of the v2 suite follows): the page's own tiny demo instance is
+matching the E2E policy the rest of the suite follows): the page's own tiny demo instance is
 disposed, its `#chart` mount reused, and the generated `function boot({ mount, StarGantt })` is
 evaluated once via an isolated `new Function` scope and called, with any throw caught and reported
 rather than left to fail the page-eval call. (No `examples/*.html` page wires a playground-shell

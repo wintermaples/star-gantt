@@ -646,7 +646,7 @@ Thresholds that are not finite numbers ≥ 0, colors that are not non-empty stri
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
-| `panel` | `boolean` | `false` | Mounts the findings panel (§8); counts as `false` unless exactly `true`. The detection machinery has no other public outlet in v2 (§1.4). |
+| `panel` | `boolean` | `false` | Mounts the findings panel (§8); counts as `false` unless exactly `true`. The detection machinery has no other public outlet (§1.4). |
 
 ## 12. Messages
 

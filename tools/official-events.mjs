@@ -3,7 +3,7 @@
 // Official event catalog — CI LINT ONLY.
 //
 // This module is consumed exclusively by tools/lint-deps.mjs to check `ctx.emit`
-// / `ctx.on` call sites in OFFICIAL PLUGIN SOURCES against v2's closed event
+// / `ctx.on` call sites in OFFICIAL PLUGIN SOURCES against the closed event
 // catalog (see docs/specs/architecture.md, "Official event catalog"). It is a
 // development-time discipline for this repository only.
 //

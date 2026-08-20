@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Tree grid interaction example</title>
+    <title>StarGantt — Tree grid interaction example</title>
     <!--
       Demonstrates expand/collapse, scroll sync between the grid and chart panes, a third-party
       grid column + row-height contribution (via `definePlugin`/`ctx.contribute`), and the
@@ -23,46 +23,10 @@
         are the third-party contribution points used below (verified against
         packages/core/src/index.ts `PluginContext`).
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-        font-size: 13px;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      h2 {
-        font-size: 12px;
-        font-weight: 600;
-        margin: 8px 0 4px;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 12px;
-        margin: 0 0 4px;
-      }
-      .toolbar label {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-      button {
-        font: inherit;
-      }
-      .readout {
-        font: 11px/1.3 ui-monospace, monospace;
-        color: #444;
-      }
-      #chart {
-        height: 300px;
-        border: 1px solid #ccc;
-      }
+  <link rel="stylesheet" href="examples.css">
+  <style>
+      /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+         chrome) now comes from the shared .ex-* vocabulary above. */
       .panels {
         display: flex;
         gap: 16px;
@@ -75,93 +39,90 @@
       .panels li {
         margin-bottom: 2px;
       }
-      #outlineStatus {
-        font-size: 11px;
-        color: #333;
-        margin: 4px 0 0;
-      }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — tree grid interaction</h1>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt — tree grid interaction</h1>
 
-    <div class="toolbar">
-      <button type="button" id="expandAllBtn">Expand all</button>
-      <button type="button" id="collapseAllBtn">Collapse all</button>
-      <button type="button" id="toggleFirstBtn">Toggle first summary</button>
-      <span class="readout">Visible rows: <span id="rowCount">0</span></span>
-      <span class="readout">Scroll position: <span id="scrollPos">0, 0</span></span>
-    </div>
-
-    <div class="toolbar" role="group" aria-labelledby="outlineControlsTitle">
-      <span id="outlineControlsTitle"><strong>Outline &amp; structure</strong></span>
-      <label for="rowTarget">
-        Target row
-        <select id="rowTarget"></select>
-      </label>
-      <button type="button" id="indentBtn">Indent</button>
-      <button type="button" id="outdentBtn">Outdent</button>
-      <button type="button" id="insertBelowBtn">Insert row below</button>
-      <button type="button" id="insertChildBtn">Insert child row</button>
-      <label for="levelSelect">
-        Expand to level
-        <select id="levelSelect">
-          <option value="0">0 — roots only</option>
-          <option value="1" selected>1 — roots + children</option>
-          <option value="2">2 — three levels</option>
-        </select>
-      </label>
-      <button type="button" id="expandLevelBtn">Apply level</button>
-      <span class="readout">Target task type: <span id="targetType">&mdash;</span></span>
-      <span class="readout">Collapsed badges: <span id="badgeReadout">none</span></span>
-    </div>
-    <p id="outlineStatus" role="status">
-      Pick a target row, then indent, outdent or insert. Inside the grid pane
-      <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> do the same to the active row; <kbd>Escape</kbd>
-      releases <kbd>Tab</kbd> so it leaves the grid again.
-    </p>
-
-    <div id="chart"></div>
-
-    <div class="panels">
-      <div>
-        <h2>Demo features</h2>
-        <ul>
-          <li>Expand/collapse tasks with the arrows on the left of the tree grid</li>
-          <li>Bulk control via the "Expand all" / "Collapse all" buttons</li>
-          <li>The grid pane (left) and the chart pane (right) scroll in sync</li>
-          <li>Summary tasks (project rows) get a taller row height than their children</li>
-          <li>Column definitions: task name, start date, end date, progress, custom column (description)</li>
-          <li>Scroll position is displayed in real time</li>
-          <li>Outline editing: indent/outdent the target row, or press Tab / Shift+Tab on the
-            active row inside the grid pane (Escape releases Tab so it leaves the pane again)</li>
-          <li>Insert a row below the target or as its child — one undoable step each. A sibling
-            insert targets the new row; a child insert keeps the parent targeted so its type flip
-            stays visible</li>
-          <li>"Expand to level" sets the whole tree's expand state at once (display state only,
-            not undoable)</li>
-          <li>Collapsed branches show a "(n)" hidden-descendant badge as plain text</li>
-          <li>Auto-summary: inserting a child under the plain "Routine maintenance" task promotes
-            it to a summary in the same transaction — the "Target task type" readout flips to
-            "summary" (the target stays on the parent), and the status line names the promotion</li>
-        </ul>
+      <div class="toolbar ex-toolbar">
+        <button type="button" id="expandAllBtn" class="ex-btn">Expand all</button>
+        <button type="button" id="collapseAllBtn" class="ex-btn">Collapse all</button>
+        <button type="button" id="toggleFirstBtn" class="ex-btn">Toggle first summary</button>
+        <span class="readout ex-readout">Visible rows: <span id="rowCount">0</span></span>
+        <span class="readout ex-readout">Scroll position: <span id="scrollPos">0, 0</span></span>
       </div>
-      <div>
-        <h2>Public API usage</h2>
-        <ul>
-          <li><code>StarGantt.create()</code> - initialize the gantt chart</li>
-          <li><code>presetStandard()</code> - the standard plugin set</li>
-          <li><code>gantt.service("stargantt.rows")</code> - access to the row model</li>
-          <li><code>gantt.service("stargantt.data")</code> - access to the data store</li>
-          <li><code>gantt.dispatch("view/rowToggle", { id })</code> - expand/collapse operations</li>
-          <li><code>gantt.service("stargantt.rows").rows.subscribe(...)</code> - row-set changes</li>
-          <li><code>gantt.on("view/scrolled", ...)</code> - scroll events</li>
-          <li><code>gantt.dispatch("view/rowIndent" / "view/rowOutdent", { id })</code> - outline editing</li>
-          <li><code>gantt.dispatch("view/rowInsert", { id, position })</code> - insert a row</li>
-          <li><code>gantt.dispatch("view/expandToLevel", { level })</code> - bulk expand state</li>
-          <li><code>treeGrid: { outlineEditing: true, collapsedBadge: true }</code> - Tab outlining and the "(n)" badge</li>
-          <li><code>definePlugin()</code> - a custom plugin (column definition, row height customization)</li>
-        </ul>
+
+      <div class="toolbar ex-toolbar" role="group" aria-labelledby="outlineControlsTitle">
+        <span id="outlineControlsTitle" class="ex-group-label"><strong>Outline &amp; structure</strong></span>
+        <label for="rowTarget" class="ex-field">
+          Target row
+          <select id="rowTarget" class="ex-select"></select>
+        </label>
+        <button type="button" id="indentBtn" class="ex-btn">Indent</button>
+        <button type="button" id="outdentBtn" class="ex-btn">Outdent</button>
+        <button type="button" id="insertBelowBtn" class="ex-btn">Insert row below</button>
+        <button type="button" id="insertChildBtn" class="ex-btn">Insert child row</button>
+        <label for="levelSelect" class="ex-field">
+          Expand to level
+          <select id="levelSelect" class="ex-select">
+            <option value="0">0 — roots only</option>
+            <option value="1" selected>1 — roots + children</option>
+            <option value="2">2 — three levels</option>
+          </select>
+        </label>
+        <button type="button" id="expandLevelBtn" class="ex-btn">Apply level</button>
+        <span class="readout ex-readout">Target task type: <span id="targetType">&mdash;</span></span>
+        <span class="readout ex-readout">Collapsed badges: <span id="badgeReadout">none</span></span>
+      </div>
+      <p id="outlineStatus" role="status" class="ex-readout">
+        Pick a target row, then indent, outdent or insert. Inside the grid pane
+        <kbd class="ex-kbd">Tab</kbd> / <kbd class="ex-kbd">Shift+Tab</kbd> do the same to the active row; <kbd class="ex-kbd">Escape</kbd>
+        releases <kbd class="ex-kbd">Tab</kbd> so it leaves the grid again.
+      </p>
+
+      <div id="chart" class="ex-chart"></div>
+
+      <div class="panels">
+        <div class="ex-panel">
+          <h2 class="ex-panel-title">Demo features</h2>
+          <ul>
+            <li>Expand/collapse tasks with the arrows on the left of the tree grid</li>
+            <li>Bulk control via the "Expand all" / "Collapse all" buttons</li>
+            <li>The grid pane (left) and the chart pane (right) scroll in sync</li>
+            <li>Summary tasks (project rows) get a taller row height than their children</li>
+            <li>Column definitions: task name, start date, end date, progress, custom column (description)</li>
+            <li>Scroll position is displayed in real time</li>
+            <li>Outline editing: indent/outdent the target row, or press Tab / Shift+Tab on the
+              active row inside the grid pane (Escape releases Tab so it leaves the pane again)</li>
+            <li>Insert a row below the target or as its child — one undoable step each. A sibling
+              insert targets the new row; a child insert keeps the parent targeted so its type flip
+              stays visible</li>
+            <li>"Expand to level" sets the whole tree's expand state at once (display state only,
+              not undoable)</li>
+            <li>Collapsed branches show a "(n)" hidden-descendant badge as plain text</li>
+            <li>Auto-summary: inserting a child under the plain "Routine maintenance" task promotes
+              it to a summary in the same transaction — the "Target task type" readout flips to
+              "summary" (the target stays on the parent), and the status line names the promotion</li>
+          </ul>
+        </div>
+        <div class="ex-panel">
+          <h2 class="ex-panel-title">Public API usage</h2>
+          <ul>
+            <li><code>StarGantt.create()</code> - initialize the gantt chart</li>
+            <li><code>presetStandard()</code> - the standard plugin set</li>
+            <li><code>gantt.service("stargantt.rows")</code> - access to the row model</li>
+            <li><code>gantt.service("stargantt.data")</code> - access to the data store</li>
+            <li><code>gantt.dispatch("view/rowToggle", { id })</code> - expand/collapse operations</li>
+            <li><code>gantt.service("stargantt.rows").rows.subscribe(...)</code> - row-set changes</li>
+            <li><code>gantt.on("view/scrolled", ...)</code> - scroll events</li>
+            <li><code>gantt.dispatch("view/rowIndent" / "view/rowOutdent", { id })</code> - outline editing</li>
+            <li><code>gantt.dispatch("view/rowInsert", { id, position })</code> - insert a row</li>
+            <li><code>gantt.dispatch("view/expandToLevel", { level })</code> - bulk expand state</li>
+            <li><code>treeGrid: { outlineEditing: true, collapsedBadge: true }</code> - Tab outlining and the "(n)" badge</li>
+            <li><code>definePlugin()</code> - a custom plugin (column definition, row height customization)</li>
+          </ul>
+        </div>
       </div>
     </div>
 

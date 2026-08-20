@@ -23,12 +23,15 @@
   ],
   "forwardPorts": [
     4173,
-    4175,
-    5175
+    4175
   ],
   "portsAttributes": {
     "4173": {
       "label": "examples / Playwright",
+      "onAutoForward": "silent"
+    },
+    "4175": {
+      "label": "User docs",
       "onAutoForward": "silent"
     }
   },

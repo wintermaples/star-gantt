@@ -64,7 +64,7 @@ e2e/pages.spec.ts        全ページの実行検査（Playwright、基準画像
 # 前提: リポジトリルートで pnpm run build（サイトは dist を読む。古いと嘘を書く）
 pnpm install
 pnpm run generate      # api.json + tokens.json + search-index.json 再生成
-pnpm run dev           # http://localhost:5175
+pnpm run dev           # http://localhost:4175
 pnpm run test          # vitest（網羅性）
 pnpm run test:e2e      # Playwright（要 build）
 pnpm run typecheck     # src + e2e

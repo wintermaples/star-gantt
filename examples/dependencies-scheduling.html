@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Dependencies and scheduling example</title>
+    <title>StarGantt — Dependencies and scheduling example</title>
     <!--
       Demonstrates `dependencies` and `autoSchedule`, nested groups of the merged `scheduling`
       plugin (scheduling.md §11), one of the nine plugins `presetStandard()` composes. The side
@@ -22,50 +22,18 @@
       §2.3, so no custom `schedule/constraintBounds` contribution is needed — preview reschedule,
       reschedule).
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 6px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 12px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      .group {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-      .group label,
-      .group span.label {
-        color: #444;
-      }
-      button,
-      select {
-        font: inherit;
-        font-size: 12px;
-      }
-      button[aria-pressed="true"] {
-        background: #e0f2f1;
-        border-color: #0f766e;
+  <link rel="stylesheet" href="examples.css">
+  <style>
+      /* Rules with no examples.css equivalent — everything else (toolbar/group/button/select
+         chrome) now comes from the shared .ex-* vocabulary above.
+         #statusPanel/#statusPanel.error are ID selectors deliberately, not .ex-readout: the script
+         below overwrites statusPanel.className wholesale on every status update
+         (`statusPanel.className = isError ? "error" : ""`), which would strip any class-based
+         style — an ID rule survives that unaffected. */
+      #chart {
+        --ex-chart-height: 440px;
+        /* The dependency inspector is a side panel inside the chart — 1280px starves it of room. */
+        --ex-chart-max-width: none;
       }
       #statusPanel {
         margin: 0 0 6px;
@@ -80,16 +48,13 @@
         background: #fee2e2;
         color: #7f1d1d;
       }
-      #chart {
-        height: 440px;
-        border: 1px solid #ccc;
-      }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — dependencies and scheduling</h1>
-    <details open>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — dependencies and scheduling</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
       <ul>
         <li><strong>Move a task</strong>: drag a task bar to change its start time.</li>
         <li><strong>Dependencies</strong>: move an upstream task and its dependents slide with it.</li>
@@ -98,56 +63,56 @@
           downstream closure) and snap's <code>pushSuccessors</code> (propagation off; snap pushes
           violated successors forward by exactly their deficit — snap stands down automatically
           whenever propagation is on, so exactly one of the two ever runs).</li>
-        <li><strong>Undo / redo</strong>: toolbar buttons or <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Shift+Z</kbd>.</li>
+        <li><strong>Undo / redo</strong>: toolbar buttons or <kbd class="ex-kbd">Ctrl+Z</kbd> / <kbd class="ex-kbd">Ctrl+Shift+Z</kbd>.</li>
         <li><strong>Scheduling row</strong> acts on the live chart — no rebuild, no reload.</li>
       </ul>
-    </details>
-
-    <div class="toolbar">
-      <button id="undoBtn" type="button" title="Ctrl+Z">↶ Undo</button>
-      <button id="redoBtn" type="button" title="Ctrl+Shift+Z">↷ Redo</button>
-      <button id="addSsLinkBtn" type="button">+ SS link demo</button>
-      <button id="addFfLinkBtn" type="button">+ FF link demo</button>
     </div>
 
-    <div class="toolbar" role="group" aria-label="Link rendering (plugin construction options)">
-      <span class="label">Link rendering:</span>
-      <button class="opt" type="button" data-opt="showLinks" data-label="Links" aria-pressed="true">● Links</button>
-      <button class="opt" type="button" data-opt="typeColors" data-label="Type colours" aria-pressed="true">● Type colours</button>
-      <button class="opt" type="button" data-opt="highlightPaths" data-label="Path emphasis" aria-pressed="true">● Path emphasis</button>
-      <button class="opt" type="button" data-opt="highlightConflicts" data-label="Conflicts" aria-pressed="true">● Conflicts</button>
-      <button class="opt" type="button" data-opt="highlightDriving" data-label="Driving" aria-pressed="true">● Driving</button>
-      <button class="opt" type="button" data-opt="highlightDropTargets" data-label="Drop targets" aria-pressed="true">● Drop targets</button>
-      <button class="opt" type="button" data-opt="avoidBars" data-label="Avoid bars" aria-pressed="true">● Avoid bars</button>
-      <button class="opt" type="button" data-opt="linkEditing" data-label="Link editing" aria-pressed="true">● Link editing</button>
-      <button class="opt" type="button" data-opt="inspector" data-label="Inspector panel" aria-pressed="false">○ Inspector panel</button>
-      <div class="group">
+    <div class="toolbar ex-toolbar">
+      <button id="undoBtn" type="button" class="ex-btn" title="Ctrl+Z">↶ Undo</button>
+      <button id="redoBtn" type="button" class="ex-btn" title="Ctrl+Shift+Z">↷ Redo</button>
+      <button id="addSsLinkBtn" type="button" class="ex-btn">+ SS link demo</button>
+      <button id="addFfLinkBtn" type="button" class="ex-btn">+ FF link demo</button>
+    </div>
+
+    <div class="toolbar ex-toolbar" role="group" aria-label="Link rendering (plugin construction options)">
+      <span class="label ex-group-label">Link rendering:</span>
+      <button class="opt ex-btn" type="button" data-opt="showLinks" data-label="Links" aria-pressed="true">● Links</button>
+      <button class="opt ex-btn" type="button" data-opt="typeColors" data-label="Type colours" aria-pressed="true">● Type colours</button>
+      <button class="opt ex-btn" type="button" data-opt="highlightPaths" data-label="Path emphasis" aria-pressed="true">● Path emphasis</button>
+      <button class="opt ex-btn" type="button" data-opt="highlightConflicts" data-label="Conflicts" aria-pressed="true">● Conflicts</button>
+      <button class="opt ex-btn" type="button" data-opt="highlightDriving" data-label="Driving" aria-pressed="true">● Driving</button>
+      <button class="opt ex-btn" type="button" data-opt="highlightDropTargets" data-label="Drop targets" aria-pressed="true">● Drop targets</button>
+      <button class="opt ex-btn" type="button" data-opt="avoidBars" data-label="Avoid bars" aria-pressed="true">● Avoid bars</button>
+      <button class="opt ex-btn" type="button" data-opt="linkEditing" data-label="Link editing" aria-pressed="true">● Link editing</button>
+      <button class="opt ex-btn" type="button" data-opt="inspector" data-label="Inspector panel" aria-pressed="false">○ Inspector panel</button>
+      <div class="group ex-field">
         <label for="optLineStyle">Line style</label>
-        <select id="optLineStyle">
+        <select id="optLineStyle" class="ex-select">
           <option value="default">Default (1.5px, solid, filled head)</option>
           <option value="bold-dashed">Bold dashed (2.5px, 6-3 dash)</option>
           <option value="hairline-open">Hairline (1px, open head)</option>
         </select>
       </div>
-      <div class="group">
+      <div class="group ex-field">
         <label for="optReconciler">Reconciler</label>
-        <select id="optReconciler">
+        <select id="optReconciler" class="ex-select">
           <option value="auto-schedule">auto-schedule propagation</option>
           <option value="snap-push">snap pushSuccessors (propagation off)</option>
         </select>
       </div>
     </div>
 
-    <div class="toolbar" role="group" aria-label="Scheduling (acts on the live chart)">
-      <span class="label" id="schedLabel">Scheduling:</span>
-      <div class="group">
+    <div class="toolbar ex-toolbar" role="group" aria-label="Scheduling (acts on the live chart)">
+      <span class="label ex-group-label" id="schedLabel">Scheduling:</span>
+      <div class="group ex-field">
         <label for="schedTask">Task</label>
-        <select id="schedTask" aria-describedby="schedLabel"></select>
+        <select id="schedTask" class="ex-select" aria-describedby="schedLabel"></select>
       </div>
-      <button id="schedModeBtn" type="button" title="schedule/setTaskMode">Switch to manual</button>
-      <div class="group">
+      <button id="schedModeBtn" type="button" class="ex-btn" title="schedule/setTaskMode">Switch to manual</button>
+      <div class="group ex-field">
         <label for="schedConstraint">Constraint</label>
-        <select id="schedConstraint" title="task.constraint">
+        <select id="schedConstraint" class="ex-select" title="task.constraint">
           <option value="">None</option>
           <option value="SNLT">SNLT — start no later than</option>
           <option value="FNET">FNET — finish no earlier than</option>
@@ -155,13 +120,14 @@
           <option value="MFO">MFO — must finish on</option>
         </select>
       </div>
-      <button id="previewRescheduleBtn" type="button" title="SchedulerService.previewReschedule() — a dry run">Preview reschedule</button>
-      <button id="rescheduleBtn" type="button" title="schedule/reschedule — one transaction, one undo step">Reschedule</button>
-      <span id="schedDatesHint"></span>
+      <button id="previewRescheduleBtn" type="button" class="ex-btn" title="SchedulerService.previewReschedule() — a dry run">Preview reschedule</button>
+      <button id="rescheduleBtn" type="button" class="ex-btn" title="schedule/reschedule — one transaction, one undo step">Reschedule</button>
+      <span id="schedDatesHint" class="ex-readout"></span>
     </div>
 
     <div id="statusPanel" role="status" aria-live="polite" aria-atomic="true">Status: initializing...</div>
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

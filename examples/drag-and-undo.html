@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Drag editing and undo/redo example</title>
+    <title>StarGantt — Drag editing and undo/redo example</title>
     <!--
       One HTML file + one script tag. Demonstrates drag/resize/progress editing, the undo/redo
       toolbar and its keyboard chords, keyboard-only editing chords, and an opt-in "task-edge
@@ -16,80 +16,26 @@
       `interaction: { snap: {...} }`, and the timeline scale lives under
       `view: { timeline: {...} }`.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 6px;
-        font-size: 11px;
-        color: #333;
-      }
-      details > summary {
-        cursor: pointer;
-        color: #555;
-      }
-      details ul {
-        margin: 4px 0 0;
-        padding-left: 18px;
-      }
-      kbd {
-        font: 11px ui-monospace, monospace;
-        border: 1px solid #bbb;
-        border-radius: 3px;
-        padding: 0 4px;
-        background: #f5f5f5;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 16px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      button,
-      select {
-        font: inherit;
-        padding: 4px 10px;
-        cursor: pointer;
-      }
-      .label {
-        color: #555;
-        font-size: 11px;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-      #alignStatus {
-        font-size: 11px;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — drag editing and undo/redo</h1>
-    <details open>
-      <summary>How to use</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — drag editing and undo/redo</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">How to use</p>
       <ul>
         <li><strong>Move a bar:</strong> drag a bar to change the task's start and end dates.</li>
         <li><strong>Resize:</strong> drag the handles at either end of a bar to stretch or shrink its duration.</li>
         <li><strong>Adjust progress:</strong> drag the progress handle inside a bar to change the completion ratio.</li>
-        <li><strong>Undo:</strong> use the toolbar button or <kbd>Ctrl+Z</kbd> to revert the last change.</li>
-        <li><strong>Redo:</strong> use the toolbar button, <kbd>Ctrl+Shift+Z</kbd> or <kbd>Ctrl+Y</kbd> to reapply a reverted change.</li>
+        <li><strong>Undo:</strong> use the toolbar button or <kbd class="ex-kbd">Ctrl+Z</kbd> to revert the last change.</li>
+        <li><strong>Redo:</strong> use the toolbar button, <kbd class="ex-kbd">Ctrl+Shift+Z</kbd> or <kbd class="ex-kbd">Ctrl+Y</kbd> to reapply a reverted change.</li>
         <li>
           <strong>Keyboard editing:</strong> every drag above has a keyboard equivalent. Focus a
-          row in the grid (click it, or Tab in), then: <kbd>Ctrl+&larr;</kbd> / <kbd>Ctrl+&rarr;</kbd>
-          move the task by one unit of the current zoom scale; <kbd>Ctrl+Shift+&larr;</kbd> /
-          <kbd>Ctrl+Shift+&rarr;</kbd> resize its end; <kbd>Ctrl+Shift+&uarr;</kbd> /
-          <kbd>Ctrl+Shift+&darr;</kbd> step its progress by 10%.
+          row in the grid (click it, or Tab in), then: <kbd class="ex-kbd">Ctrl+&larr;</kbd> / <kbd class="ex-kbd">Ctrl+&rarr;</kbd>
+          move the task by one unit of the current zoom scale; <kbd class="ex-kbd">Ctrl+Shift+&larr;</kbd> /
+          <kbd class="ex-kbd">Ctrl+Shift+&rarr;</kbd> resize its end; <kbd class="ex-kbd">Ctrl+Shift+&uarr;</kbd> /
+          <kbd class="ex-kbd">Ctrl+Shift+&darr;</kbd> step its progress by 10%.
         </li>
         <li>
           <strong>Task-edge magnet:</strong> turn <em>Magnet</em> on in the toolbar to enable the
@@ -101,32 +47,34 @@
           because plugin options are chosen when the chart is created.
         </li>
       </ul>
-    </details>
+    </div>
 
-    <div class="toolbar">
-      <span class="label">History</span>
-      <button type="button" id="undoBtn" title="Ctrl+Z">&#8630; Undo</button>
-      <button type="button" id="redoBtn" title="Ctrl+Shift+Z">&#8631; Redo</button>
-      <span class="label" id="historyStatus"></span>
-      <span class="label" id="alignLabel">Task-edge magnet</span>
+    <div class="toolbar ex-toolbar">
+      <span class="label ex-group-label">History</span>
+      <button type="button" id="undoBtn" title="Ctrl+Z" class="ex-btn">&#8630; Undo</button>
+      <button type="button" id="redoBtn" title="Ctrl+Shift+Z" class="ex-btn">&#8631; Redo</button>
+      <span class="label ex-readout" id="historyStatus"></span>
+      <span class="label ex-group-label" id="alignLabel">Task-edge magnet</span>
       <button
         type="button"
         id="alignToggle"
         aria-pressed="false"
         aria-describedby="alignStatus"
         title="Enable the snap plugin's alignToTasks rule (re-creates the chart)"
+        class="ex-btn"
       >
         Magnet: Off
       </button>
-      <label class="label" for="alignTolerance">Tolerance</label>
-      <select id="alignTolerance" title="Pixel tolerance of the magnet (re-creates the chart)">
+      <label class="label ex-group-label" for="alignTolerance">Tolerance</label>
+      <select id="alignTolerance" title="Pixel tolerance of the magnet (re-creates the chart)" class="ex-select">
         <option value="8" selected>8 px</option>
         <option value="16">16 px</option>
         <option value="32">32 px</option>
       </select>
-      <span id="alignStatus" role="status"></span>
+      <span id="alignStatus" role="status" class="ex-readout"></span>
     </div>
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>
@@ -245,7 +193,7 @@
         const data = gantt.service("stargantt.data");
         data.load(dataset());
 
-        // History toolbar. `HistoryService.bindButtons()` is removed in v2 — the plugin's
+        // History toolbar. `HistoryService.bindButtons()` does not exist — the plugin's
         // `state` store is subscribed instead (undo-redo.md "Service" resolution note).
         const history = gantt.service("stargantt.history");
 

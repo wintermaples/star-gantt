@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — EVM example</title>
+    <title>StarGantt — EVM example</title>
     <!--
       One HTML file + one script tag, composed with `presetStandard()` plus the OPT-IN tracking
       plugin (tracking ships in the bundle but is not preset-composed), configured with only its
@@ -24,72 +24,39 @@
       through this page and any e2e coverage see the same shapes. CLAUDE.md's documented viewport
       floor is 720x540 (tablet and up, no mobile breakpoints) — the chrome below is kept minimal.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 460px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button,
-      #status-toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-      #status-toolbar button[aria-pressed="true"] {
-        font-weight: 600;
-      }
-      #status-readout {
-        margin: 4px 0 0;
-        font-size: 11px;
-        min-height: 14px;
-      }
-    </style>
+  <link rel="stylesheet" href="examples.css">
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — EVM (earned value)</h1>
-    <details>
-      <summary>What's on this page</summary>
-      Per-task BAC / actual cost (percent-complete accrual), the ten-tile KPI dashboard (BAC PV EV
-      AC SV CV SPI CPI EAC ETC) and the PV/EV/AC S-curve. The status-date buttons below re-create
-      the chart at a different status date — the solid line is <code>view.todayLine</code>'s
-      "today" marker; the dashed line is the same status date fed to
-      <code>view.todayLine.statusDate</code> and <code>tracking.evm.statusDate</code>, so the two
-      coincide only at the "Today" offset.
-    </details>
-    <div id="toolbar">
-      <button id="evm-dashboard" type="button">Open EVM dashboard</button>
-      <button id="evm-curve" type="button">Open S-curve</button>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — EVM (earned value)</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        Per-task BAC / actual cost (percent-complete accrual), the ten-tile KPI dashboard (BAC PV EV
+        AC SV CV SPI CPI EAC ETC) and the PV/EV/AC S-curve. The status-date buttons below re-create
+        the chart at a different status date — the solid line is <code>view.todayLine</code>'s
+        "today" marker; the dashed line is the same status date fed to
+        <code>view.todayLine.statusDate</code> and <code>tracking.evm.statusDate</code>, so the two
+        coincide only at the "Today" offset.
+      </p>
     </div>
-    <div id="chart"></div>
+    <div id="toolbar" class="ex-toolbar">
+      <button id="evm-dashboard" type="button" class="ex-btn">Open EVM dashboard</button>
+      <button id="evm-curve" type="button" class="ex-btn">Open S-curve</button>
+    </div>
+    <div id="chart" class="ex-chart"></div>
 
     <section aria-labelledby="status-date-title">
-      <h2 id="status-date-title" style="font-size: 12px; margin: 8px 0 2px">Status-date line</h2>
-      <div id="status-toolbar" role="group" aria-labelledby="status-date-title">
-        <button id="status-back" type="button" aria-pressed="false" data-offset="-3">3 days ago</button>
-        <button id="status-today" type="button" aria-pressed="true" data-offset="0">Today</button>
-        <button id="status-fwd" type="button" aria-pressed="false" data-offset="3">In 3 days</button>
+      <h2 id="status-date-title" class="ex-panel-title">Status-date line</h2>
+      <div id="status-toolbar" role="group" aria-labelledby="status-date-title" class="ex-group">
+        <button id="status-back" type="button" aria-pressed="false" data-offset="-3" class="ex-btn">3 days ago</button>
+        <button id="status-today" type="button" aria-pressed="true" data-offset="0" class="ex-btn">Today</button>
+        <button id="status-fwd" type="button" aria-pressed="false" data-offset="3" class="ex-btn">In 3 days</button>
       </div>
-      <p id="status-readout" role="status"></p>
+      <p id="status-readout" role="status" class="ex-readout"></p>
     </section>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

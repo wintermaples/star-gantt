@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Resource assignment example</title>
+    <title>StarGantt — Resource assignment example</title>
     <!--
       This page's focus is the merged plugin's `assign` nest (docs/specs/plugins/resource.md
       §3.3/§6.2): the Resources grid column (one chip per assignment, an "open editor" button),
@@ -23,43 +23,8 @@
       `assignments` stores. This page has no playground/reboot shell, so the effort panel's
       helpers reference the single `gantt` instance created below directly.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 420px;
-        border: 1px solid #ccc;
-        margin-bottom: 8px;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-      .effort-panel {
-        font-size: 12px;
-      }
-      .effort-panel h2 {
-        font-size: 13px;
-        margin: 0 0 4px;
-      }
+  <link rel="stylesheet" href="examples.css">
+  <style>
       #effort-status {
         font-style: italic;
         min-height: 1.2em;
@@ -76,18 +41,21 @@
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — resource assignment</h1>
-    <details>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — resource assignment</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
       The Resources grid column (chips + an editor button), the assignment editor dialog, chip
       drag-reassign, and — below the chart — the auto-scheduler's effort tri-state, which
       recomputes duration/work/units on an assignment edit as part of the same undoable step.
-    </details>
-    <div id="chart"></div>
+      </p>
+    </div>
+    <div id="chart" class="ex-chart"></div>
 
-    <section class="effort-panel" aria-labelledby="effort-heading">
-      <h2 id="effort-heading">Effort tri-state (fixed duration / work / units)</h2>
+    <section class="effort-panel ex-panel" aria-labelledby="effort-heading">
+      <h2 id="effort-heading" class="ex-panel-title">Effort tri-state (fixed duration / work / units)</h2>
       <p>
         Three tasks opt into the auto-schedule engine's effort accounting through
         <code>meta.effortMode</code> and <code>meta.work</code> (work in milliseconds). The engine
@@ -95,18 +63,18 @@
         assignment rates, and appends its recomputation to the <em>same</em> transaction as the
         edit that triggered it — one Ctrl+Z reverts both together.
       </p>
-      <div id="toolbar">
-        <button id="effort-work" type="button" aria-pressed="false">
+      <div id="toolbar" class="ex-toolbar">
+        <button id="effort-work" type="button" aria-pressed="false" class="ex-btn">
           <span class="effort-mark" aria-hidden="true">[ ]</span>Implementation: Alice at 100%
         </button>
-        <button id="effort-duration" type="button" aria-pressed="false">
+        <button id="effort-duration" type="button" aria-pressed="false" class="ex-btn">
           <span class="effort-mark" aria-hidden="true">[ ]</span>Design: Alice at 100%
         </button>
-        <button id="effort-units" type="button" aria-pressed="false">
+        <button id="effort-units" type="button" aria-pressed="false" class="ex-btn">
           <span class="effort-mark" aria-hidden="true">[ ]</span>Planning: 5-day duration
         </button>
       </div>
-      <p id="effort-status" role="status" aria-live="polite"></p>
+      <p id="effort-status" role="status" aria-live="polite" class="ex-readout"></p>
       <table class="effort-table" id="effort-table">
         <thead>
           <tr>
@@ -142,6 +110,7 @@
         </tbody>
       </table>
     </section>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

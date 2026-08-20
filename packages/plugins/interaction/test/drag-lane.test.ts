@@ -17,13 +17,13 @@
  *       the constant `Y` below — the harness's fake root reports `getBoundingClientRect().top === 0`,
  *       so root-relative y equals `clientY` directly, and every move/press event in this file sets
  *       `y === clientY` so the pointer's *viewport-local* y cancels out of `viewportYToRoot`, leaving
- *       the source-lane lookup keyed on the bar's own (unchanging) box — exactly as it is in v2).
+ *       the source-lane lookup keyed on the bar's own (unchanging) box — exactly as it is here).
  *     - `booted.press("Escape")` → `controller.cancel()` (Escape/abandonment is the ARBITER's job in
- *       v2, already covered by `test/arbiter.test.ts`'s `dragging-lane` cases; here only the
+ *       the arbiter, already covered by `test/arbiter.test.ts`'s `dragging-lane` cases; here only the
  *       controller's OWN reaction to `cancel()` — nothing written, the provider's mark cleared — is
  *       under test).
  *     - `booted.cancelPointer()` → `controller.up(barUp({ …, type: "pointercancel" }))` (a cancelled
- *       capture arrives as the gesture's own release in v2's arbiter, not as a separate cancel path).
+ *       capture arrives as the gesture's own release in the arbiter, not as a separate cancel path).
  */
 import { describe, expect, it } from "vitest";
 import { isUsableLaneProvider, laneTargetAt } from "../src/internal/drag/lane-drag";

@@ -1,6 +1,6 @@
 # E2E tests
 
-Playwright end-to-end tests for StarGantt v2.
+Playwright end-to-end tests for StarGantt.
 
 - **Target the build, not the source.** Specs load the `examples/*.html` pages, which pull in the
   built bundle from `../packages/stargantt/dist/stargantt.iife.js`. Run `pnpm run build` before
@@ -24,7 +24,7 @@ Playwright end-to-end tests for StarGantt v2.
 - **`scheduling.spec.ts`** covers `examples/scheduling.html`: dependency links (creation,
   selection, routing), the auto-scheduling engine's propagation, schedule modes, working-calendar
   snapping, critical-path classification, the schedule-diagnostics panel and a 10k-task reschedule
-  performance budget — link-line assertions are canvas pixel probes, since v2 paints links rather
+  performance budget — link-line assertions are canvas pixel probes, since StarGantt paints links rather
   than mounting per-link DOM nodes.
 - **`export.spec.ts`** covers the `stargantt.export` facade composed onto
   `examples/scheduling.html`: PNG/JPEG/SVG capture, PDF pagination, the print preview dialog,

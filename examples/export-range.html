@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StarGantt v2 — Export range example (PNG/JPEG/SVG)</title>
+    <title>StarGantt — Export range example (PNG/JPEG/SVG)</title>
     <!--
       Demonstrates `stargantt.export`'s image capture: `toPng()` / `toSvg()` and the `range`
       option ("viewport" | "full" | { start, end }).
@@ -20,59 +20,10 @@
       save); `StarGantt.downloadFile()` would fire the save immediately instead of leaving a link
       to click, so it doesn't fit this page's preview-first UI.
     -->
-    <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 6px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 420px;
-        border: 1px solid #ccc;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 16px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      .group {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-      .group-label {
-        font-weight: 600;
-        margin-right: 4px;
-      }
-      button {
-        font: inherit;
-        padding: 4px 8px;
-      }
-      button.active {
-        background: #d8e8ff;
-        border-color: #6ba0e8;
-      }
+  <link rel="stylesheet" href="examples.css">
+  <style>
       #exportStatus.error {
         color: #a30000;
-      }
-      #exportStatus {
-        font-size: 12px;
       }
       .result {
         margin-top: 6px;
@@ -88,10 +39,12 @@
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — export range (PNG/JPEG/SVG)</h1>
-    <details>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt — export range (PNG/JPEG/SVG)</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
       <code>toPng(options)</code>/<code>toSvg(options)</code> accept a per-call
       <code>range</code>: "viewport" (visible only), "full" (the whole task extent), or an
       explicit <code>{ start, end }</code> span (here, the first 20 days). JPEG shares the same
@@ -99,25 +52,26 @@
       anything else (including omitting it) leaves the encoder's own default (~0.92) in charge.
       JPEG has no alpha channel, so this page configures <code>background: "#ffffff"</code>, which
       is also what the encoder falls back to on its own.
-    </details>
-    <div class="toolbar">
-      <div class="group">
-        <span class="group-label">range</span>
-        <div class="group" id="rangeButtons">
-          <button data-range="viewport" class="active" aria-pressed="true" type="button">viewport</button>
-          <button data-range="full" aria-pressed="false" type="button">full</button>
-          <button data-range="custom" aria-pressed="false" type="button">{ start, end } (first 20 days)</button>
+      </p>
+    </div>
+    <div class="toolbar ex-toolbar">
+      <div class="group ex-group">
+        <span class="group-label ex-group-label">range</span>
+        <div class="group ex-group" id="rangeButtons">
+          <button data-range="viewport" class="active ex-btn" aria-pressed="true" type="button">viewport</button>
+          <button data-range="full" aria-pressed="false" type="button" class="ex-btn">full</button>
+          <button data-range="custom" aria-pressed="false" type="button" class="ex-btn">{ start, end } (first 20 days)</button>
         </div>
       </div>
-      <div class="group">
-        <span class="group-label">export</span>
-        <button id="exportPngBtn" type="button">Export to PNG</button>
-        <button id="exportJpegBtn" type="button">Export to JPEG</button>
-        <button id="exportSvgBtn" type="button">Export to SVG</button>
+      <div class="group ex-group">
+        <span class="group-label ex-group-label">export</span>
+        <button id="exportPngBtn" type="button" class="ex-btn">Export to PNG</button>
+        <button id="exportJpegBtn" type="button" class="ex-btn">Export to JPEG</button>
+        <button id="exportSvgBtn" type="button" class="ex-btn">Export to SVG</button>
       </div>
-      <div class="group">
+      <div class="group ex-field">
         <label class="group-label" for="jpegQuality">quality (JPEG only)</label>
-        <select id="jpegQuality">
+        <select id="jpegQuality" class="ex-select">
           <option value="">(omitted) — encoder default</option>
           <option value="0.92">0.92 — high</option>
           <option value="0.5" selected>0.5 — medium</option>
@@ -126,11 +80,13 @@
         </select>
       </div>
     </div>
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
     <div class="result">
-      <div id="exportStatus" role="status" aria-live="polite">No export yet.</div>
+      <div id="exportStatus" role="status" aria-live="polite" class="ex-readout">No export yet.</div>
       <img id="exportPreview" alt="Exported gantt chart preview" />
       <div><a id="exportDownload" download style="display: none">Download the exported file</a></div>
+    </div>
+
     </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->

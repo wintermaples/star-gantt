@@ -208,7 +208,7 @@ test("the today marker lands inside the chart pane instead of at its clipped lef
 // `ViewService.textWidth()` and lays its caption pill out from the result. The caption always
 // includes the `custom/todayCaptionExtra` extension point's contribution from `custom.at-risk-badge`
 // ("1 at risk" — the "impl" summary task carries `meta.customAtRisk: true` from first paint), which
-// is itself a genuinely new v2 mechanism: a third-party plugin (`custom.today-line`) DECLARES its
+// is itself a genuinely distinct mechanism: a third-party plugin (`custom.today-line`) DECLARES its
 // own extension point and a second third-party plugin (`custom.at-risk-badge`) contributes to it,
 // on exactly the terms an official point would offer.
 test("the painter's caption includes the contributed extension-point text and measures it through the cache", async ({
