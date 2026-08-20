@@ -35,6 +35,8 @@
          chrome) now comes from the shared .ex-* vocabulary above. */
       #chart {
         --ex-chart-height: 320px;
+        /* The side panel is a chart-internal column — 1280px starves it of room. */
+        --ex-chart-max-width: none;
       }
       .panels {
         display: flex;

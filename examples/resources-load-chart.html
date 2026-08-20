@@ -76,7 +76,8 @@
     <p class="readout ex-readout" id="panel-readout" aria-live="polite">
       Double-click opens the grid's inline cell editor.
     </p>
-    <div id="chart" class="ex-chart"></div>
+    <!-- The load-chart band and side panel are chart-internal — 1280px starves them of room. -->
+    <div id="chart" class="ex-chart" style="--ex-chart-max-width: none"></div>
     </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

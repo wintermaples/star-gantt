@@ -32,6 +32,8 @@
          style — an ID rule survives that unaffected. */
       #chart {
         --ex-chart-height: 440px;
+        /* The dependency inspector is a side panel inside the chart — 1280px starves it of room. */
+        --ex-chart-max-width: none;
       }
       #statusPanel {
         margin: 0 0 6px;

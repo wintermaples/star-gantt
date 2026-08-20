@@ -40,7 +40,8 @@
       <div id="toolbar" class="ex-toolbar">
         <button id="view-toggle" type="button" class="ex-btn">Show / hide resource view</button>
       </div>
-      <div id="chart" class="ex-chart"></div>
+      <!-- The resource-view strip is a chart-internal row — 1280px starves it of room. -->
+      <div id="chart" class="ex-chart" style="--ex-chart-max-width: none"></div>
     </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

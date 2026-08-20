@@ -57,7 +57,8 @@
       <button id="btn-summary" class="ex-btn">Team capacity…</button>
       <button id="btn-trend" class="ex-btn">Demand vs supply…</button>
     </div>
-    <div id="chart" class="ex-chart"></div>
+    <!-- The load-chart band is a chart-internal row — 1280px starves it of room. -->
+    <div id="chart" class="ex-chart" style="--ex-chart-max-width: none"></div>
     </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->

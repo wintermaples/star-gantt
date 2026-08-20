@@ -60,7 +60,8 @@
         Custom weighted-hours load/capacity
       </label>
     </div>
-    <div id="chart" class="ex-chart"></div>
+    <!-- The load-chart band is a chart-internal row — 1280px starves it of room. -->
+    <div id="chart" class="ex-chart" style="--ex-chart-max-width: none"></div>
     <p class="footnote ex-footer">
       Rebuilding on every toggle: <code>bucket</code>, <code>resources</code>, <code>load</code>
       and <code>capacity</code> are all read once at <code>setup()</code>, so each change here

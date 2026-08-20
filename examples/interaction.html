@@ -24,7 +24,8 @@
         <summary>Activity log</summary>
         <div id="log"></div>
       </details>
-      <div id="chart" class="ex-chart"></div>
+      <!-- The side panel is a chart-internal column — 1280px starves it of room. -->
+      <div id="chart" class="ex-chart" style="--ex-chart-max-width: none"></div>
     </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->

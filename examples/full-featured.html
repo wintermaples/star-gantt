@@ -214,6 +214,9 @@
       #gantt-root {
         width: 100%;
         height: 100%;
+        /* This page composes every plugin at once, including the side panel — 1280px (the
+           examples.css default) starves the grid+timeline+panel layout of room. */
+        --ex-chart-max-width: none;
         border: 1px solid var(--border);
         border-radius: 8px;
         overflow: hidden;
