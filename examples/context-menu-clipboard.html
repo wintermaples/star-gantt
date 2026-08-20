@@ -35,85 +35,58 @@
     -->
   <link rel="stylesheet" href="examples.css">
   <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 6px;
-        font-size: 11px;
-        color: #333;
-      }
-      details > summary {
-        cursor: pointer;
-        color: #555;
-      }
-      details ul {
-        margin: 4px 0 0;
-        padding-left: 18px;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 16px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      button,
-      textarea {
-        font: inherit;
-      }
-      button {
-        padding: 4px 10px;
-        cursor: pointer;
-      }
-      textarea {
-        font: 11px ui-monospace, monospace;
-        width: 320px;
-        height: 40px;
-        vertical-align: middle;
-      }
-      .label {
-        color: #555;
-        font-size: 11px;
-      }
-      .panel {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 18px;
-        margin: 0 0 6px;
-        font-size: 11px;
-      }
-      .panel > div {
-        display: flex;
-        gap: 4px;
-        align-items: baseline;
-      }
-      pre {
-        margin: 2px 0 0;
-        padding: 3px 6px;
-        border: 1px solid #eee;
-        font: 11px ui-monospace, monospace;
-        max-width: 100%;
-        overflow-x: auto;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-    </style>
+    /* No examples.css equivalent for a per-page chart height — the shared .ex-chart height
+       (600px) is a default a page may override via this custom property. */
+    #chart {
+      --ex-chart-height: 480px;
+    }
+
+    /* Plain inline label preceding a control/readout — no group-label wrapper existed around
+       these, and nothing in examples.css styles a bare `.label`. */
+    .label {
+      color: #555;
+      font-size: 11px;
+    }
+
+    /* `.ex-panel` supplies the bordered/background card look but not the flex-wrap row layout
+       that arranges the panel's label/readout pairs; restore that (the `.panel > div` row
+       layout itself is adequately reproduced by `.ex-field`'s inline-flex, which blockifies to
+       the same flex-item behavior as the original `.panel > div`'s `display: flex`). */
+    .panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 18px;
+      margin: 0 0 6px;
+      font-size: 11px;
+    }
+
+    /* Not covered by `.ex-readout` (which caps width at 44ch and drops the monospace font) —
+       the tab-separated preview needs a wide, monospace, horizontally-scrollable code block.
+       Targeted by id so it reliably outranks `.ex-readout`'s max-width. */
+    #tsvReadout {
+      margin: 2px 0 0;
+      padding: 3px 6px;
+      border: 1px solid #eee;
+      font: 11px ui-monospace, monospace;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* The paste-as-cells textarea carries no `.ex-input` class — restore its original compact
+       monospace sizing. */
+    textarea {
+      font: 11px ui-monospace, monospace;
+      width: 320px;
+      height: 40px;
+      vertical-align: middle;
+    }
+  </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — context menu and clipboard</h1>
-    <details>
-      <summary>How to use</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — context menu and clipboard</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">How to use</p>
       <ul>
         <li><strong>Right-press a bar</strong> to open the menu: <em>Insert task</em>, <em>Duplicate task</em>, <em>Delete task</em>, then <em>Start link from here</em>. Pick that last entry, right-press a second bar, and <em>Link here from source</em> becomes enabled — activating it creates an FS dependency. The pending source is one-shot: every menu opened while it is armed also offers <em>Cancel link</em>, and the source is dropped once the next menu invocation ends.</li>
         <li><strong>Right-press empty chart space</strong> for the background menu (<em>Insert task</em> at the root level).</li>
@@ -124,35 +97,36 @@
         <li><strong>Paste rows as cells</strong> feeds the textarea's tab-separated rows to a foreign-text paste. Text is written onto the rows from the anchor downward — the anchor is the focused row, else the first selected row — and any rows that outrun the grid become new root tasks appended at the end. Click a row first to move the anchor there.</li>
         <li>Every clipboard or menu action is exactly one history entry: <strong>Undo</strong> reverses a whole paste, not one task at a time.</li>
       </ul>
-    </details>
-
-    <div class="toolbar">
-      <span class="label">Clipboard actions</span>
-      <button type="button" id="selectBranchBtn">Select summary branch</button>
-      <button type="button" id="clearSelBtn">Clear selection</button>
-      <button type="button" id="copyBtn">Copy</button>
-      <button type="button" id="pasteBtn">Paste</button>
-      <button type="button" id="duplicateBtn">Duplicate</button>
-      <span class="label">History</span>
-      <button type="button" id="undoBtn">Undo</button>
-      <button type="button" id="redoBtn">Redo</button>
-      <button id="extrasToggle" type="button" aria-pressed="true">Extra menu entries: on</button>
     </div>
-    <div class="toolbar">
+
+    <div class="toolbar ex-toolbar">
+      <span class="label">Clipboard actions</span>
+      <button type="button" id="selectBranchBtn" class="ex-btn">Select summary branch</button>
+      <button type="button" id="clearSelBtn" class="ex-btn">Clear selection</button>
+      <button type="button" id="copyBtn" class="ex-btn">Copy</button>
+      <button type="button" id="pasteBtn" class="ex-btn">Paste</button>
+      <button type="button" id="duplicateBtn" class="ex-btn">Duplicate</button>
+      <span class="label">History</span>
+      <button type="button" id="undoBtn" class="ex-btn">Undo</button>
+      <button type="button" id="redoBtn" class="ex-btn">Redo</button>
+      <button id="extrasToggle" type="button" aria-pressed="true" class="ex-btn">Extra menu entries: on</button>
+    </div>
+    <div class="toolbar ex-toolbar">
       <label class="label" for="cellText">Spreadsheet rows (name, start, end, progress)</label>
       <textarea id="cellText" spellcheck="false"></textarea>
-      <button type="button" id="pasteCellsBtn">Paste rows as cells</button>
+      <button type="button" id="pasteCellsBtn" class="ex-btn">Paste rows as cells</button>
     </div>
-    <div class="panel">
-      <div><span class="label">Status</span><span id="statusReadout" role="status">Ready.</span></div>
-      <div><span class="label">Selection</span><span id="selectionReadout">(none)</span></div>
-      <div><span class="label">Clipboard</span><span id="clipboardReadout">empty</span></div>
-      <div><span class="label">Paste anchor (focused row)</span><span id="anchorReadout">(none)</span></div>
-      <div><span class="label">Tasks in store</span><span id="taskCountReadout">0</span></div>
+    <div class="panel ex-panel">
+      <div class="ex-field"><span class="label">Status</span><span id="statusReadout" role="status" class="ex-readout">Ready.</span></div>
+      <div class="ex-field"><span class="label">Selection</span><span id="selectionReadout" class="ex-readout">(none)</span></div>
+      <div class="ex-field"><span class="label">Clipboard</span><span id="clipboardReadout" class="ex-readout">empty</span></div>
+      <div class="ex-field"><span class="label">Paste anchor (focused row)</span><span id="anchorReadout" class="ex-readout">(none)</span></div>
+      <div class="ex-field"><span class="label">Tasks in store</span><span id="taskCountReadout" class="ex-readout">0</span></div>
     </div>
     <div class="label">Last copied cell text (TSV preview)</div>
-    <pre id="tsvReadout">(nothing copied yet)</pre>
-    <div id="chart"></div>
+    <pre id="tsvReadout" class="ex-readout">(nothing copied yet)</pre>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

@@ -22,46 +22,10 @@
   -->
 <link rel="stylesheet" href="examples.css">
   <style>
-    body {
-      margin: 0;
-      padding: 6px 12px;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-    }
-    h1 {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 4px;
-    }
     h2 {
       font-size: 12px;
       font-weight: 600;
       margin: 8px 0 4px;
-    }
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px 16px;
-      margin: 0 0 6px;
-    }
-    .group {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      font-size: 11px;
-    }
-    .group-label {
-      font-weight: 600;
-      color: #555;
-    }
-    label {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    #chart {
-      height: 420px;
-      border: 1px solid #ccc;
     }
     .lower {
       display: flex;
@@ -114,34 +78,35 @@
     .demo-pill--open { background: #e5e7eb; }
   </style>
 </head>
-<body>
-  <h1>StarGantt v2 — column editing and sort</h1>
+<body class="ex-body">
+  <div class="ex-page">
+  <h1 class="ex-title">StarGantt v2 — column editing and sort</h1>
 
-  <div class="toolbar">
-    <div class="group">
-      <span class="group-label">columns</span>
-      <label><input type="checkbox" id="wbsToggle" /><code>wbs</code>: WBS numbering column</label>
-      <label>
+  <div class="toolbar ex-toolbar">
+    <div class="group ex-group">
+      <span class="group-label ex-group-label">columns</span>
+      <label class="ex-checkbox"><input type="checkbox" id="wbsToggle" /><code>wbs</code>: WBS numbering column</label>
+      <label class="ex-field">
         <code>columnLayout</code>
-        <select id="layoutSelect">
+        <select id="layoutSelect" class="ex-select">
           <option value="none">as contributed</option>
           <option value="compact">hide Start &amp; End</option>
           <option value="wbsFirst">WBS, Status, Name first</option>
         </select>
       </label>
     </div>
-    <div class="group">
-      <span class="group-label">cell &amp; row painting</span>
-      <label><input type="checkbox" id="renderersToggle" /><code>cellRenderers</code>: Progress meter + Status pill</label>
-      <label><input type="checkbox" id="rowClassToggle" /><code>rowClass</code>: flag priority-1 rows</label>
+    <div class="group ex-group">
+      <span class="group-label ex-group-label">cell &amp; row painting</span>
+      <label class="ex-checkbox"><input type="checkbox" id="renderersToggle" /><code>cellRenderers</code>: Progress meter + Status pill</label>
+      <label class="ex-checkbox"><input type="checkbox" id="rowClassToggle" /><code>rowClass</code>: flag priority-1 rows</label>
     </div>
-    <div class="group">
-      <span class="group-label">sorting</span>
-      <label><input type="checkbox" id="collationToggle" /><code>collation</code>: locale-aware, numeric Name sort</label>
+    <div class="group ex-group">
+      <span class="group-label ex-group-label">sorting</span>
+      <label class="ex-checkbox"><input type="checkbox" id="collationToggle" /><code>collation</code>: locale-aware, numeric Name sort</label>
     </div>
   </div>
 
-  <div id="chart"></div>
+  <div id="chart" class="ex-chart"></div>
 
   <div class="lower">
     <div>
@@ -173,6 +138,7 @@
         <li class="empty">Nothing to undo yet</li>
       </ol>
     </div>
+  </div>
   </div>
 
   <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

@@ -15,75 +15,26 @@
       is 720x540 (tablet+); no mobile breakpoint.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 16px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      button {
-        font: inherit;
-        padding: 4px 10px;
-        cursor: pointer;
-      }
-      .readout {
-        display: inline-flex;
-        gap: 6px;
-        align-items: baseline;
-      }
-      .readout .label {
-        color: #555;
-        font-size: 11px;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-      details {
-        margin: 6px 0 0;
-        font-size: 11px;
-        color: #333;
-      }
-      details > summary {
-        cursor: pointer;
-        color: #555;
-      }
-      details ul {
-        margin: 4px 0 0;
-        padding-left: 18px;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — drag editing extensions</h1>
-    <div class="toolbar">
-      <button type="button" id="scrollStartBtn">Scroll to start</button>
-      <button type="button" id="scrollEndBtn">Scroll to end</button>
-      <span class="readout">
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — drag editing extensions</h1>
+    <div class="toolbar ex-toolbar">
+      <button type="button" id="scrollStartBtn" class="ex-btn">Scroll to start</button>
+      <button type="button" id="scrollEndBtn" class="ex-btn">Scroll to end</button>
+      <span class="readout ex-readout">
         <span class="label">Horizontal scroll (view/scrolled)</span>
         <span id="scrollReadout">scrollLeft = 0 px</span>
       </span>
-      <span class="readout">
+      <span class="readout ex-readout">
         <span class="label">Last drag: pointer moves vs frames</span>
         <span id="frameSyncReadout">no drag yet</span>
       </span>
     </div>
-    <div id="chart"></div>
-    <details>
-      <summary>How to try the two pointer-loop flags</summary>
+    <div id="chart" class="ex-chart"></div>
+    <div class="ex-note">
+      <p class="ex-note-title">How to try the two pointer-loop flags</p>
       <ul>
         <li>
           <strong>Auto-scroll</strong> (<code>dragEdit: { autoScroll: true }</code>): press a bar
@@ -108,7 +59,8 @@
           outside.)
         </li>
       </ul>
-    </details>
+    </div>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

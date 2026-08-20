@@ -26,77 +26,32 @@
       lines by default.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin: 0 0 6px;
-      }
-      button {
-        font: inherit;
-        font-size: 12px;
-      }
-      #chart {
-        height: 420px;
-        border: 1px solid #ccc;
-      }
-      #readout {
-        margin-top: 8px;
-        font-size: 12px;
-      }
-      #readout h2 {
-        font-size: 12px;
-        margin: 8px 0 2px;
-      }
-      #readout ul {
-        margin: 2px 0 4px;
-        padding-left: 18px;
-      }
-      #actionStatus {
-        color: #333;
-        min-height: 1.2em;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — schedule diagnostics</h1>
-    <details>
-      <summary>What's on this page</summary>
-      The opt-in schedule-diagnostics corner panel (`scheduling.diagnostics.panel`, top-left of the
-      chart) plus a page-level readout of the same two DCMA-style findings: unlinked ("orphan")
-      tasks and leads (links with negative lag).
-    </details>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt v2 — schedule diagnostics</h1>
+      <div class="ex-note">
+        <p class="ex-note-title">What's on this page</p>
+        <p>
+          The opt-in schedule-diagnostics corner panel (`scheduling.diagnostics.panel`, top-left of the
+          chart) plus a page-level readout of the same two DCMA-style findings: unlinked ("orphan")
+          tasks and leads (links with negative lag).
+        </p>
+      </div>
 
-    <div class="toolbar">
-      <button id="orphanLinkBtn" type="button" aria-pressed="false">Link &ldquo;Design review&rdquo;</button>
-      <button id="leadBtn" type="button" aria-pressed="false">Lead on &ldquo;Build &rarr; Test&rdquo;</button>
-      <button id="selectOrphansBtn" type="button">Select unlinked tasks</button>
-    </div>
-    <div id="chart"></div>
+      <div class="toolbar ex-toolbar">
+        <button id="orphanLinkBtn" type="button" aria-pressed="false" class="ex-btn">Link &ldquo;Design review&rdquo;</button>
+        <button id="leadBtn" type="button" aria-pressed="false" class="ex-btn">Lead on &ldquo;Build &rarr; Test&rdquo;</button>
+        <button id="selectOrphansBtn" type="button" class="ex-btn">Select unlinked tasks</button>
+      </div>
+      <div id="chart" class="ex-chart"></div>
 
-    <div id="readout">
-      <h2>Diagnostics readout (page-level, mirrors the corner panel — see the top comment)</h2>
-      <div id="reportBody" role="status" aria-live="polite">Loading&hellip;</div>
-      <div id="actionStatus" role="status" aria-live="polite"></div>
+      <div id="readout" class="ex-panel">
+        <h2 class="ex-panel-title">Diagnostics readout (page-level, mirrors the corner panel — see the top comment)</h2>
+        <div id="reportBody" role="status" aria-live="polite" class="ex-readout">Loading&hellip;</div>
+        <div id="actionStatus" role="status" aria-live="polite" class="ex-readout"></div>
+      </div>
     </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->

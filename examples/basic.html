@@ -5,28 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>StarGantt v2 — Basic example</title>
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 24px;
-        font-family: system-ui, sans-serif;
-      }
-      #chart {
-        height: 420px;
-        border: 1px solid #ccc;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2</h1>
-    <p>One HTML file + one script tag. Styles are injected by <code>create()</code>.</p>
-    <div id="chart"></div>
-    <p id="perf-readout"></p>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt v2</h1>
+      <p class="ex-description">One HTML file + one script tag. Styles are injected by <code>create()</code>.</p>
+      <div id="chart" class="ex-chart"></div>
+      <p id="perf-readout" class="ex-readout"></p>
 
-    <footer>
-      Loads <code>../packages/stargantt/dist/stargantt.iife.js</code> (core + all fifteen official
-      plugins + CSS; this page composes the nine-plugin <code>presetStandard()</code>).
-    </footer>
+      <footer class="ex-footer">
+        Loads <code>../packages/stargantt/dist/stargantt.iife.js</code> (core + all fifteen official
+        plugins + CSS; this page composes the nine-plugin <code>presetStandard()</code>).
+      </footer>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

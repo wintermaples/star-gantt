@@ -26,141 +26,76 @@
       `Viewport.detail` semantics.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 16px 24px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 18px;
-        margin: 0 0 4px;
-      }
-      #chart {
-        height: 460px;
-        border: 1px solid #ccc;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 16px;
-        margin: 10px 0;
-      }
-      .group {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .group-label {
-        font-size: 12px;
-        font-weight: 600;
-        color: #333;
-      }
-      button {
-        font: inherit;
-        font-size: 13px;
-        padding: 4px 10px;
-        border: 1px solid #999;
-        border-radius: 4px;
-        background: #f5f5f5;
-        cursor: pointer;
-      }
-      button[aria-pressed="true"] {
-        background: #1f4e79;
-        color: #fff;
-        border-color: #1f4e79;
-      }
-      button:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-      .readout {
-        font-size: 12px;
-        color: #333;
-      }
-      section.panel {
-        margin: 16px 0;
-        padding-top: 8px;
-        border-top: 1px solid #ddd;
-      }
-      section.panel h2 {
-        font-size: 15px;
-        margin: 0 0 4px;
-      }
-      section.panel p {
-        max-width: 90ch;
-        font-size: 13px;
-        color: #444;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — 10,000-task performance test</h1>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt v2 — 10,000-task performance test</h1>
 
-    <div class="toolbar">
-      <div class="group">
-        <button id="load10k-btn" type="button">Load 10,000 tasks</button>
-        <button id="load100k-btn" type="button">Load 100,000 tasks (optional)</button>
+      <div class="ex-toolbar toolbar">
+        <div class="ex-group group">
+          <button id="load10k-btn" type="button" class="ex-btn">Load 10,000 tasks</button>
+          <button id="load100k-btn" type="button" class="ex-btn">Load 100,000 tasks (optional)</button>
+        </div>
+        <div class="ex-group group">
+          <span class="ex-group-label group-label">History</span>
+          <button id="undoBtn" type="button" title="Ctrl+Z" class="ex-btn">&#8630; Undo</button>
+          <button id="redoBtn" type="button" title="Ctrl+Shift+Z" class="ex-btn">&#8631; Redo</button>
+        </div>
+        <span class="ex-readout readout" id="status" role="status">Initial state</span>
+        <span class="ex-readout readout" id="statusDetail"></span>
+        <span class="ex-readout readout" id="scrollReadout"></span>
       </div>
-      <div class="group">
-        <span class="group-label">History</span>
-        <button id="undoBtn" type="button" title="Ctrl+Z">&#8630; Undo</button>
-        <button id="redoBtn" type="button" title="Ctrl+Shift+Z">&#8631; Redo</button>
-      </div>
-      <span class="readout" id="status" role="status">Initial state</span>
-      <span class="readout" id="statusDetail"></span>
-      <span class="readout" id="scrollReadout"></span>
+
+      <div id="chart" class="ex-chart"></div>
+
+      <section class="ex-panel panel" aria-labelledby="perf-panel-heading">
+        <h2 id="perf-panel-heading" class="ex-panel-title">Performance features</h2>
+        <p>
+          The opt-in switches the library ships for large charts. The renderer switches and the
+          dependency-line culling are resolved once when a plugin is created, so toggling one
+          re-creates the chart — the loaded tasks are cleared and have to be loaded again, which is
+          exactly the trade-off a host makes when it picks these options at composition time.
+        </p>
+
+        <div class="ex-group group" role="group" aria-labelledby="perf-deferred-label">
+          <span class="ex-group-label group-label" id="perf-deferred-label">Deferred data</span>
+          <button id="deferredLoadBtn" type="button" class="ex-btn">Load 20 projects with deferred children</button>
+          <button id="materializeBtn" type="button" disabled class="ex-btn">Expand next subtree</button>
+        </div>
+        <p class="ex-readout readout" id="deferredReadout">
+          Deferred subtrees: none loaded. The load parks 4,000 child rows and 3,980 links as raw
+          data — they exist nowhere in the store until a subtree is materialized.
+        </p>
+
+        <div class="ex-group group" role="group" aria-labelledby="perf-switches-label">
+          <span class="ex-group-label group-label" id="perf-switches-label">Composition</span>
+          <button id="progressiveBtn" type="button" aria-pressed="true" class="ex-btn">Progressive: on</button>
+          <button id="dirtyRegionsBtn" type="button" aria-pressed="true" class="ex-btn">Dirty regions: on</button>
+          <button id="prefetchBtn" type="button" aria-pressed="true" class="ex-btn">Prefetch: on</button>
+          <button id="cullLinesBtn" type="button" aria-pressed="true" class="ex-btn">Cull dependency lines: on</button>
+        </div>
+
+        <div class="ex-group group" role="group" aria-labelledby="perf-probe-label">
+          <span class="ex-group-label group-label" id="perf-probe-label">Repaint probe</span>
+          <button id="tintBtn" type="button" aria-pressed="false" class="ex-btn">Tint repainted area: off</button>
+          <button id="invalidateBtn" type="button" class="ex-btn">Repaint a 240&times;160 region</button>
+        </div>
+        <p class="ex-readout readout" id="renderMetrics">Renderer metrics: waiting for the first paint&hellip;</p>
+
+        <div class="ex-group group" role="group" aria-labelledby="perf-tools-label">
+          <span class="ex-group-label group-label" id="perf-tools-label">perf-tools</span>
+          <button id="perfOverlayBtn" type="button" aria-pressed="true" class="ex-btn">FPS overlay: on</button>
+          <button id="recordBtn" type="button" class="ex-btn">Start trace recording</button>
+          <button id="downloadTraceBtn" type="button" disabled class="ex-btn">Download trace JSON</button>
+        </div>
+        <p class="ex-readout readout" id="perfReadout">
+          Trace recorder idle. The frame-rate overlay floats in the chart pane's top-right corner;
+          it is inert (<code>pointer-events: none</code>) and hidden from assistive technology, as a
+          dev overlay must be.
+        </p>
+      </section>
     </div>
-
-    <div id="chart"></div>
-
-    <section class="panel" aria-labelledby="perf-panel-heading">
-      <h2 id="perf-panel-heading">Performance features</h2>
-      <p>
-        The opt-in switches the library ships for large charts. The renderer switches and the
-        dependency-line culling are resolved once when a plugin is created, so toggling one
-        re-creates the chart — the loaded tasks are cleared and have to be loaded again, which is
-        exactly the trade-off a host makes when it picks these options at composition time.
-      </p>
-
-      <div class="group" role="group" aria-labelledby="perf-deferred-label">
-        <span class="group-label" id="perf-deferred-label">Deferred data</span>
-        <button id="deferredLoadBtn" type="button">Load 20 projects with deferred children</button>
-        <button id="materializeBtn" type="button" disabled>Expand next subtree</button>
-      </div>
-      <p class="readout" id="deferredReadout">
-        Deferred subtrees: none loaded. The load parks 4,000 child rows and 3,980 links as raw
-        data — they exist nowhere in the store until a subtree is materialized.
-      </p>
-
-      <div class="group" role="group" aria-labelledby="perf-switches-label">
-        <span class="group-label" id="perf-switches-label">Composition</span>
-        <button id="progressiveBtn" type="button" aria-pressed="true">Progressive: on</button>
-        <button id="dirtyRegionsBtn" type="button" aria-pressed="true">Dirty regions: on</button>
-        <button id="prefetchBtn" type="button" aria-pressed="true">Prefetch: on</button>
-        <button id="cullLinesBtn" type="button" aria-pressed="true">Cull dependency lines: on</button>
-      </div>
-
-      <div class="group" role="group" aria-labelledby="perf-probe-label">
-        <span class="group-label" id="perf-probe-label">Repaint probe</span>
-        <button id="tintBtn" type="button" aria-pressed="false">Tint repainted area: off</button>
-        <button id="invalidateBtn" type="button">Repaint a 240&times;160 region</button>
-      </div>
-      <p class="readout" id="renderMetrics">Renderer metrics: waiting for the first paint&hellip;</p>
-
-      <div class="group" role="group" aria-labelledby="perf-tools-label">
-        <span class="group-label" id="perf-tools-label">perf-tools</span>
-        <button id="perfOverlayBtn" type="button" aria-pressed="true">FPS overlay: on</button>
-        <button id="recordBtn" type="button">Start trace recording</button>
-        <button id="downloadTraceBtn" type="button" disabled>Download trace JSON</button>
-      </div>
-      <p class="readout" id="perfReadout">
-        Trace recorder idle. The frame-rate overlay floats in the chart pane's top-right corner;
-        it is inert (<code>pointer-events: none</code>) and hidden from assistive technology, as a
-        dev overlay must be.
-      </p>
-    </section>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

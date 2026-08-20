@@ -30,123 +30,65 @@
       (tablet and up, no mobile breakpoints) — the chrome below is kept minimal.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 460px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-      fieldset {
-        display: inline-flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px;
-        margin: 0 8px 6px 0;
-        padding: 4px 8px 6px;
-        font-size: 11px;
-        vertical-align: top;
-      }
-      fieldset label {
-        display: inline-flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-      fieldset input,
-      fieldset select {
-        font: inherit;
-        min-height: 22px;
-      }
-      #cost-status {
-        margin: 4px 0;
-        font-size: 11px;
-        min-height: 14px;
-      }
-      #cost-readout {
-        margin: 0;
-        padding: 6px 8px;
-        font: 11px/1.5 ui-monospace, monospace;
-        background: #f6f6f6;
-        border: 1px solid #ddd;
-        white-space: pre-wrap;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — cost tracking</h1>
-    <details>
-      <summary>What's on this page</summary>
-      A rate master (per-resource standard/overtime hourly rates), manual cost fields on tasks
-      (fixed / material / actual cost, cost codes, classified items), a project budget with
-      per-code budgets and threshold alerts, cost baselines with variance, and the cumulative cost
-      curve with S-curve forecast. Every control below drives the real `stargantt.cost` service —
-      the readout panel re-renders on every store change.
-    </details>
-    <div id="toolbar">
-      <button id="cost-table" type="button">Budget vs actual table</button>
-      <button id="cost-curve" type="button">Cost curve &amp; forecast</button>
-      <button id="cost-breakdown" type="button">Cost breakdown</button>
-      <button id="cost-close" type="button">Close panel</button>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — cost tracking</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        A rate master (per-resource standard/overtime hourly rates), manual cost fields on tasks
+        (fixed / material / actual cost, cost codes, classified items), a project budget with
+        per-code budgets and threshold alerts, cost baselines with variance, and the cumulative cost
+        curve with S-curve forecast. Every control below drives the real `stargantt.cost` service —
+        the readout panel re-renders on every store change.
+      </p>
+    </div>
+    <div id="toolbar" class="ex-toolbar">
+      <button id="cost-table" type="button" class="ex-btn">Budget vs actual table</button>
+      <button id="cost-curve" type="button" class="ex-btn">Cost curve &amp; forecast</button>
+      <button id="cost-breakdown" type="button" class="ex-btn">Cost breakdown</button>
+      <button id="cost-close" type="button" class="ex-btn">Close panel</button>
     </div>
     <div>
-      <fieldset>
-        <legend>Rate master</legend>
-        <label>Resource<select id="rate-resource"></select></label>
-        <label>Standard / h<input id="rate-standard" type="number" min="0" step="5" value="110" /></label>
-        <label>Overtime / h<input id="rate-overtime" type="number" min="0" step="5" value="165" /></label>
-        <button id="rate-apply" type="button">Set rate</button>
+      <fieldset class="ex-toolbar">
+        <legend class="ex-group-label">Rate master</legend>
+        <label class="ex-field">Resource<select id="rate-resource" class="ex-select"></select></label>
+        <label class="ex-field">Standard / h<input id="rate-standard" type="number" min="0" step="5" value="110" class="ex-input" /></label>
+        <label class="ex-field">Overtime / h<input id="rate-overtime" type="number" min="0" step="5" value="165" class="ex-input" /></label>
+        <button id="rate-apply" type="button" class="ex-btn">Set rate</button>
       </fieldset>
-      <fieldset>
-        <legend>Cost item</legend>
-        <label>Task<select id="item-task"></select></label>
-        <label
+      <fieldset class="ex-toolbar">
+        <legend class="ex-group-label">Cost item</legend>
+        <label class="ex-field">Task<select id="item-task" class="ex-select"></select></label>
+        <label class="ex-field"
           >Type
-          <select id="item-type">
+          <select id="item-type" class="ex-select">
             <option value="labor">labor</option>
             <option value="fixed">fixed</option>
             <option value="variable" selected>variable</option>
             <option value="material">material</option>
           </select>
         </label>
-        <label>Amount<input id="item-amount" type="number" min="0" step="100" value="1500" /></label>
-        <button id="item-add" type="button">Add item</button>
+        <label class="ex-field">Amount<input id="item-amount" type="number" min="0" step="100" value="1500" class="ex-input" /></label>
+        <button id="item-add" type="button" class="ex-btn">Add item</button>
       </fieldset>
-      <fieldset>
-        <legend>Project budget</legend>
-        <label>Amount (empty clears)<input id="budget-amount" type="number" min="0" step="1000" value="50000" /></label>
-        <button id="budget-apply" type="button">Set budget</button>
+      <fieldset class="ex-toolbar">
+        <legend class="ex-group-label">Project budget</legend>
+        <label class="ex-field">Amount (empty clears)<input id="budget-amount" type="number" min="0" step="1000" value="50000" class="ex-input" /></label>
+        <button id="budget-apply" type="button" class="ex-btn">Set budget</button>
       </fieldset>
-      <fieldset>
-        <legend>Cost baselines</legend>
-        <button id="baseline-save" type="button">Save cost baseline</button>
-        <button id="baseline-variance" type="button">Show variance vs latest</button>
+      <fieldset class="ex-toolbar">
+        <legend class="ex-group-label">Cost baselines</legend>
+        <button id="baseline-save" type="button" class="ex-btn">Save cost baseline</button>
+        <button id="baseline-variance" type="button" class="ex-btn">Show variance vs latest</button>
       </fieldset>
     </div>
-    <p id="cost-status" role="status" aria-live="polite"></p>
-    <div id="chart"></div>
-    <pre id="cost-readout"></pre>
+    <p id="cost-status" class="ex-readout" role="status" aria-live="polite"></p>
+    <div id="chart" class="ex-chart"></div>
+    <pre id="cost-readout" class="ex-readout"></pre>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

@@ -49,6 +49,15 @@
        * This page styles its own chrome only — never `.sg-*` classes and never `--sg-*` custom
        * properties, which belong to the library. The one carve-out is sizing the mount element,
        * which is what `#gantt-root` does.
+       *
+       * Generic chrome (buttons, groups, selects, readouts) is now mostly covered by
+       * examples.css's `.ex-*` classes, applied alongside the classes below. What remains here
+       * is: layout that `.ex-*` does not provide (the body's own flex column, `main`,
+       * `#gantt-root` sizing), and the page's bespoke widgets that have no `.ex-*` equivalent at
+       * all — the skip link, the app bar's brand/group-label, the two `<dialog>` elements and
+       * everything inside them (dlg-head/dlg-body/dlg-foot, the settings sections/badges/opt
+       * rows, the note box, the confirm dialog body) — plus the `.btn`/`.btn--primary` rule,
+       * which is still the only styling for the confirm dialog's buttons.
        */
       :root {
         color-scheme: light dark;
@@ -62,10 +71,6 @@
         --accent-text: light-dark(#ffffff, #10131a);
         --warn: light-dark(#9a3412, #fdba74);
         --focus: light-dark(#1d4ed8, #9ec1ff);
-      }
-
-      * {
-        box-sizing: border-box;
       }
 
       html,
@@ -137,11 +142,6 @@
         font-weight: 600;
       }
 
-      .group {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
       .group-label {
         font-size: 11px;
         font-weight: 600;
@@ -170,9 +170,9 @@
         }
       }
 
-      /* 32px min height keeps every pointer target past the 24x24 floor (WCAG 2.5.8). */
-      .btn,
-      .sel {
+      /* 32px min height keeps every pointer target past the 24x24 floor (WCAG 2.5.8). Still the
+         only styling for the confirm dialog's buttons, which never got an `.ex-btn` class. */
+      .btn {
         min-height: 32px;
         padding: 4px 10px;
         border: 1px solid var(--border);
@@ -182,8 +182,7 @@
         font: inherit;
         cursor: pointer;
       }
-      .btn:hover:not(:disabled),
-      .sel:hover {
+      .btn:hover:not(:disabled) {
         border-color: var(--accent);
       }
       .btn:disabled {
@@ -376,59 +375,60 @@
       }
     </style>
   </head>
-  <body>
+  <body class="ex-body">
+    <div class="ex-page">
     <a class="skip" href="#gantt-root">Skip to the chart</a>
 
-    <header class="appbar">
+    <header class="appbar ex-toolbar">
       <div class="brand">
         <strong>StarGantt v2 — full-featured chart</strong>
       </div>
 
-      <div class="group">
-        <span class="group-label" id="lblHistory">History</span>
-        <button type="button" class="btn" id="undoBtn" aria-describedby="lblHistory">Undo</button>
-        <button type="button" class="btn" id="redoBtn" aria-describedby="lblHistory">Redo</button>
+      <div class="group ex-group">
+        <span class="group-label ex-group-label" id="lblHistory">History</span>
+        <button type="button" class="btn ex-btn" id="undoBtn" aria-describedby="lblHistory">Undo</button>
+        <button type="button" class="btn ex-btn" id="redoBtn" aria-describedby="lblHistory">Redo</button>
       </div>
 
-      <div class="group">
+      <div class="group ex-field">
         <label class="group-label" for="viewModeSel">View</label>
-        <select class="sel" id="viewModeSel">
+        <select class="sel ex-select" id="viewModeSel">
           <option value="split">Split</option>
           <option value="grid">Table</option>
           <option value="gantt">Chart</option>
         </select>
       </div>
 
-      <div class="group">
-        <span class="group-label" id="lblExport">Export</span>
-        <button type="button" class="btn" id="pngBtn" aria-describedby="lblExport">PNG</button>
-        <button type="button" class="btn" id="csvBtn" aria-describedby="lblExport">CSV</button>
-        <button type="button" class="btn" id="printBtn" aria-describedby="lblExport">Print</button>
+      <div class="group ex-group">
+        <span class="group-label ex-group-label" id="lblExport">Export</span>
+        <button type="button" class="btn ex-btn" id="pngBtn" aria-describedby="lblExport">PNG</button>
+        <button type="button" class="btn ex-btn" id="csvBtn" aria-describedby="lblExport">CSV</button>
+        <button type="button" class="btn ex-btn" id="printBtn" aria-describedby="lblExport">Print</button>
       </div>
 
-      <div class="group">
-        <span class="group-label" id="lblReports">Reports</span>
-        <button type="button" class="btn" id="dashboardBtn" aria-describedby="lblReports">Dashboard</button>
-        <button type="button" class="btn" id="evmBtn" aria-describedby="lblReports">EVM</button>
-        <button type="button" class="btn" id="costBtn" aria-describedby="lblReports">Cost</button>
-        <button type="button" class="btn" id="utilBtn" aria-describedby="lblReports">Workload</button>
-        <button type="button" class="btn" id="trendBtn" aria-describedby="lblReports">Trend</button>
+      <div class="group ex-group">
+        <span class="group-label ex-group-label" id="lblReports">Reports</span>
+        <button type="button" class="btn ex-btn" id="dashboardBtn" aria-describedby="lblReports">Dashboard</button>
+        <button type="button" class="btn ex-btn" id="evmBtn" aria-describedby="lblReports">EVM</button>
+        <button type="button" class="btn ex-btn" id="costBtn" aria-describedby="lblReports">Cost</button>
+        <button type="button" class="btn ex-btn" id="utilBtn" aria-describedby="lblReports">Workload</button>
+        <button type="button" class="btn ex-btn" id="trendBtn" aria-describedby="lblReports">Trend</button>
       </div>
 
-      <div class="group">
-        <span class="group-label" id="lblCalendar">Calendar</span>
-        <button type="button" class="btn" id="calendarBtn" aria-describedby="lblCalendar">Edit</button>
-        <button type="button" class="btn" id="rescheduleBtn" aria-describedby="lblCalendar">
+      <div class="group ex-group">
+        <span class="group-label ex-group-label" id="lblCalendar">Calendar</span>
+        <button type="button" class="btn ex-btn" id="calendarBtn" aria-describedby="lblCalendar">Edit</button>
+        <button type="button" class="btn ex-btn" id="rescheduleBtn" aria-describedby="lblCalendar">
           Re-run scheduler
         </button>
       </div>
-      <button type="button" class="btn btn--primary" id="settingsBtn">Settings</button>
+      <button type="button" class="btn btn--primary ex-btn ex-btn-primary" id="settingsBtn">Settings</button>
 
-      <span class="readout" id="status" role="status" aria-live="polite"></span>
+      <span class="readout ex-readout" id="status" role="status" aria-live="polite"></span>
     </header>
 
     <main>
-      <div id="gantt-root"></div>
+      <div id="gantt-root" class="ex-chart"></div>
     </main>
 
     <dialog id="settingsDialog" aria-labelledby="settingsTitle">
@@ -454,10 +454,10 @@
           <div id="settingsSections"></div>
         </div>
         <div class="dlg-foot">
-          <span class="readout" id="settingsHint"></span>
-          <button type="button" class="btn" id="settingsReset">Reset to defaults</button>
-          <button type="button" class="btn" id="settingsCancel">Cancel</button>
-          <button type="submit" class="btn btn--primary" id="settingsApply">Apply &amp; rebuild</button>
+          <span class="readout ex-readout" id="settingsHint"></span>
+          <button type="button" class="btn ex-btn" id="settingsReset">Reset to defaults</button>
+          <button type="button" class="btn ex-btn" id="settingsCancel">Cancel</button>
+          <button type="submit" class="btn btn--primary ex-btn ex-btn-primary" id="settingsApply">Apply &amp; rebuild</button>
         </div>
       </form>
     </dialog>
@@ -470,6 +470,7 @@
         <button type="button" class="btn btn--primary" id="confirmYes">Delete</button>
       </div>
     </dialog>
+    </div>
 
     <!-- A single file containing core + all fifteen official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

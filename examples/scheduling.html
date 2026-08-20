@@ -27,41 +27,22 @@
       e2e/scheduling.spec.ts's "performance" describe block.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — scheduling</h1>
-    <details>
-      <summary>What's on this page</summary>
-      Dependency links (FS/SS/FF/SF samples, port drag / <kbd>Alt+L</kbd> creation, click to
-      select, Delete to remove, side-panel inspector), a working calendar (Sat/Sun off, shaded),
-      auto-scheduling (drag a predecessor and its successor follows), critical-path highlighting,
-      and the schedule diagnostics panel (top-left corner).
-    </details>
-    <div id="chart"></div>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt v2 — scheduling</h1>
+      <div class="ex-note">
+        <p class="ex-note-title">What's on this page</p>
+        <p>
+          Dependency links (FS/SS/FF/SF samples, port drag / <kbd class="ex-kbd">Alt+L</kbd> creation, click to
+          select, Delete to remove, side-panel inspector), a working calendar (Sat/Sun off, shaded),
+          auto-scheduling (drag a predecessor and its successor follows), critical-path highlighting,
+          and the schedule diagnostics panel (top-left corner).
+        </p>
+      </div>
+      <div id="chart" class="ex-chart"></div>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

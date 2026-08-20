@@ -27,54 +27,29 @@
       below is kept minimal.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — tracking</h1>
-    <details>
-      <summary>What's on this page</summary>
-      Baselines (seeded "Approved plan" baseline, slip triangles on <code>impl</code>/<code>qa</code>),
-      progress tracking (RAG badges, bar recolor, status-date line via the toolbar toggle), cost
-      tracking (rate master, manual cost fields, budget) and EVM (ten KPI tiles). The toolbar below
-      opens the on-demand panels through the real services — nothing here is a shortcut around the
-      public API.
-    </details>
-    <div id="toolbar">
-      <button id="btn-progress-line">Toggle progress line</button>
-      <button id="btn-bulk">Bulk update progress…</button>
-      <button id="btn-cost-table">Budget vs actual…</button>
-      <button id="btn-evm-dashboard">EVM dashboard…</button>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — tracking</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        Baselines (seeded "Approved plan" baseline, slip triangles on <code>impl</code>/<code>qa</code>),
+        progress tracking (RAG badges, bar recolor, status-date line via the toolbar toggle), cost
+        tracking (rate master, manual cost fields, budget) and EVM (ten KPI tiles). The toolbar below
+        opens the on-demand panels through the real services — nothing here is a shortcut around the
+        public API.
+      </p>
     </div>
-    <div id="chart"></div>
+    <div id="toolbar" class="ex-toolbar">
+      <button id="btn-progress-line" class="ex-btn">Toggle progress line</button>
+      <button id="btn-bulk" class="ex-btn">Bulk update progress…</button>
+      <button id="btn-cost-table" class="ex-btn">Budget vs actual…</button>
+      <button id="btn-evm-dashboard" class="ex-btn">EVM dashboard…</button>
+    </div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

@@ -29,99 +29,55 @@
         live instance.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 560px;
-        border: 1px solid #ccc;
-      }
-      #toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 14px;
-        align-items: center;
-        margin-bottom: 4px;
-      }
-      #toolbar span[role="group"] {
-        display: inline-flex;
-        gap: 4px;
-        align-items: center;
-      }
-      .group-label {
-        font-size: 11px;
-        color: #555;
-      }
-      #toolbar button {
-        min-height: 24px;
-        font: inherit;
-        cursor: pointer;
-      }
-      .readout {
-        font-size: 11px;
-        color: #333;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — load chart and side panel</h1>
-    <details>
-      <summary>What's on this page</summary>
-      The load chart's aggregate band and resource lanes (with lane-scale, resizing and per-run
-      value-label toggles), the side panel, the optional edit dialog, view-mode switching and a
-      rejected-edit demo. See the header comment for the page's plugin composition.
-    </details>
-    <div id="toolbar">
-      <span role="group" aria-label="History">
-        <span class="group-label">History</span>
-        <button id="undo-btn" type="button" title="Ctrl+Z">↶ Undo</button>
-        <button id="redo-btn" type="button" title="Ctrl+Shift+Z">↷ Redo</button>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — load chart and side panel</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        The load chart's aggregate band and resource lanes (with lane-scale, resizing and per-run
+        value-label toggles), the side panel, the optional edit dialog, view-mode switching and a
+        rejected-edit demo. See the header comment for the page's plugin composition.
+      </p>
+    </div>
+    <div id="toolbar" class="ex-toolbar">
+      <span role="group" aria-label="History" class="ex-group">
+        <span class="group-label ex-group-label">History</span>
+        <button id="undo-btn" type="button" title="Ctrl+Z" class="ex-btn">↶ Undo</button>
+        <button id="redo-btn" type="button" title="Ctrl+Shift+Z" class="ex-btn">↷ Redo</button>
       </span>
-      <span role="group" aria-label="View mode">
-        <span class="group-label">View</span>
-        <button id="view-split" type="button" aria-pressed="true">Split</button>
-        <button id="view-grid" type="button" aria-pressed="false">Table</button>
-        <button id="view-gantt" type="button" aria-pressed="false">Chart</button>
-        <span class="readout" id="view-readout" aria-live="polite">Mode: <strong>Split</strong></span>
+      <span role="group" aria-label="View mode" class="ex-group">
+        <span class="group-label ex-group-label">View</span>
+        <button id="view-split" type="button" aria-pressed="true" class="ex-btn">Split</button>
+        <button id="view-grid" type="button" aria-pressed="false" class="ex-btn">Table</button>
+        <button id="view-gantt" type="button" aria-pressed="false" class="ex-btn">Chart</button>
+        <span class="readout ex-readout" id="view-readout" aria-live="polite">Mode: <strong>Split</strong></span>
       </span>
-      <span role="group" aria-label="Resource lanes">
-        <span class="group-label">Lanes</span>
-        <button id="lane-ratio" type="button" aria-pressed="true">Ratio</button>
-        <button id="lane-shared" type="button" aria-pressed="false">Units</button>
-        <button id="lane-auto" type="button" aria-pressed="false">Per lane</button>
-        <button id="total-toggle" type="button" aria-pressed="true">Total band: on</button>
-        <button id="resize-toggle" type="button" aria-pressed="true">Dividers: on</button>
-        <button id="lane-values-toggle" type="button" aria-pressed="false">Values: off</button>
+      <span role="group" aria-label="Resource lanes" class="ex-group">
+        <span class="group-label ex-group-label">Lanes</span>
+        <button id="lane-ratio" type="button" aria-pressed="true" class="ex-btn">Ratio</button>
+        <button id="lane-shared" type="button" aria-pressed="false" class="ex-btn">Units</button>
+        <button id="lane-auto" type="button" aria-pressed="false" class="ex-btn">Per lane</button>
+        <button id="total-toggle" type="button" aria-pressed="true" class="ex-btn">Total band: on</button>
+        <button id="resize-toggle" type="button" aria-pressed="true" class="ex-btn">Dividers: on</button>
+        <button id="lane-values-toggle" type="button" aria-pressed="false" class="ex-btn">Values: off</button>
       </span>
-      <span role="group" aria-label="Side panel">
-        <span class="group-label">Side panel</span>
-        <button id="dialog-toggle" type="button" aria-pressed="false">Edit dialog: off</button>
-        <button id="invalid-edit-btn" type="button">Try an invalid edit</button>
+      <span role="group" aria-label="Side panel" class="ex-group">
+        <span class="group-label ex-group-label">Side panel</span>
+        <button id="dialog-toggle" type="button" aria-pressed="false" class="ex-btn">Edit dialog: off</button>
+        <button id="invalid-edit-btn" type="button" class="ex-btn">Try an invalid edit</button>
       </span>
     </div>
-    <p class="readout" id="lane-readout" aria-live="polite">
+    <p class="readout ex-readout" id="lane-readout" aria-live="polite">
       Scale: <strong>Ratio</strong> — every lane's 100% line sits at the same height.
     </p>
-    <p class="readout" id="panel-readout" aria-live="polite">
+    <p class="readout ex-readout" id="panel-readout" aria-live="polite">
       Double-click opens the grid's inline cell editor.
     </p>
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

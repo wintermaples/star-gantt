@@ -21,29 +21,10 @@
     -->
   <link rel="stylesheet" href="examples.css">
   <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
+      /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+         chrome) now comes from the shared .ex-* vocabulary above. */
       #chart {
-        height: 320px;
-        border: 1px solid #ccc;
-      }
-      #pf-status {
-        font-size: 12px;
-        color: #333;
-        margin: 4px 0;
+        --ex-chart-height: 320px;
       }
       .panels {
         display: flex;
@@ -52,25 +33,8 @@
         margin: 6px 0;
       }
       .panel {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 6px 8px;
         min-width: 230px;
         flex: 1 1 230px;
-      }
-      .panel h2 {
-        font-size: 12px;
-        margin: 0 0 4px;
-      }
-      .panel button,
-      .panel select,
-      .panel input[type="text"] {
-        font: inherit;
-        min-height: 24px;
-      }
-      .panel button {
-        margin: 0 4px 4px 0;
-        cursor: pointer;
       }
       ul.tree {
         list-style: none;
@@ -128,64 +92,68 @@
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — portfolio (hierarchy, health, goals, filter)</h1>
-    <details>
-      <summary>What's on this page</summary>
-      One <code>portfolio({ nodes, goals, views })</code> composition over three projects grouped
-      under two programs under one initiative.
-    </details>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — portfolio (hierarchy, health, goals, filter)</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        One <code>portfolio({ nodes, goals, views })</code> composition over three projects grouped
+        under two programs under one initiative.
+      </p>
+    </div>
 
-    <div id="chart"></div>
-    <p id="pf-status" role="status" aria-live="polite">Ready. Duplicating a project or moving a task is one undoable step.</p>
+    <div id="chart" class="ex-chart"></div>
+    <p id="pf-status" class="ex-readout" role="status" aria-live="polite">Ready. Duplicating a project or moving a task is one undoable step.</p>
 
     <div class="panels">
-      <div class="panel">
-        <h2>Hierarchy &amp; health</h2>
+      <div class="panel ex-panel">
+        <h2 class="ex-panel-title">Hierarchy &amp; health</h2>
         <ul class="tree" id="pf-tree"></ul>
         <button id="pf-collapse-all">Collapse all projects</button>
         <button id="pf-expand-all">Expand all projects</button>
       </div>
 
-      <div class="panel">
-        <h2>Goals / OKRs</h2>
+      <div class="panel ex-panel">
+        <h2 class="ex-panel-title">Goals / OKRs</h2>
         <div id="pf-goals"></div>
       </div>
 
-      <div class="panel">
-        <h2>Filter &amp; saved views</h2>
-        <p class="readout">
+      <div class="panel ex-panel">
+        <h2 class="ex-panel-title">Filter &amp; saved views</h2>
+        <p class="readout ex-readout">
           Check nodes in the hierarchy card, then narrow the rows to their tasks. Filtering is
           display state only — it never touches the data or the undo history.
         </p>
         <button id="pf-filter-apply">Filter to checked nodes</button>
         <button id="pf-filter-clear">Clear filter</button>
-        <div class="field">
-          <label for="pf-view-select">Saved view</label>
-          <select id="pf-view-select"></select>
-          <button id="pf-view-apply">Apply</button>
-          <button id="pf-view-delete">Delete</button>
+        <div class="field ex-group">
+          <label for="pf-view-select" class="ex-group-label">Saved view</label>
+          <select id="pf-view-select" class="ex-select"></select>
+          <button id="pf-view-apply" class="ex-btn">Apply</button>
+          <button id="pf-view-delete" class="ex-btn">Delete</button>
         </div>
-        <div class="field">
-          <label for="pf-view-name">Save current as</label>
-          <input type="text" id="pf-view-name" size="12" placeholder="My view" />
-          <button id="pf-view-save">Save view</button>
+        <div class="field ex-group">
+          <label for="pf-view-name" class="ex-group-label">Save current as</label>
+          <input type="text" id="pf-view-name" size="12" placeholder="My view" class="ex-input" />
+          <button id="pf-view-save" class="ex-btn">Save view</button>
         </div>
       </div>
 
-      <div class="panel">
-        <h2>Cross-project move</h2>
-        <div class="field">
+      <div class="panel ex-panel">
+        <h2 class="ex-panel-title">Cross-project move</h2>
+        <div class="field ex-field">
           <label for="pf-move-task">Task</label>
-          <select id="pf-move-task"></select>
+          <select id="pf-move-task" class="ex-select"></select>
         </div>
-        <div class="field">
+        <div class="field ex-field">
           <label for="pf-move-target">Into project</label>
-          <select id="pf-move-target"></select>
+          <select id="pf-move-target" class="ex-select"></select>
         </div>
         <button id="pf-move-run">Move task</button>
         <button id="pf-undo">Undo last edit</button>
       </div>
+    </div>
     </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

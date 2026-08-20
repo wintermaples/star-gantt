@@ -31,44 +31,10 @@
     -->
   <link rel="stylesheet" href="examples.css">
   <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
+      /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+         chrome) now comes from the shared .ex-* vocabulary above. */
       #chart {
-        height: 320px;
-        border: 1px solid #ccc;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin: 6px 0;
-      }
-      .group {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-      .group-label {
-        font-size: 11px;
-        color: #555;
-      }
-      .toolbar button {
-        min-height: 24px;
-        font: inherit;
-        cursor: pointer;
+        --ex-chart-height: 320px;
       }
       .panels {
         display: flex;
@@ -77,100 +43,68 @@
         margin: 6px 0;
       }
       .panel {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 6px 8px;
         min-width: 250px;
         flex: 1 1 250px;
-      }
-      .panel h2 {
-        font-size: 12px;
-        margin: 0 0 4px;
-      }
-      .panel input,
-      .panel select,
-      .panel button {
-        font: inherit;
-        min-height: 24px;
       }
       output,
       .readout {
         display: block;
-        font-size: 11px;
         white-space: pre-wrap;
-        color: #333;
-        margin: 4px 0;
       }
       #event-log {
         list-style: none;
         margin: 0;
         padding: 0;
-        font-size: 11px;
         max-height: 80px;
         overflow-y: auto;
       }
-      .note {
-        margin: 8px 0 0;
-        padding: 6px 10px;
-        border-left: 3px solid #888;
-        background: #f6f6f6;
-        font-size: 12px;
-      }
-      .note h2 {
-        font-size: 12px;
-        margin: 0 0 4px;
-      }
-      .note ul {
-        margin: 0;
-        padding-left: 18px;
-      }
-      .note li {
-        margin: 0 0 4px;
-      }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — internationalization (i18n)</h1>
-    <details>
-      <summary>What's on this page</summary>
-      One dictionary (<code>createDictionary()</code>), shared by <code>treeGrid</code>,
-      <code>taskBars</code>, <code>undoRedo</code> and the merged <code>interaction</code> plugin's
-      side panel / edit dialog / context menu / zoom toolbar, plus the runtime
-      <code>stargantt.i18n</code> service for live lookups. The chart itself does not re-translate
-      live: every plugin resolves its catalog once at setup, so a language change re-creates the
-      chart (the buttons below do this).
-    </details>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — internationalization (i18n)</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        One dictionary (<code>createDictionary()</code>), shared by <code>treeGrid</code>,
+        <code>taskBars</code>, <code>undoRedo</code> and the merged <code>interaction</code> plugin's
+        side panel / edit dialog / context menu / zoom toolbar, plus the runtime
+        <code>stargantt.i18n</code> service for live lookups. The chart itself does not re-translate
+        live: every plugin resolves its catalog once at setup, so a language change re-creates the
+        chart (the buttons below do this).
+      </p>
+    </div>
 
-    <div class="toolbar">
-      <div class="group">
-        <span class="group-label" id="lang-label">Chart language (re-creates the chart)</span>
+    <div class="toolbar ex-toolbar">
+      <div class="group ex-group">
+        <span class="group-label ex-group-label" id="lang-label">Chart language (re-creates the chart)</span>
         <div role="group" aria-labelledby="lang-label" id="lang-buttons">
-          <button type="button" data-locale="en" aria-pressed="false">English</button>
-          <button type="button" data-locale="ja" aria-pressed="true" lang="ja">日本語</button>
-          <button type="button" data-locale="ja-JP" aria-pressed="false" lang="ja">日本語 (ja-JP)</button>
-          <button type="button" data-locale="fr" aria-pressed="false" lang="fr">Français (partial)</button>
+          <button type="button" class="ex-btn" data-locale="en" aria-pressed="false">English</button>
+          <button type="button" class="ex-btn" data-locale="ja" aria-pressed="true" lang="ja">日本語</button>
+          <button type="button" class="ex-btn" data-locale="ja-JP" aria-pressed="false" lang="ja">日本語 (ja-JP)</button>
+          <button type="button" class="ex-btn" data-locale="fr" aria-pressed="false" lang="fr">Français (partial)</button>
         </div>
       </div>
-      <div class="group">
-        <span class="group-label"><label for="fallback-input">Fallback chain</label></span>
+      <div class="group ex-group">
+        <span class="group-label ex-group-label"><label for="fallback-input">Fallback chain</label></span>
         <div>
-          <input type="text" id="fallback-input" value="en" size="14" aria-describedby="fallback-hint" />
-          <button type="button" id="apply-fallback">Apply &amp; re-create</button>
+          <input type="text" id="fallback-input" class="ex-input" value="en" size="14" aria-describedby="fallback-hint" />
+          <button type="button" class="ex-btn" id="apply-fallback">Apply &amp; re-create</button>
         </div>
       </div>
     </div>
 
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
 
     <div class="panels">
-      <section class="panel">
-        <h2>Live dictionary service</h2>
-        <p class="readout" id="fallback-hint">
+      <section class="panel ex-panel">
+        <h2 class="ex-panel-title">Live dictionary service</h2>
+        <p class="readout ex-readout" id="fallback-hint">
           These controls talk to <code>gantt.service("stargantt.i18n")</code> at runtime. The chart
           above deliberately does not re-translate.
         </p>
         <label for="svc-locale">Service locale</label>
-        <select id="svc-locale">
+        <select id="svc-locale" class="ex-select">
           <option value="en">en</option>
           <option value="ja">ja</option>
           <option value="ja-JP">ja-JP</option>
@@ -178,42 +112,42 @@
           <option value="fr">fr</option>
           <option value="de">de (unregistered)</option>
         </select>
-        <button type="button" id="ja-table-toggle" aria-pressed="true">ja table registered</button>
-        <output id="chain-readout" for="svc-locale"></output>
+        <button type="button" class="ex-btn" id="ja-table-toggle" aria-pressed="true">ja table registered</button>
+        <output id="chain-readout" for="svc-locale" class="ex-readout"></output>
       </section>
 
-      <section class="panel">
-        <h2>Key lookup</h2>
-        <p class="readout">A miss returns <code>undefined</code> — the plugin then keeps its own English default.</p>
+      <section class="panel ex-panel">
+        <h2 class="ex-panel-title">Key lookup</h2>
+        <p class="readout ex-readout">A miss returns <code>undefined</code> — the plugin then keeps its own English default.</p>
         <label for="lookup-key">Key</label>
-        <input type="text" id="lookup-key" value="treeGrid.nameColumn" list="key-list" spellcheck="false" />
+        <input type="text" id="lookup-key" class="ex-input" value="treeGrid.nameColumn" list="key-list" spellcheck="false" />
         <datalist id="key-list"></datalist>
-        <button type="button" id="lookup-btn">Look up</button>
-        <output id="lookup-readout" for="lookup-key"></output>
+        <button type="button" class="ex-btn" id="lookup-btn">Look up</button>
+        <output id="lookup-readout" for="lookup-key" class="ex-readout"></output>
       </section>
 
-      <section class="panel">
-        <h2>catalog(prefix, defaults)</h2>
-        <p class="readout">The exact object handed to a sibling plugin's <code>messages</code> field.</p>
+      <section class="panel ex-panel">
+        <h2 class="ex-panel-title">catalog(prefix, defaults)</h2>
+        <p class="readout ex-readout">The exact object handed to a sibling plugin's <code>messages</code> field.</p>
         <label for="catalog-prefix">Prefix</label>
-        <select id="catalog-prefix">
+        <select id="catalog-prefix" class="ex-select">
           <option value="treeGrid">treeGrid</option>
           <option value="interaction">interaction</option>
           <option value="taskBars">taskBars</option>
           <option value="undoRedo">undoRedo</option>
         </select>
-        <output id="catalog-readout" for="catalog-prefix"></output>
+        <output id="catalog-readout" for="catalog-prefix" class="ex-readout"></output>
       </section>
 
-      <section class="panel">
-        <h2>i18n dictionary state changes</h2>
-        <p class="readout">Emitted (via the <code>state</code> store) for every observable dictionary change.</p>
-        <ul id="event-log" aria-live="polite" aria-relevant="additions"></ul>
+      <section class="panel ex-panel">
+        <h2 class="ex-panel-title">i18n dictionary state changes</h2>
+        <p class="readout ex-readout">Emitted (via the <code>state</code> store) for every observable dictionary change.</p>
+        <ul id="event-log" class="ex-readout" aria-live="polite" aria-relevant="additions"></ul>
       </section>
     </div>
 
-    <div class="note">
-      <h2>What to look for</h2>
+    <div class="note ex-note">
+      <h2 class="ex-note-title">What to look for</h2>
       <ul>
         <li><strong>One dictionary, many plugins</strong>: the grid headers, the detail pane on the
           right, the zoom toolbar in the chart's corner and the right-click menu all read their
@@ -238,6 +172,7 @@
         <li><strong>Task names are your data</strong>: the dictionary translates chart chrome, not
           the rows — localizing task text is the host's job.</li>
       </ul>
+    </div>
     </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

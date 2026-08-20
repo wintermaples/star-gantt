@@ -27,82 +27,32 @@
     -->
   <link rel="stylesheet" href="examples.css">
   <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 360px;
-        border: 1px solid #ccc;
-      }
       .panels {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
         margin: 6px 0;
       }
-      .panel {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 6px 8px;
-        min-width: 230px;
-        flex: 1 1 230px;
-      }
-      .panel h2 {
-        font-size: 12px;
-        margin: 0 0 4px;
-      }
-      .panel button,
-      .panel input[type="text"],
-      .panel select {
-        font: inherit;
-        min-height: 24px;
-      }
-      .panel button {
-        margin: 0 4px 4px 0;
-        cursor: pointer;
-      }
-      .readout {
-        font-size: 11px;
-        color: #333;
-        margin: 2px 0;
-      }
-      #status {
-        font-size: 12px;
-        color: #333;
-        margin: 4px 0 0;
-      }
       #status[data-kind="error"] {
         color: #a30000;
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — data-sources (REST / GraphQL / lazy loading)</h1>
-    <details>
-      <summary>What's on this page</summary>
-      One <code>dataSync()</code> composition with a REST source, a GraphQL source (config-nested,
-      not a separate factory), and a lazily-paged 60-row backlog. No real server is contacted — a
-      mock <code>fetch</code> below stands in.
-    </details>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — data-sources (REST / GraphQL / lazy loading)</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        One <code>dataSync()</code> composition with a REST source, a GraphQL source (config-nested,
+        not a separate factory), and a lazily-paged 60-row backlog. No real server is contacted — a
+        mock <code>fetch</code> below stands in.
+      </p>
+    </div>
 
     <div class="panels">
-      <div class="panel">
-        <h2>Backend source</h2>
+      <div class="panel ex-panel">
+        <h2 class="ex-panel-title">Backend source</h2>
         <select id="source-select">
           <option value="rest" selected>rest (REST adapter)</option>
           <option value="graphql">graphql (GraphQL adapter)</option>
@@ -113,41 +63,42 @@
         <br />
         <input id="filter-input" type="text" placeholder="e.g. migration" />
         <button id="filter-btn">Apply &amp; reload</button>
-        <p class="readout" id="server-out">server: revision v1</p>
+        <p class="readout ex-readout" id="server-out">server: revision v1</p>
       </div>
 
-      <div class="panel">
-        <h2>Optimistic write-back</h2>
+      <div class="panel ex-panel">
+        <h2 class="ex-panel-title">Optimistic write-back</h2>
         <button id="edit-btn">Reschedule a task locally (+1 day)</button>
         <br />
         <button id="flush-btn">Flush pending changes</button>
-        <p class="readout" id="pending-out">pending: 0 creates, 0 updates, 0 removes</p>
-        <p class="readout">Flush with "fail the next request" armed to watch the rollback.</p>
+        <p class="readout ex-readout" id="pending-out">pending: 0 creates, 0 updates, 0 removes</p>
+        <p class="readout ex-readout">Flush with "fail the next request" armed to watch the rollback.</p>
       </div>
 
-      <div class="panel">
-        <h2>Lazy loading (backlog)</h2>
+      <div class="panel ex-panel">
+        <h2 class="ex-panel-title">Lazy loading (backlog)</h2>
         <button id="page-btn">Load next backlog page</button>
         <button id="stream-btn">Apply streamed change</button>
         <br />
-        <label><input id="auto-page-toggle" type="checkbox" /> Fetch next page near scroll end</label>
-        <p class="readout" id="lazy-out">pages loaded: 0, total: unknown</p>
+        <label class="ex-checkbox"><input id="auto-page-toggle" type="checkbox" /> Fetch next page near scroll end</label>
+        <p class="readout ex-readout" id="lazy-out">pages loaded: 0, total: unknown</p>
       </div>
 
-      <div class="panel">
-        <h2>Mock transport</h2>
-        <label>Latency <input id="latency" type="range" min="0" max="2000" step="100" value="200" /></label>
-        <span class="readout" id="latency-out">200 ms</span>
+      <div class="panel ex-panel">
+        <h2 class="ex-panel-title">Mock transport</h2>
+        <label class="ex-field">Latency <input id="latency" type="range" min="0" max="2000" step="100" value="200" /></label>
+        <span class="readout ex-readout" id="latency-out">200 ms</span>
         <br />
-        <label><input id="fail-next" type="checkbox" /> Fail the next request</label>
-        <p class="readout">The switch disarms itself once the failure has been served.</p>
+        <label class="ex-checkbox"><input id="fail-next" type="checkbox" /> Fail the next request</label>
+        <p class="readout ex-readout">The switch disarms itself once the failure has been served.</p>
       </div>
     </div>
 
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
     <p id="status" role="status" aria-live="polite" data-kind="idle">
       Idle. The chart shows the page's local cache; nothing has been fetched yet.
     </p>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

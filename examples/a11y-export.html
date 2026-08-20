@@ -25,113 +25,88 @@
     -->
   <link rel="stylesheet" href="examples.css">
   <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 6px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 400px;
-        border: 1px solid #ccc;
-      }
-      .layout {
-        display: flex;
-        gap: 12px;
-        align-items: flex-start;
-      }
-      .main {
-        flex: 1 1 auto;
-        min-width: 0;
-      }
-      aside {
-        flex: 0 0 220px;
-        border: 1px solid #ddd;
-        padding: 6px 8px;
-        font-size: 11px;
-      }
-      .toolbar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin: 0 0 6px;
-        flex-wrap: wrap;
-      }
-      button {
-        font: inherit;
-        padding: 4px 8px;
-      }
-      .readout {
-        font-size: 12px;
-      }
-      #liveRegion {
-        max-height: 260px;
-        overflow-y: auto;
-      }
-      .announcement {
-        border-bottom: 1px solid #eee;
-        padding: 2px 0;
-      }
-      .panel {
-        border: 1px solid #ddd;
-        padding: 6px 8px;
-        margin: 0 0 6px;
-        font-size: 12px;
-      }
-      .panel h3 {
-        font-size: 12px;
-        margin: 0 0 4px;
-      }
-      #exportPreview {
-        display: none;
-        max-width: 100%;
-        max-height: 260px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        margin-top: 4px;
-      }
-    </style>
+    /* No examples.css equivalent for a per-page chart height — the shared .ex-chart height
+       (600px) is a default a page may override via this custom property. */
+    #chart {
+      --ex-chart-height: 400px;
+    }
+
+    /* This page's content column is NOT inside `.ex-shell` (the index.html topbar/sidebar
+       shell) — `.ex-main`'s 24px/28px/40px padding is meant to offset the shell's own chrome
+       and has no such purpose here, so this page uses its own bespoke `.main` instead (see the
+       markup fix: the earlier automated pass wrongly applied `.ex-main` to this standalone
+       page). `.ex-stage` (unchanged) already reproduces the original `.layout`'s flex row. */
+    .main {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    /* `.ex-slot-aside` supplies sizing/scroll (flex basis, max-height) but no visual framing —
+       restore the original bordered/padded panel look for the announcement-log aside. */
+    aside {
+      border: 1px solid #ddd;
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+
+    /* The aside itself now owns the scroll/max-height (via .ex-slot-aside), so without this the
+       "Announcement log" heading would scroll away with the list instead of staying pinned above
+       it. */
+    #liveRegion {
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    /* Per-entry separator in the announcement log — no examples.css equivalent. */
+    .announcement {
+      border-bottom: 1px solid #eee;
+      padding: 2px 0;
+    }
+
+    /* Not covered by any .ex-* class: this <img> carries no class at all. `display: none` is
+       load-bearing, not cosmetic — it hides the broken-image placeholder before the first
+       export (the export handler only sets `style.display` at click time). */
+    #exportPreview {
+      display: none;
+      max-width: 100%;
+      max-height: 260px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+  </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — accessibility &amp; PNG export</h1>
-    <details>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — accessibility &amp; PNG export</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
       Navigate the gantt chart rows with the keyboard (arrow keys, Enter key). A parallel ARIA
       treegrid is generated for screen-reader support, here with the opt-in dependency read-out,
       shortcut-help dialog and summary table turned on (see the keyboard panel below the chart).
       The export button renders the chart's canvas surfaces (timeline, bars, dependencies) as a
       PNG image; the tree-grid pane is DOM, not canvas, so it is not part of the export.
-    </details>
-    <div class="layout">
+      </p>
+    </div>
+    <div class="ex-stage">
       <div class="main">
-        <div class="toolbar">
-          <button id="exportBtn" type="button">📥 Export to PNG</button>
-          <span id="statusText" class="readout"></span>
+        <div class="toolbar ex-toolbar">
+          <button id="exportBtn" type="button" class="ex-btn">📥 Export to PNG</button>
+          <span id="statusText" class="readout ex-readout"></span>
         </div>
-        <div id="chart"></div>
+        <div id="chart" class="ex-chart"></div>
 
-        <section class="panel" aria-labelledby="kbdPanelTitle">
-          <h3 id="kbdPanelTitle">⌨️ Keyboard accessibility features</h3>
-          <p class="readout">
-            Tab into the chart, then: <kbd>?</kbd> opens the shortcut-help dialog, built from the
+        <section class="panel ex-panel" aria-labelledby="kbdPanelTitle">
+          <h3 id="kbdPanelTitle" class="ex-panel-title">⌨️ Keyboard accessibility features</h3>
+          <p class="readout ex-readout">
+            Tab into the chart, then: <kbd class="ex-kbd">?</kbd> opens the shortcut-help dialog, built from the
             chart's live key bindings — one line per chord that carries a description, so the
             navigation and a11y shortcuts are listed while the undescribed edit chords below are
-            not (<code>shortcutHelp</code>); <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> builds the
+            not (<code>shortcutHelp</code>); <kbd class="ex-kbd">Ctrl</kbd>+<kbd class="ex-kbd">Alt</kbd>+<kbd class="ex-kbd">S</kbd> builds the
             visually hidden screen-reader summary table of every task and moves the focus into it,
             and closes it again (<code>summaryTable</code>);
-            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>→</kbd>
+            <kbd class="ex-kbd">Ctrl</kbd>+<kbd class="ex-kbd">Alt</kbd>+<kbd class="ex-kbd">←</kbd> / <kbd class="ex-kbd">Ctrl</kbd>+<kbd class="ex-kbd">Alt</kbd>+<kbd class="ex-kbd">→</kbd>
             move the focused task's <em>start</em> edge by one day — the keyboard equivalent of
             dragging the bar's left handle, announced in the log to the right; and arrow-key
             navigation reads each row's predecessors and successors through
@@ -139,27 +114,28 @@
             read-out below. The buttons send those same keystrokes to the chart, so the features
             are reachable with a pointer too.
           </p>
-          <div class="toolbar">
-            <button id="focusRowBtn" type="button">Move focus into the chart</button>
-            <button id="shortcutHelpBtn" type="button" aria-haspopup="dialog">Shortcut help (?)</button>
-            <button id="summaryTableBtn" type="button">Summary table (Ctrl+Alt+S)</button>
-            <button id="startEarlierBtn" type="button">Start −1 day (Ctrl+Alt+←)</button>
-            <button id="startLaterBtn" type="button">Start +1 day (Ctrl+Alt+→)</button>
+          <div class="toolbar ex-toolbar">
+            <button id="focusRowBtn" type="button" class="ex-btn">Move focus into the chart</button>
+            <button id="shortcutHelpBtn" type="button" aria-haspopup="dialog" class="ex-btn">Shortcut help (?)</button>
+            <button id="summaryTableBtn" type="button" class="ex-btn">Summary table (Ctrl+Alt+S)</button>
+            <button id="startEarlierBtn" type="button" class="ex-btn">Start −1 day (Ctrl+Alt+←)</button>
+            <button id="startLaterBtn" type="button" class="ex-btn">Start +1 day (Ctrl+Alt+→)</button>
           </div>
-          <div id="kbdStatus" class="readout" role="status">Nothing sent yet.</div>
+          <div id="kbdStatus" class="readout ex-readout" role="status">Nothing sent yet.</div>
           <div><strong>🔗 Dependency read-out of the focused row</strong></div>
-          <div id="depReadout" class="readout">No chart row holds the keyboard focus yet.</div>
+          <div id="depReadout" class="readout ex-readout">No chart row holds the keyboard focus yet.</div>
         </section>
 
-        <div class="panel">
-          <h3>📸 PNG preview</h3>
+        <div class="panel ex-panel">
+          <h3 class="ex-panel-title">📸 PNG preview</h3>
           <img id="exportPreview" alt="Exported gantt chart" />
         </div>
       </div>
-      <aside aria-label="Announcement log">
+      <aside aria-label="Announcement log" class="ex-slot-aside">
         <strong>📣 Announcement log</strong>
         <div id="liveRegion" role="log" aria-live="polite" aria-label="Announcements"></div>
       </aside>
+    </div>
     </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->

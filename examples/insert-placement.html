@@ -25,103 +25,76 @@
   -->
 <link rel="stylesheet" href="examples.css">
   <style>
-    body {
-      margin: 0;
-      padding: 6px 12px;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-    }
-    h1 {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 4px;
-    }
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 6px 16px;
-      margin: 0 0 4px;
-    }
-    .group {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      font-size: 11px;
-    }
-    .group-label {
-      font-weight: 600;
-      color: #555;
-    }
+    /* No examples.css equivalent for a per-page chart height — the shared .ex-chart height
+       (600px) is a default a page may override via this custom property. */
     #chart {
-      height: 360px;
-      border: 1px solid #ccc;
+      --ex-chart-height: 360px;
     }
+
+    /* .ex-readout is designed for a single readout item, not a wrapper of several (see its other
+       uses across examples/*.html: always on the leaf span/p, never the container). Restore the
+       original flex-wrap row layout for this multi-readout wrapper, and cancel the 44ch cap
+       .ex-readout leaves on it so the four readouts still flow in one wrapping row. */
     .readouts {
       display: flex;
       flex-wrap: wrap;
       gap: 4px 16px;
       margin: 6px 0;
       font-size: 11px;
+      max-width: none;
     }
     .readouts span.value {
       font: 11px/1.3 ui-monospace, monospace;
       color: #333;
     }
-    .note ul {
-      margin: 4px 0 0;
-      padding-left: 18px;
-    }
-    .note li {
-      margin-bottom: 4px;
-    }
   </style>
 </head>
-<body>
-  <h1>StarGantt v2 — insert placement</h1>
+<body class="ex-body">
+  <div class="ex-page">
+  <h1 class="ex-title">StarGantt v2 — insert placement</h1>
 
-  <div class="toolbar">
-    <div class="group">
+  <div class="toolbar ex-toolbar">
+    <div class="group ex-field">
       <label class="group-label" for="zoomSelect">Zoom level (sets the cell an insert fills)</label>
-      <select id="zoomSelect">
+      <select id="zoomSelect" class="ex-select">
         <option value="day">Day</option>
         <option value="week">Week</option>
         <option value="month">Month</option>
         <option value="quarter">Quarter</option>
       </select>
     </div>
-    <div class="group">
-      <span class="group-label" id="gridInsertLabel">Grid command</span>
+    <div class="group ex-group">
+      <span class="group-label ex-group-label" id="gridInsertLabel">Grid command</span>
       <div role="group" aria-labelledby="gridInsertLabel">
-        <button type="button" id="insertChildBtn">Insert row under "Design system"</button>
+        <button type="button" id="insertChildBtn" class="ex-btn">Insert row under "Design system"</button>
       </div>
     </div>
-    <div class="group">
-      <span class="group-label" id="splitLabel">Split row</span>
+    <div class="group ex-group">
+      <span class="group-label ex-group-label" id="splitLabel">Split row</span>
       <div role="group" aria-labelledby="splitLabel">
-        <button type="button" id="splitToggleBtn">Collapse "Content migration"</button>
+        <button type="button" id="splitToggleBtn" class="ex-btn">Collapse "Content migration"</button>
       </div>
     </div>
-    <div class="group">
-      <span class="group-label" id="historyLabel">History</span>
+    <div class="group ex-group">
+      <span class="group-label ex-group-label" id="historyLabel">History</span>
       <div role="group" aria-labelledby="historyLabel">
-        <button type="button" id="undoBtn">Undo</button>
-        <button type="button" id="redoBtn">Redo</button>
+        <button type="button" id="undoBtn" class="ex-btn">Undo</button>
+        <button type="button" id="redoBtn" class="ex-btn">Redo</button>
       </div>
     </div>
   </div>
 
-  <div class="readouts">
+  <div class="readouts ex-readout">
     <span>Status: <span class="value" id="statusReadout" role="status">Ready.</span></span>
     <span>Tasks in store: <span class="value" id="taskCountReadout">0</span></span>
     <span>Last task added: <span class="value" id="addedReadout">(none)</span></span>
     <span>"Content migration" row paints: <span class="value" id="splitReadout">(none)</span></span>
   </div>
 
-  <div id="chart"></div>
+  <div id="chart" class="ex-chart"></div>
 
-  <div class="note">
-    <h2>How to use</h2>
+  <div class="note ex-note">
+    <h2 class="ex-note-title">How to use</h2>
     <ul>
       <li><strong>Right-press a bar or a grid row</strong> and pick <em>Insert task</em>: the new
         task is a <strong>child</strong> of the task you pressed, starts where it starts, and is
@@ -149,6 +122,7 @@
       <li>Every insert is exactly one history entry: <strong>Undo</strong>
         reverses it in one step.</li>
     </ul>
+  </div>
   </div>
 
   <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

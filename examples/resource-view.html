@@ -24,49 +24,24 @@
       architecture ch. 4.1).
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 460px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — resource view</h1>
-    <details>
-      <summary>What's on this page</summary>
-      The resource-view strip below the chart: one lane per resource, grouped into teams, with
-      Alice's row flagged where Design and Implementation overlap her over her capacity. Drag a bar
-      vertically onto another lane to reassign it. The toggle button shows and hides the strip.
-    </details>
-    <div id="toolbar">
-      <button id="view-toggle" type="button">Show / hide resource view</button>
+  <body class="ex-body">
+    <div class="ex-page">
+      <h1 class="ex-title">StarGantt v2 — resource view</h1>
+      <div class="ex-note">
+        <p class="ex-note-title">What's on this page</p>
+        <p>
+          The resource-view strip below the chart: one lane per resource, grouped into teams, with
+          Alice's row flagged where Design and Implementation overlap her over her capacity. Drag a bar
+          vertically onto another lane to reassign it. The toggle button shows and hides the strip.
+        </p>
+      </div>
+      <div id="toolbar" class="ex-toolbar">
+        <button id="view-toggle" type="button" class="ex-btn">Show / hide resource view</button>
+      </div>
+      <div id="chart" class="ex-chart"></div>
     </div>
-    <div id="chart"></div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

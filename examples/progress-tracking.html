@@ -25,54 +25,29 @@
       chrome below is kept minimal.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 480px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — progress tracking</h1>
-    <details>
-      <summary>What's on this page</summary>
-      RAG badges (design=green, impl=amber, test=red), the status-date zigzag progress line
-      (toggleable), the bulk-update panel (edit progress % / remaining work for every task in one
-      undo step) and the progress-trend panel (a small polyline over the seeded snapshots plus one
-      you can record live). The toolbar below opens the on-demand panels through the real
-      `stargantt.progress` service — nothing here is a shortcut around the public API.
-    </details>
-    <div id="toolbar">
-      <button id="btn-progress-line">Toggle progress line</button>
-      <button id="btn-bulk">Update progress…</button>
-      <button id="btn-trend">Progress trend…</button>
-      <button id="btn-snapshot">Record trend snapshot</button>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — progress tracking</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        RAG badges (design=green, impl=amber, test=red), the status-date zigzag progress line
+        (toggleable), the bulk-update panel (edit progress % / remaining work for every task in one
+        undo step) and the progress-trend panel (a small polyline over the seeded snapshots plus one
+        you can record live). The toolbar below opens the on-demand panels through the real
+        `stargantt.progress` service — nothing here is a shortcut around the public API.
+      </p>
     </div>
-    <div id="chart"></div>
+    <div id="toolbar" class="ex-toolbar">
+      <button id="btn-progress-line" class="ex-btn">Toggle progress line</button>
+      <button id="btn-bulk" class="ex-btn">Update progress…</button>
+      <button id="btn-trend" class="ex-btn">Progress trend…</button>
+      <button id="btn-snapshot" class="ex-btn">Record trend snapshot</button>
+    </div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

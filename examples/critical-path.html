@@ -22,39 +22,26 @@
     -->
   <link rel="stylesheet" href="examples.css">
   <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
+      /* No examples.css equivalent for a per-page chart height — the shared .ex-chart height
+         (600px) is a default a page may override via this custom property. */
       #chart {
-        height: 480px;
-        border: 1px solid #ccc;
+        --ex-chart-height: 480px;
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — critical path</h1>
-    <details>
-      <summary>What's on this page</summary>
-      Critical-path highlighting (`scheduling.criticalPath`): critical bars/links in red, a
-      near-critical branch in orange (within the 2-day near-critical band), and one slack task left
-      unhighlighted.
-    </details>
-    <div id="chart"></div>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — critical path</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        Critical-path highlighting (`scheduling.criticalPath`): critical bars/links in red, a
+        near-critical branch in orange (within the 2-day near-critical band), and one slack task left
+        unhighlighted.
+      </p>
+    </div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

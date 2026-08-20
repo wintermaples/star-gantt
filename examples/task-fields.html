@@ -41,25 +41,10 @@
   -->
 <link rel="stylesheet" href="examples.css">
   <style>
-    body {
-      margin: 0;
-      padding: 6px 12px;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-    }
-    h1 {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 4px;
-    }
-    h2 {
-      font-size: 13px;
-      font-weight: 600;
-      margin: 8px 0 4px;
-    }
+    /* Rules with no examples.css equivalent — everything else (toolbar/group/panel/note/readout
+       chrome) now comes from the shared .ex-* vocabulary above. */
     #chart {
-      height: 420px;
-      border: 1px solid #ccc;
+      --ex-chart-height: 420px;
     }
     .panel {
       margin-top: 8px;
@@ -123,12 +108,13 @@
     }
   </style>
 </head>
-<body>
-  <h1>StarGantt v2 — task fields and custom fields</h1>
-  <div id="chart"></div>
+<body class="ex-body">
+  <div class="ex-page">
+  <h1 class="ex-title">StarGantt v2 — task fields and custom fields</h1>
+  <div id="chart" class="ex-chart"></div>
 
-  <section class="panel" aria-labelledby="panelHeading">
-    <h2 id="panelHeading">Selected task</h2>
+  <section class="panel ex-panel" aria-labelledby="panelHeading">
+    <h2 id="panelHeading" class="ex-panel-title">Selected task</h2>
     <p id="selStatus" role="status" aria-live="polite">Select a task row to edit its fields.</p>
 
     <dl class="detail" id="selDetail"></dl>
@@ -179,6 +165,7 @@
       </fieldset>
     </div>
   </section>
+  </div>
 
   <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
   <script>

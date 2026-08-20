@@ -19,45 +19,23 @@
       idiom.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      #chart {
-        height: 420px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 4px 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — dashboard (KPI panel)</h1>
-    <details>
-      <summary>What's on this page</summary>
-      One <code>portfolio({ dashboard: {} })</code> composition. The dashboard is a feature area
-      of the merged portfolio plugin — no separate factory exists in v2.
-    </details>
-    <div id="toolbar">
-      <button id="dash-open">Open dashboard</button>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — dashboard (KPI panel)</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        One <code>portfolio({ dashboard: {} })</code> composition. The dashboard is a feature area
+        of the merged portfolio plugin — no separate factory exists in v2.
+      </p>
     </div>
-    <div id="chart"></div>
+    <div id="toolbar" class="ex-toolbar">
+      <button id="dash-open" class="ex-btn">Open dashboard</button>
+    </div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
     <script>

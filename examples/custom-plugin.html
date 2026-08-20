@@ -47,40 +47,6 @@
     -->
   <link rel="stylesheet" href="examples.css">
   <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 460px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-      .readout {
-        margin: 4px 0;
-        font-size: 11px;
-        color: #333;
-        min-height: 15px;
-      }
       /*
         The two DOM-overlay elements the plugins below create are page-authored content, not
         library elements, so the bundled stylesheet knows nothing about them. Focus rings are
@@ -94,33 +60,37 @@
       }
     </style>
   </head>
-  <body>
-    <h1>StarGantt v2 — writing your own plugin</h1>
-    <details>
-      <summary>What's on this page</summary>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — writing your own plugin</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
       Six third-party plugins defined in this file: a weekend background layer and a today line
       (<code>renderer/layers</code>), a hit tester for the today line
       (<code>renderer/hitTest</code>), a tooltip provider for it (<code>tooltip/content</code>), a
-      focusable keyboard marker plus an <kbd>Alt</kbd>+<kbd>T</kbd> shortcut
+      focusable keyboard marker plus an <kbd class="ex-kbd">Alt</kbd>+<kbd class="ex-kbd">T</kbd> shortcut
       (<code>renderer/domOverlays</code> + <code>keys/bindings</code> + a custom command), and an
       "at risk" HTML badge that places itself through the renderer's batched layout queue. Two of
       them register their own services, one claims a <code>task.meta</code> key, one declares its
       own extension point and another contributes to it. Plus one OFFICIAL plugin configured rather
       than replaced: <code>presetStandard({ taskBars: { label } })</code>.
-    </details>
-
-    <div id="toolbar">
-      <button type="button" id="btn-caption" aria-pressed="false">Long caption: off</button>
-      <button type="button" id="btn-measure">Measure 2,000 labels</button>
-      <button type="button" id="btn-batch">Re-place badge (batched)</button>
-      <button type="button" id="btn-today">Scroll to today (Alt+T)</button>
-      <button type="button" id="btn-orders">Show layer order registry</button>
+      </p>
     </div>
-    <p class="readout" id="readout" role="status" aria-live="polite">
+
+    <div id="toolbar" class="ex-toolbar">
+      <button type="button" id="btn-caption" class="ex-btn" aria-pressed="false">Long caption: off</button>
+      <button type="button" id="btn-measure" class="ex-btn">Measure 2,000 labels</button>
+      <button type="button" id="btn-batch" class="ex-btn">Re-place badge (batched)</button>
+      <button type="button" id="btn-today" class="ex-btn">Scroll to today (Alt+T)</button>
+      <button type="button" id="btn-orders" class="ex-btn">Show layer order registry</button>
+    </div>
+    <p class="ex-readout" id="readout" role="status" aria-live="polite">
       Toggle the caption to watch the today-line pill resize to the measured text width.
     </p>
 
-    <div id="chart"></div>
+    <div id="chart" class="ex-chart"></div>
+    </div>
 
     <!-- A single file containing core + the official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>

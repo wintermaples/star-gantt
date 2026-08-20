@@ -35,59 +35,29 @@
       breakpoints) — the chrome below is kept minimal.
     -->
   <link rel="stylesheet" href="examples.css">
-  <style>
-      body {
-        margin: 0;
-        padding: 6px 12px;
-        font-family: system-ui, sans-serif;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      details {
-        margin: 0 0 4px;
-        font-size: 11px;
-        color: #555;
-      }
-      details > summary {
-        cursor: pointer;
-      }
-      #chart {
-        height: 420px;
-        border: 1px solid #ccc;
-      }
-      #toolbar button {
-        min-height: 24px;
-        margin: 0 4px 4px 0;
-        font: inherit;
-        cursor: pointer;
-      }
-      #status {
-        font-size: 12px;
-        color: #333;
-        margin: 4px 0 0;
-      }
-    </style>
+  
   </head>
-  <body>
-    <h1>StarGantt v2 — data-sync</h1>
-    <details>
-      <summary>What's on this page</summary>
-      A `localAdapter` source (no server) plus a real IndexedDB offline snapshot. Load, edit, save
-      offline, then reload the page and restore — the buttons below drive the public
-      `stargantt.data-sync` service and the public `task/add` command exactly as a host would.
-    </details>
-    <div id="toolbar">
-      <button id="load-from-source">Load from source</button>
-      <button id="add-task">Add task</button>
-      <button id="save-offline">Save offline</button>
-      <button id="restore-offline">Restore offline</button>
-      <button id="clear-offline">Clear offline</button>
+  <body class="ex-body">
+    <div class="ex-page">
+    <h1 class="ex-title">StarGantt v2 — data-sync</h1>
+    <div class="ex-note">
+      <p class="ex-note-title">What's on this page</p>
+      <p>
+        A `localAdapter` source (no server) plus a real IndexedDB offline snapshot. Load, edit, save
+        offline, then reload the page and restore — the buttons below drive the public
+        `stargantt.data-sync` service and the public `task/add` command exactly as a host would.
+      </p>
     </div>
-    <div id="chart"></div>
-    <p id="status">idle</p>
+    <div id="toolbar" class="ex-toolbar">
+      <button id="load-from-source" class="ex-btn">Load from source</button>
+      <button id="add-task" class="ex-btn">Add task</button>
+      <button id="save-offline" class="ex-btn">Save offline</button>
+      <button id="restore-offline" class="ex-btn">Restore offline</button>
+      <button id="clear-offline" class="ex-btn">Clear offline</button>
+    </div>
+    <div id="chart" class="ex-chart"></div>
+    <p id="status" class="ex-readout">idle</p>
+    </div>
 
     <!-- A single file containing core + the currently-composed official plugins + CSS. -->
     <script src="../packages/stargantt/dist/stargantt.iife.js"></script>
